@@ -14,6 +14,7 @@ Usage:
 """
 
 import argparse
+import logging
 import csv
 import json
 import re
@@ -55,12 +56,54 @@ ELEVATION_RE = re.compile(
 )
 
 
-def classify_plan(filename: str) -> str:
-    """Classify a DXF/DWG file by plan type based on its filename."""
-    fl = filename.lower()
+# Encoding pairs for recovering garbled Cyrillic filenames.
+# Each tuple is (misinterpreted_encoding, actual_encoding).
+_ENCODING_RECOVERY_PAIRS = [
+    ("cp857", "cp866"),     # Turkish OEM -> Russian OEM (superset of cp850)
+    ("cp850", "cp866"),     # Western OEM -> Russian OEM
+    ("cp1252", "cp1251"),   # Western Windows -> Russian Windows
+    ("latin-1", "cp1251"),  # Latin-1 -> Russian Windows
+    ("latin-1", "cp866"),   # Latin-1 -> Russian OEM
+    ("iso-8859-15", "cp1251"),
+    ("cp437", "cp866"),     # US OEM -> Russian OEM
+]
+
+_logger = logging.getLogger(__name__)
+
+
+def _try_recover_cyrillic(text: str) -> str:
+    """Try to recover garbled Cyrillic text by re-encoding through common pairs.
+
+    When filenames are created on systems with different codepages,
+    Cyrillic characters get mangled.  This function attempts to reverse
+    the mangling by trying known encoding misinterpretation pairs.
+
+    Returns the original text unchanged if no Cyrillic recovery succeeds.
+    """
+    # Already contains Cyrillic -- no recovery needed
+    if any("Ѐ" <= ch <= "ӿ" for ch in text):
+        return text
+    # Only try recovery if text has chars in the high-byte range
+    if not any(0x80 <= ord(ch) <= 0xFF for ch in text):
+        return text
+    for src_enc, dst_enc in _ENCODING_RECOVERY_PAIRS:
+        try:
+            raw = text.encode(src_enc)
+            recovered = raw.decode(dst_enc)
+            if any("Ѐ" <= ch <= "ӿ" for ch in recovered):
+                _logger.debug("Recovered Cyrillic: %r -> %r (%s->%s)",
+                              text, recovered, src_enc, dst_enc)
+                return recovered
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            continue
+    return text
+
+
+def _classify_filename(fl: str) -> str:
+    """Core classification logic on a lowercased filename string."""
     if "розеточн" in fl:
         return "розетки"
-    if "расположени" in fl:
+    if "расположени" in fl or "расстановк" in fl:
         return "расположение"
     if "привязк" in fl:
         return "привязка"
@@ -79,6 +122,31 @@ def classify_plan(filename: str) -> str:
     if "спецификац" in fl:
         return "спецификация"
     return "другое"
+
+
+def classify_plan(filename: str) -> str:
+    """Classify a DXF/DWG file by plan type based on its filename.
+
+    First tries direct Cyrillic matching on the filename.  If that yields
+    "другое" (unrecognised), attempts to recover garbled Cyrillic text
+    by re-encoding through common Windows codepage misinterpretation pairs
+    (e.g. cp850-displayed cp866 bytes) and re-classifies.
+
+    Note: encoding recovery runs on the ORIGINAL filename (before lowering)
+    because .lower() changes Latin-supplement byte values and breaks the
+    codepage re-interpretation.
+    """
+    fl = filename.lower()
+    result = _classify_filename(fl)
+    if result != "другое":
+        return result
+    # Try recovering garbled Cyrillic on the ORIGINAL (pre-lower) filename
+    recovered = _try_recover_cyrillic(filename)
+    if recovered != filename:
+        result = _classify_filename(recovered.lower())
+        _logger.debug("classify_plan: %r -> recovered %r -> %s",
+                      filename, recovered, result)
+    return result
 
 
 def extract_elevation_str(filename: str) -> str | None:
@@ -764,6 +832,8 @@ _CABLE_TYPE_RE = re.compile(
     r"(?:\([А-Яа-яA-Za-z]+\))?(?:-[A-Z]+)?\s+\d+[хx×]\d+[\.,]?\d*)"
 )
 _CABLE_LENGTH_RE = re.compile(r"L\s*=\s*(\d+)")
+# T065: Extended length regex — also matches L-N (dash) and L=Nм (with units)
+_CABLE_LENGTH_EXT_RE = re.compile(r"L\s*[=\-]\s*(\d+)")
 
 
 def _extract_cables_mtext(
@@ -952,11 +1022,145 @@ def _extract_cables_mtext_multiline(
     return result
 
 
+def _extract_cables_mtext_table(dxf_path: str) -> dict[str, CableItem]:
+    """T065: Extract cables from MTEXT in ACAD_TABLE geometry blocks (*T blocks).
+
+    Multi-sheet DWG schemas store cable journal data as ACAD_TABLE entities
+    whose geometry lives in *T blocks.  Each *T block contains MTEXT entries
+    arranged in a grid (rows by Y, columns by X).  Cable journal rows
+    typically contain cable_type + cross_section + length.
+
+    Handles two formats:
+      - Inline: cable type and L= in the same MTEXT
+        e.g. 'ППГнг(А)-HF 3х2,5 в гофре ΔU=0,18% L=13м'
+      - Multi-MTEXT: cable type in one MTEXT, length in an adjacent MTEXT
+        at the same Y coordinate (same table row)
+        e.g. MTEXT1='ППГнг(А)-HF 3х2,5' MTEXT2='L=13'
+
+    Deduplicates by (cable_type, length) pair.
+    """
+    result: dict[str, CableItem] = {}
+    seen_pairs: set[tuple[str, int]] = set()
+
+    def _add_cable(ct_raw: str, length: int) -> None:
+        ct = ct_raw.replace("х", "×").replace("x", "×")
+        pair = (ct, length)
+        if pair in seen_pairs:
+            return
+        seen_pairs.add(pair)
+        if ct not in result:
+            result[ct] = CableItem(cable_type=ct)
+        result[ct].count += 1
+        result[ct].total_length_m += length
+
+    try:
+        doc = ezdxf.readfile(dxf_path)
+    except Exception:
+        return result
+
+    for block in doc.blocks:
+        if not block.name.startswith("*T"):
+            continue
+
+        # Collect all MTEXT entries from this table block
+        entries: list[tuple[str, float, float]] = []
+        for ent in block:
+            if ent.dxftype() != "MTEXT":
+                continue
+            try:
+                raw = ent.text
+                clean = _clean_mtext(raw)
+                if not clean.strip():
+                    continue
+                x = float(ent.dxf.insert.x)
+                y = float(ent.dxf.insert.y)
+                entries.append((clean.strip(), x, y))
+            except Exception:
+                continue
+
+        if not entries:
+            continue
+
+        # Check if this block has any cable-related content
+        has_cable = any(_CABLE_TYPE_RE.search(t) for t, _, _ in entries)
+        has_length = any(_CABLE_LENGTH_EXT_RE.search(t) for t, _, _ in entries)
+        if not has_cable:
+            continue
+
+        # -- Inline extraction: cable type + L= in same MTEXT --
+        for text, x, y in entries:
+            cm = _CABLE_TYPE_RE.search(text)
+            lm = _CABLE_LENGTH_EXT_RE.search(text)
+            if cm and lm:
+                _add_cable(cm.group(1), int(lm.group(1)))
+
+        # -- Multi-MTEXT extraction: cable type and length in adjacent cells --
+        if not has_length:
+            continue
+
+        # Group entries by Y coordinate (rows) with tolerance
+        row_map: dict[int, list[tuple[str, float]]] = {}
+        y_tolerance = 50  # Y tolerance for grouping into same row
+        y_keys: list[float] = sorted(set(y for _, _, y in entries))
+
+        # Build Y-cluster mapping
+        y_cluster: dict[float, int] = {}
+        cluster_id = 0
+        for i, yk in enumerate(y_keys):
+            if i == 0 or abs(yk - y_keys[i - 1]) > y_tolerance:
+                cluster_id = i
+            y_cluster[yk] = cluster_id
+
+        for text, x, y in entries:
+            cid = y_cluster[y]
+            if cid not in row_map:
+                row_map[cid] = []
+            row_map[cid].append((text, x))
+
+        # For each row, try to pair cable types with lengths
+        for cid, cells in row_map.items():
+            type_cells: list[tuple[str, float]] = []
+            length_cells: list[tuple[int, float]] = []
+            for text, x in cells:
+                cm = _CABLE_TYPE_RE.search(text)
+                lm = _CABLE_LENGTH_EXT_RE.search(text)
+                if cm and not lm:
+                    type_cells.append((cm.group(1), x))
+                elif lm and not cm:
+                    length_cells.append((int(lm.group(1)), x))
+
+            if not type_cells or not length_cells:
+                continue
+
+            # Pair by nearest X coordinate
+            type_cells.sort(key=lambda t: t[1])
+            length_cells.sort(key=lambda t: t[1])
+
+            for ct_raw, tx in type_cells:
+                # Find closest length cell by X
+                best_len = None
+                best_dist = float("inf")
+                for ln, lx in length_cells:
+                    dist = abs(tx - lx)
+                    if dist < best_dist:
+                        best_dist = dist
+                        best_len = ln
+                if best_len is not None:
+                    _add_cable(ct_raw, best_len)
+
+    return result
+
+
 def extract_cables_dxf(dxf_path: str) -> list[CableItem]:
     """Extract cable data from a DXF file.
 
     P-005 fix: Uses dual strategy — raw DXF scanning AND MTEXT parsing
     in parallel, then merges results (takes the better one).
+
+    T065: Added MTEXT table parser for multi-sheet DWG schemas.
+    Scans *T blocks (ACAD_TABLE geometry) for cable journal tables,
+    handling both inline (cable+L= same MTEXT) and multi-MTEXT
+    (cable in one, length in adjacent) formats.
     """
     cables_raw = _extract_cables_raw_dxf(dxf_path)
     entries = _get_mtext_entries(dxf_path)
@@ -967,6 +1171,18 @@ def extract_cables_dxf(dxf_path: str) -> list[CableItem]:
 
     # Merge MTEXT results (multi-line may catch more)
     for ct, item in cables_mtext_ml.items():
+        if ct not in cables_mtext:
+            cables_mtext[ct] = item
+        elif item.total_length_m > cables_mtext[ct].total_length_m:
+            cables_mtext[ct] = item
+
+    # T065: MTEXT table parser for multi-sheet DWG schemas
+    cables_table = _extract_cables_mtext_table(dxf_path)
+    table_total = sum(c.total_length_m for c in cables_table.values())
+
+    # Merge table results into MTEXT results (table may find cables
+    # in *T blocks that modelspace MTEXT parsing misses)
+    for ct, item in cables_table.items():
         if ct not in cables_mtext:
             cables_mtext[ct] = item
         elif item.total_length_m > cables_mtext[ct].total_length_m:
@@ -990,6 +1206,11 @@ def extract_cables_dxf(dxf_path: str) -> list[CableItem]:
         for ct, item in cables_mtext.items():
             if ct not in cables:
                 cables[ct] = item
+
+    # T065: Also supplement with table results not found elsewhere
+    for ct, item in cables_table.items():
+        if ct not in cables:
+            cables[ct] = item
 
     return sorted(cables.values(), key=lambda c: -c.total_length_m)
 
@@ -1125,12 +1346,18 @@ def parse_spec_dxf(dxf_path: str, log=print) -> list[SpecItem]:
     blocks, reconstructs the grid layout, and extracts equipment rows
     with names and quantities.  Falls back to raw DXF scanning when
     ezdxf yields no cells.
+
+    T063: Improved cable extraction — separator filtering is only applied
+    for the raw-DXF fallback (ezdxf cells are clean and don’t contain
+    DXF group-code noise).  Float quantities supported (rounded to int).
     """
     # Primary: ezdxf-based extraction from *T blocks
     cells = _extract_table_cells_ezdxf(dxf_path, log)
+    _use_sep_filter = False
     if not cells:
         # Fallback: raw DXF scan with code-1 + code-3 support
         cells = _extract_table_cells_raw(dxf_path, log)
+        _use_sep_filter = True  # raw extraction may include DXF group codes
 
     if not cells:
         return []
@@ -1153,13 +1380,20 @@ def parse_spec_dxf(dxf_path: str, log=print) -> list[SpecItem]:
         current_row.sort(key=lambda c: c[0])
         rows.append([t for _, t in current_row])
 
-    _UNIT_VALUES = {"шт", "м", "компл", "комплект", "кг", "м²", "м³",
+    _UNIT_VALUES = {"шт", "м", "м.", "м.п.", "м.п",
+                    "компл", "комплект", "кг", "м²", "м³",
                     "м2", "м3", "компл.", "маш/час", "маш/ча", "каб.",
                     "измерени", "изм."}
 
     items: list[SpecItem] = []
     for row in rows:
-        data = [c for c in row if c not in _TABLE_SEPARATOR_VALUES]
+        # T063: Only filter separator noise for raw-DXF fallback.
+        # ezdxf extraction yields clean cell text; filtering drops
+        # legitimate quantity values like 91, 44, 40, 70, etc.
+        if _use_sep_filter:
+            data = [c for c in row if c not in _TABLE_SEPARATOR_VALUES]
+        else:
+            data = list(row)
         if len(data) < 3:
             continue
         pos = data[0]
@@ -1177,10 +1411,14 @@ def parse_spec_dxf(dxf_path: str, log=print) -> list[SpecItem]:
 
         unit = data[unit_idx]
         qty_str = data[unit_idx + 1]
+        # T063: Support float quantities (e.g. 156.5) — round to int.
         try:
             qty = int(qty_str)
         except (ValueError, TypeError):
-            continue
+            try:
+                qty = round(float(qty_str.replace(",", ".")))
+            except (ValueError, TypeError):
+                continue
         if qty < 1:
             continue
 

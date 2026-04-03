@@ -12,6 +12,7 @@ Usage:
 """
 
 import argparse
+import logging
 import math
 import re
 import sys
@@ -39,6 +40,8 @@ from equipment_counter import (
     ELEVATION_RE,
     _HAS_DXF,
 )
+
+_vor_logger = logging.getLogger(__name__)
 
 try:
     import ezdxf as _ezdxf
@@ -255,6 +258,27 @@ def _classify_by_content(dxf_path: str) -> tuple[str, float | None]:
         return "привязка", elev
     if "план расстановки" in combined or "план расположения" in combined:
         return "расположение", elev
+    # Heuristic: ACAD_TABLE with QF/автомат/L= entries indicates a schema
+    has_acad_table = False
+    has_qf = False
+    has_automat = "автомат" in combined
+    has_cable_length = "l=" in combined or "l =" in combined
+    for e in msp:
+        if e.dxftype() == "ACAD_TABLE":
+            has_acad_table = True
+            break
+    if "qf" in combined:
+        has_qf = True
+    if has_acad_table and (has_qf or has_automat or has_cable_length):
+        _vor_logger.debug("Content schema detection: ACAD_TABLE + "
+                          "QF=%s automat=%s L==%s",
+                          has_qf, has_automat, has_cable_length)
+        return "схема", elev
+    # Fallback: even without ACAD_TABLE, QF + cable length is strong signal
+    if has_qf and has_cable_length:
+        _vor_logger.debug("Content schema detection: QF + L= (no ACAD_TABLE)")
+        return "схема", elev
+
     # Heuristic: luminaire mentions imply lighting plan
     has_luminaire = "светильник" in combined
     has_rozetka = "розетк" in combined
@@ -795,6 +819,7 @@ def scan_and_classify(folder: Path) -> list[tuple[Path, str, float | None]]:
             plan_type, content_elev = _classify_by_content(str(f))
             if elev is None and content_elev is not None:
                 elev = content_elev
+        _vor_logger.debug("classify: %s -> %s (elev=%s)", f.name, plan_type, elev)
         results.append((f, plan_type, elev))
     return results
 
@@ -1746,19 +1771,18 @@ def aggregate_by_height(
 
     if _has_spec_cables and cables:
         _derived_cable_total_m = sum(c.total_length_m for c in cables)
-        # T052: Spec cables are ALWAYS authoritative.  Derived cables
-        # from schema DXFs are unreliable (partial extraction, wrong
-        # type/cross-section assignments, project-wide schemas).
-        # Previous heuristic (3× threshold) kept wrong derived data
-        # when totals were close, causing cable type swaps.
+        # T062: Validate spec cables BEFORE suppressing derived cables.
+        # Spec cable parsing may fail silently (malformed ACAD_TABLE,
+        # wrong column mapping) producing empty or garbage CableItem
+        # objects.  We convert first, then validate, and only suppress
+        # derived cables when enough valid spec cables exist.
         #
         # Convert spec cables → CableItem so they flow through the
         # normal rendering pipeline (Прокладка + material rows).
-        log(f"\n  [cable-fix] Spec cables={_spec_cable_total_m}m, "
-            f"derived={_derived_cable_total_m}m — "
-            f"replacing derived cables with spec (authoritative)")
         _new_cables: dict[str, CableItem] = {}
         _unconverted: list[SpecGroupedItem] = []
+        _valid_count = 0
+        _invalid_count = 0
         for sc in spec_cables:
             if sc.unit not in ("м", "м.", "м.п.", "м. п."):
                 _unconverted.append(sc)
@@ -1769,22 +1793,47 @@ def aggregate_by_height(
                 section = m.group(2)
                 cable_brand = m.group(3)
                 ct = f"{cable_brand} {conductors}\u00d7{section}"
+                _length_m = int(sc.quantity)
+                # T062: Validate — cable_type must match known pattern
+                # and total_length_m must be positive.
+                if _length_m <= 0:
+                    log(f"    [cable-spec] INVALID (length<=0): {ct} = {sc.quantity}m")
+                    _invalid_count += 1
+                    _unconverted.append(sc)
+                    continue
+                _valid_count += 1
                 if ct in _new_cables:
                     _new_cables[ct].count += 1
-                    _new_cables[ct].total_length_m += int(sc.quantity)
+                    _new_cables[ct].total_length_m += _length_m
                 else:
                     _new_cables[ct] = CableItem(
                         cable_type=ct, count=1,
-                        total_length_m=int(sc.quantity),
+                        total_length_m=_length_m,
                     )
                 log(f"    [cable-spec] {ct} = {sc.quantity}m")
             else:
+                _invalid_count += 1
                 _unconverted.append(sc)
-        cables = sorted(
-            _new_cables.values(), key=lambda c: -c.total_length_m,
-        )
-        # Keep only unconverted spec cables for the fallback section
-        spec_cables[:] = _unconverted
+
+        # T062: Only suppress derived cables when we have >= 3 valid
+        # spec cables.  If spec parsing produced too few valid entries,
+        # the spec table was likely malformed — keep derived cables.
+        if _valid_count >= 3:
+            log(f"\n  [cable-fix] Spec cables found: {_valid_count} valid, "
+                f"{_invalid_count} invalid - using spec "
+                f"(spec={_spec_cable_total_m}m, derived={_derived_cable_total_m}m)")
+            cables = sorted(
+                _new_cables.values(), key=lambda c: -c.total_length_m,
+            )
+            # Keep only unconverted spec cables for the fallback section
+            spec_cables[:] = _unconverted
+        else:
+            log(f"\n  [cable-fix] Spec cables found: {_valid_count} valid, "
+                f"{_invalid_count} invalid - using derived "
+                f"(spec validation failed, keeping {len(cables)} derived cables)")
+            # T062: Spec cables failed validation — do NOT suppress
+            # derived cables.  Leave cables list unchanged.
+
 
     # When no spec cables exist but derived cables look massively inflated
     # (e.g. project-wide schema containing all buildings), detect by
@@ -1793,10 +1842,12 @@ def aggregate_by_height(
         _derived_cable_total_m = sum(c.total_length_m for c in cables)
         _spec_panel_count = len(spec_panels)
         if _spec_panel_count > 0:
-            # Heuristic: if >200m per spec panel, check for multi-panel
-            # schema inflation
             _m_per_panel = _derived_cable_total_m / max(1, _spec_panel_count)
-            if _m_per_panel > 5000:
+            # Building-size awareness: small buildings (< 50000m total
+            # cable) cannot realistically be project-wide schemas, so
+            # never suppress them.
+            _is_small_building = _derived_cable_total_m < 50000
+            if _m_per_panel > 15000 and not _is_small_building:
                 # Likely a project-wide schema — scale down to match
                 # spec panel count.  Count distinct panel names in schema
                 # DXF text to estimate how many panels the schema covers.
@@ -1832,15 +1883,17 @@ def aggregate_by_height(
                 if _n_schema > _spec_panel_count * 2:
                     _ratio = _spec_panel_count / _n_schema
                     if _ratio < 0.2:
-                        # Ratio is very low — schema is almost certainly
-                        # project-wide with many irrelevant panels.
+                        # Both conditions met: inflated (>15000m/panel)
+                        # AND panel ratio very low (<0.2).
                         # Suppress ALL derived cables since we cannot
                         # determine which cables belong to this building.
-                        log(f"\n  [cable-fix] No spec cables. "
-                            f"Schema panels={_n_schema}, spec panels="
+                        log(f"\n  [cable-fix] SUPPRESSING all derived "
+                            f"cables (project-wide schema detected). "
+                            f"Derived total={_derived_cable_total_m}m, "
+                            f"m/panel={_m_per_panel:.0f}, "
+                            f"schema panels={_n_schema}, spec panels="
                             f"{_spec_panel_count}, ratio={_ratio:.2f} "
-                            f"< 0.2 — suppressing all derived cables "
-                            f"(project-wide schema)")
+                            f"< 0.2")
                         cables = []
                     else:
                         log(f"\n  [cable-fix] No spec cables. "
@@ -1851,6 +1904,11 @@ def aggregate_by_height(
                             c.total_length_m = round(
                                 c.total_length_m * _ratio)
                             c.count = max(1, round(c.count * _ratio))
+            elif _m_per_panel > 15000 and _is_small_building:
+                log(f"\n  [cable-fix] High m/panel "
+                    f"({_m_per_panel:.0f}) but small building "
+                    f"(total={_derived_cable_total_m}m < 50000m) "
+                    f"— keeping all derived cables")
 
     # ── Derive installation materials from cables/panels/luminaires ──
     total_luminaires = sum(lum.total for lum in luminaires)
