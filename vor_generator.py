@@ -330,6 +330,9 @@ def _classify_spec_item(desc: str) -> str:
     nl = desc.lower()
     if any(kw in nl for kw in _PANEL_KEYWORDS):
         return "panel"
+    # "Наклейка на указатель" is a consumable material, not an indicator
+    if "наклейк" in nl:
+        return "material"
     if any(kw in nl for kw in _PICTOGRAM_KEYWORDS):
         return "pictogram"
     if any(kw in nl for kw in _INDICATOR_KEYWORDS):
@@ -373,6 +376,45 @@ _KM_RE = re.compile(r"^KM-\d+$")
 _CABLE_LEN_RE = re.compile(
     r"([\w()А-Яа-яё\-]+\s+\d+[хx×]\d[\d,]*)\s+L=(\d+)", re.IGNORECASE,
 )
+
+
+def extract_tray_length_dxf(dxf_path: str) -> float:
+    """Extract total cable tray length (metres) from a cable-tray-plan DXF.
+
+    Strategy:
+    1. Prefer centreline layer ``E-CABL-TRAY-CNTR`` (true route length).
+    2. Fallback: outline layer ``E-CABL-TRAY`` divided by 2 (two parallel
+       lines per tray run).
+    3. Only LINE entities are measured (tray runs are drawn as straight
+       segments in converted DXF files).
+    """
+    if _ezdxf is None:
+        return 0.0
+    import math
+    doc = _ezdxf.readfile(dxf_path)
+    msp = doc.modelspace()
+
+    cntr_mm = 0.0
+    tray_mm = 0.0
+    for e in msp:
+        if e.dxftype() != "LINE":
+            continue
+        layer = e.dxf.layer
+        if layer not in ("E-CABL-TRAY-CNTR", "E-CABL-TRAY"):
+            continue
+        dx = e.dxf.end.x - e.dxf.start.x
+        dy = e.dxf.end.y - e.dxf.start.y
+        seg = math.sqrt(dx * dx + dy * dy)
+        if layer == "E-CABL-TRAY-CNTR":
+            cntr_mm += seg
+        else:
+            tray_mm += seg
+
+    if cntr_mm > 0:
+        return cntr_mm / 1000.0
+    if tray_mm > 0:
+        return tray_mm / 2000.0
+    return 0.0
 
 
 def extract_panels_from_schema(dxf_path: str, log=print) -> list[PanelInfo]:
@@ -453,44 +495,54 @@ def extract_panels_from_schema(dxf_path: str, log=print) -> list[PanelInfo]:
         if best_panel is not None:
             best_panel.circuit_cables.append((ctype, clen))
 
-    # Extract circuit breaker counts from ACAD_TABLE *T blocks.
-    # AutoCAD creates *T blocks and ACAD_TABLE entities in matching order
-    # (sorted by handle).  Count QF-x.y entries in each *T block, then
-    # use the corresponding ACAD_TABLE position to match to nearest panel.
+    # Extract circuit breaker counts from ACAD_TABLE entities.
+    # Each ACAD_TABLE references a *T block via block_record_handle.
+    # Count QF-x.y entries in that block, then use the ACAD_TABLE
+    # position to match to the nearest panel.
     _QF_CIRCUIT_RE = re.compile(r"^QF[-\s]?\d+\.\d+$")
-    t_blocks_sorted = sorted(
-        (b for b in doc.blocks if b.name.startswith("*T")),
-        key=lambda b: b.name,
-    )
-    acad_tables_sorted = sorted(
-        (e for e in msp if e.dxftype() == "ACAD_TABLE"),
-        key=lambda e: e.dxf.handle,
-    )
-    if len(t_blocks_sorted) == len(acad_tables_sorted):
-        for tblock, atable in zip(t_blocks_sorted, acad_tables_sorted):
-            qf_count = sum(
-                1 for ent in tblock
-                if ent.dxftype() == "MTEXT"
-                and _QF_CIRCUIT_RE.match(ent.plain_text().strip())
-            )
-            if qf_count == 0:
+
+    # Build handle → block-name map from block_records
+    _handle_to_block: dict[str, str] = {}
+    for blk in doc.blocks:
+        try:
+            _handle_to_block[blk.block_record_handle] = blk.name
+        except Exception:
+            pass
+
+    for atable in msp:
+        if atable.dxftype() != "ACAD_TABLE":
+            continue
+        br_handle = getattr(atable.dxf, "block_record_handle", None)
+        block_name = _handle_to_block.get(br_handle) if br_handle else None
+        if not block_name:
+            continue
+        try:
+            block = doc.blocks.get(block_name)
+        except Exception:
+            continue
+        qf_count = sum(
+            1 for ent in block
+            if ent.dxftype() == "MTEXT"
+            and _QF_CIRCUIT_RE.match(ent.plain_text().strip())
+        )
+        if qf_count == 0:
+            continue
+        try:
+            tx, ty = atable.dxf.insert[0], atable.dxf.insert[1]
+        except Exception:
+            continue
+        best_panel = None
+        best_d = float("inf")
+        for p in panels:
+            pos = panel_positions.get(p.name)
+            if pos is None:
                 continue
-            try:
-                tx, ty = atable.dxf.insert[0], atable.dxf.insert[1]
-            except Exception:
-                continue
-            best_panel = None
-            best_d = float("inf")
-            for p in panels:
-                pos = panel_positions.get(p.name)
-                if pos is None:
-                    continue
-                d = abs(pos[0] - tx) + abs(pos[1] - ty)
-                if d < best_d:
-                    best_d = d
-                    best_panel = p
-            if best_panel is not None and best_panel.circuit_count == 0:
-                best_panel.circuit_count = qf_count
+            d = abs(pos[0] - tx) + abs(pos[1] - ty)
+            if d < best_d:
+                best_d = d
+                best_panel = p
+        if best_panel is not None and qf_count > best_panel.circuit_count:
+            best_panel.circuit_count = qf_count
 
     # Sort: emergency panels (АО/AO) first, then distribution panels
     def _panel_sort_key(p: PanelInfo) -> tuple[int, str]:
@@ -681,6 +733,7 @@ class FileParseResult:
     cables: list[CableItem] = field(default_factory=list)
     panels: list[PanelInfo] = field(default_factory=list)
     spec_items: list[SpecItem] = field(default_factory=list)
+    tray_length_m: float = 0.0
 
 
 @dataclass
@@ -855,6 +908,14 @@ def parse_all_files(
                     result.panels = extract_panels_from_schema(str(fpath), log=log)
                 except Exception as e:
                     log(f"    Panel error: {e}")
+            if plan_type == "кабеленесущие":
+                try:
+                    tray_m = extract_tray_length_dxf(str(fpath))
+                    result.tray_length_m = tray_m
+                    if tray_m > 0:
+                        log(f"    Tray length: {tray_m:.0f}m")
+                except Exception as e:
+                    log(f"    Tray error: {e}")
 
         parse_cache[fkey] = (items, cables)
         results.append(result)
@@ -868,79 +929,169 @@ def _merge_per_elevation(
     results: list[FileParseResult],
     log=print,
 ) -> list[FileParseResult]:
-    """For each elevation, merge equipment from all matching plans.
+    """Merge освещение/привязка plans by elevation, then sum across floors.
 
-    Takes the MAX count for each equipment type across all plans at the same
-    elevation.  This captures items that appear in one plan but not the other
-    (e.g. exit indicators only on освещение, higher switch counts on привязка).
+    Two-level merge strategy:
+    1. **Per-elevation MAX**: for the same floor (elevation), take the MAX
+       count of each equipment type across освещение and привязка plans.
+       This deduplicates between plan types showing the same luminaires.
+    2. **Per-height-category SUM**: sum the per-elevation results for all
+       floors within the same height category (e.g. floors at +13.8m and
+       +18.6m both contribute to "от 13 до 20 метров").
+
+    Multi-elevation files (e.g. '+7.800, +9.000') are assigned to a single
+    elevation group matching their привязка peer via height category.
     """
     dup_types = {"привязка", "освещение", "розетки", "расположение"}
 
-    groups: dict[tuple[str, float | None], list[FileParseResult]] = defaultdict(list)
+    # Step 1: group by (category, elevation) for per-elevation MAX merge
+    elev_groups: dict[tuple[str, float | None], list[FileParseResult]] = defaultdict(list)
     out: list[FileParseResult] = []
 
     for r in results:
         if r.plan_type in dup_types:
-            dup_key = (
-                "light" if r.plan_type in ("освещение", "привязка") else "power",
-                r.elevation,
-            )
-            groups[dup_key].append(r)
+            cat = "light" if r.plan_type in ("освещение", "привязка") else "power"
+            elev_groups[(cat, r.elevation)].append(r)
         else:
             out.append(r)
 
     # Merge None-elevation groups into a known-elevation group of the same
-    # category when exactly one such group exists (e.g. привязка without
-    # elevation matched to освещение that has elevation).
-    none_keys = [k for k in groups if k[1] is None]
+    # category when exactly one such group exists.
+    none_keys = [k for k in elev_groups if k[1] is None]
     for nk in none_keys:
         cat = nk[0]
-        peers = [k for k in groups if k[0] == cat and k[1] is not None]
+        peers = [k for k in elev_groups if k[0] == cat and k[1] is not None]
         if len(peers) == 1:
-            groups[peers[0]].extend(groups.pop(nk))
+            elev_groups[peers[0]].extend(elev_groups.pop(nk))
 
-    for key in sorted(groups.keys(), key=lambda k: k[1] or 0):
-        group = groups[key]
+    # Merge orphan elevation groups that have no peer at the same elevation
+    # but DO have a peer in the same height category.  This handles the
+    # case where освещение covers +7.800,+9.000 (elev=7.8) while привязка
+    # is at +9.000 (elev=9.0) — same height category, different elevation.
+    cats_in_groups = defaultdict(list)  # cat -> list of elevations
+    for (cat, elev) in elev_groups:
+        cats_in_groups[cat].append(elev)
 
-        merged_equip: dict[str, EquipmentItem] = {}
+    for cat in cats_in_groups:
+        elevs = cats_in_groups[cat]
+        # Find groups that are alone (no peer osveshchenie+privyazka pair)
+        for elev in list(elevs):
+            grp = elev_groups.get((cat, elev))
+            if grp is None:
+                continue
+            plan_types_here = {r.plan_type for r in grp}
+            has_light = plan_types_here & {"освещение"}
+            has_bind = plan_types_here & {"привязка"}
+            if has_light and has_bind:
+                continue  # already paired
+            if not has_light and not has_bind:
+                continue
+            # Orphan: look for a peer in the same height category
+            hcat = elevation_to_height(elev) if elev is not None else None
+            if hcat is None:
+                continue
+            for other_elev in list(elevs):
+                if other_elev == elev:
+                    continue
+                other_hcat = elevation_to_height(other_elev) if other_elev is not None else None
+                if other_hcat != hcat:
+                    continue
+                other_grp = elev_groups.get((cat, other_elev))
+                if other_grp is None:
+                    continue
+                other_types = {r.plan_type for r in other_grp}
+                # Merge if the other group has the missing type
+                if (has_light and (other_types & {"привязка"})) or \
+                   (has_bind and (other_types & {"освещение"})):
+                    other_grp.extend(grp)
+                    del elev_groups[(cat, elev)]
+                    log(f"  [merge] Paired orphan elev={elev} into elev={other_elev} "
+                        f"(both in {hcat})")
+                    break
+
+    # Step 2: MAX merge within each elevation group
+    # Then collect into height category groups for SUM
+    hcat_equip: dict[tuple[str, HeightCategory | None],
+                      dict[str, EquipmentItem]] = defaultdict(dict)
+    hcat_meta: dict[tuple[str, HeightCategory | None],
+                    FileParseResult] = {}
+
+    for key in sorted(elev_groups.keys(), key=lambda k: k[1] or 0):
+        group = elev_groups[key]
+        cat = key[0]
+        elev = key[1]
+        hcat = elevation_to_height(elev) if elev is not None else None
+
+        # MAX merge across plans at this elevation
+        max_equip: dict[str, EquipmentItem] = {}
         for r in group:
             for it in r.equipment:
                 norm = _normalize_equip_name(it.name)
                 total_new = it.count + it.count_ae
-                if norm in merged_equip:
-                    total_old = merged_equip[norm].count + merged_equip[norm].count_ae
+                if norm in max_equip:
+                    total_old = max_equip[norm].count + max_equip[norm].count_ae
                     if total_new > total_old:
-                        merged_equip[norm] = EquipmentItem(
+                        max_equip[norm] = EquipmentItem(
                             symbol=it.symbol, name=it.name,
                             count=it.count, count_ae=it.count_ae,
                         )
                 else:
-                    merged_equip[norm] = EquipmentItem(
+                    max_equip[norm] = EquipmentItem(
                         symbol=it.symbol, name=it.name,
                         count=it.count, count_ae=it.count_ae,
                     )
 
-        best = max(group, key=lambda r: sum(
-            it.count + it.count_ae for it in r.equipment
-        ))
-        merged_result = FileParseResult(
-            filename=best.filename,
-            plan_type=best.plan_type,
-            elevation=key[1],
-            height_category=best.height_category,
-            equipment=list(merged_equip.values()),
-            cables=best.cables,
-            panels=best.panels,
-        )
-        out.append(merged_result)
-
-        merged_total = sum(it.count + it.count_ae for it in merged_result.equipment)
-        sources = [f"{r.filename}({sum(it.count+it.count_ae for it in r.equipment)})"
+        max_total = sum(it.count + it.count_ae for it in max_equip.values())
+        sources = [f"{r.filename[:40]}({sum(it.count+it.count_ae for it in r.equipment)})"
                    for r in group]
         if len(group) > 1:
-            log(f"  [merge] {key[1]}: {' + '.join(sources)} → {merged_total} items")
+            log(f"  [merge-elev] {elev}: {' + '.join(sources)} → {max_total}")
         else:
-            log(f"  [merge] {key[1]}: {sources[0]}")
+            log(f"  [merge-elev] {elev}: {sources[0]}")
+
+        # SUM into height category bucket
+        hcat_key = (cat, hcat)
+        dest = hcat_equip[hcat_key]
+        for norm, it in max_equip.items():
+            total_add = it.count + it.count_ae
+            if norm in dest:
+                old = dest[norm]
+                dest[norm] = EquipmentItem(
+                    symbol=old.symbol, name=old.name,
+                    count=old.count + it.count,
+                    count_ae=old.count_ae + it.count_ae,
+                )
+            else:
+                dest[norm] = EquipmentItem(
+                    symbol=it.symbol, name=it.name,
+                    count=it.count, count_ae=it.count_ae,
+                )
+
+        # Track metadata from best file in this elevation group
+        if hcat_key not in hcat_meta:
+            best = max(group, key=lambda r: sum(
+                it.count + it.count_ae for it in r.equipment
+            ))
+            hcat_meta[hcat_key] = best
+
+    # Step 3: emit one FileParseResult per height category
+    hcat_order = {hc: i for i, hc in enumerate(HEIGHT_CATEGORIES)}
+    for hcat_key in sorted(hcat_equip.keys(),
+                           key=lambda k: hcat_order.get(k[1], 99)):
+        equip = hcat_equip[hcat_key]
+        meta = hcat_meta.get(hcat_key)
+        total = sum(it.count + it.count_ae for it in equip.values())
+        merged_result = FileParseResult(
+            filename=meta.filename if meta else "",
+            plan_type=meta.plan_type if meta else "освещение",
+            elevation=meta.elevation if meta else None,
+            height_category=hcat_key[1],
+            equipment=list(equip.values()),
+            cables=meta.cables if meta else [],
+            panels=meta.panels if meta else [],
+        )
+        out.append(merged_result)
+        log(f"  [merge-hcat] {hcat_key[1]}: {total} items")
 
     return out
 
@@ -978,6 +1129,8 @@ class DerivedMaterials:
     pvc_holders: dict[int, int] = field(default_factory=dict)
     # Total PVC conduit length for work item
     pvc_total_m: int = 0
+    # Number of distinct building floors (for PNR cable count adjustment)
+    floor_count: int = 1
 
 
 # Standard conduit diameter selection by cable cross-section (mm2)
@@ -1022,14 +1175,15 @@ def _derive_installation_materials(
     luminaire_count: int,
     lighting_groups: int,
     cable_outlet_count: int = 0,
+    floor_count: int = 1,
     log=print,
 ) -> DerivedMaterials:
     """Derive installation material quantities from parsed cable/panel/luminaire data.
 
     Rules (based on standard electrical installation practices):
 
-    1. Cable connections at panels = sum of conductor count per cable run
-       (each conductor is terminated individually at the panel).
+    1. Cable connections at panels = total number of cable runs arriving
+       at panels (each cable run = 1 connection, regardless of conductor count).
 
     2. Junction boxes for lighting = luminaire_count minus end-of-line
        luminaires (1 per lighting group). Rule: "near each luminaire
@@ -1053,6 +1207,7 @@ def _derive_installation_materials(
        holders = length / 0.8m (standard step).
     """
     dm = DerivedMaterials()
+    dm.floor_count = floor_count
 
     if not cables:
         return dm
@@ -1060,28 +1215,43 @@ def _derive_installation_materials(
     total_cable_runs = sum(c.count for c in cables)
 
     # ── 1. Cable connections at panels ──
-    # Each cable run has conductors terminated at both ends (panel + device)
-    # The VOR item "Подключение жил кабелей" counts individual conductor
-    # connections.  Each circuit cable: conductor_count × 1 (at panel end).
-    # Plus feeder cables: conductor_count × 1 each.
+    # "Подключение жил кабелей до 10 мм²" = conductor terminations at panels.
+    # Each cable run contributes conductor_count connections.
+    # When the schema DXF lists cables for every floor of a multi-storey
+    # building, the total is divided by floor_count to get per-panel-set value.
     circuit_connections = 0
     for c in cables:
         n_cond = _conductor_count(c.cable_type)
         circuit_connections += c.count * n_cond
-    # Add feeder cable connections (from panel feed_cable field)
+    if floor_count > 1:
+        circuit_connections = round(circuit_connections / floor_count)
+        log(f"    [derived] Adjusted for {floor_count} floors: "
+            f"raw={sum(c.count * _conductor_count(c.cable_type) for c in cables)}"
+            f" → {circuit_connections}")
+    # Add feeder cable connections (each feeder: count its conductors)
     feeder_connections = 0
     for p in panels:
         if p.feed_cable:
-            n_cond = _conductor_count(p.feed_cable)
-            feeder_connections += n_cond
+            feeder_connections += _conductor_count(p.feed_cable)
     dm.cable_connections = circuit_connections + feeder_connections
     log(f"    [derived] Cable connections: {dm.cable_connections} "
         f"(circuits={circuit_connections} + feeders={feeder_connections})")
 
     # ── 2. Junction boxes ──
-    # Lighting: one per luminaire, minus end-of-line (1 per lighting group)
+    # Lighting: one per luminaire, minus end-of-line (1 per lighting group).
+    # For multi-floor buildings the luminaire_count spans ALL floors but
+    # lighting_groups (from schema cables) also covers all floors.
+    # Divide both by floor_count to get per-floor estimate, then report
+    # the single-floor value (VOR is per floor set, not per entire building).
     if luminaire_count > 0:
-        dm.junction_boxes_lighting = max(0, luminaire_count - lighting_groups)
+        if floor_count > 1:
+            lum_per_floor = luminaire_count / floor_count
+            grp_per_floor = lighting_groups / floor_count
+            dm.junction_boxes_lighting = max(0,
+                round(lum_per_floor - grp_per_floor))
+        else:
+            dm.junction_boxes_lighting = max(0,
+                luminaire_count - lighting_groups)
     # Power: junction boxes at cable outlet / branching points.
     # Cable outlets are branch connection points on the equipment plan.
     # If cable_outlet_count is available, use it directly.
@@ -1247,6 +1417,23 @@ def aggregate_by_height(
                 )
     cables = sorted(all_cables.values(), key=lambda c: -c.total_length_m)
 
+    # ── Tray lengths by height category ─────────────────────────────
+    tray_by_height: dict[str, float] = {}
+    for r in deduped:
+        if r.tray_length_m > 0 and r.height_category:
+            tray_by_height[r.height_category] = (
+                tray_by_height.get(r.height_category, 0) + r.tray_length_m
+            )
+    # Round to whole metres
+    tray_lengths: dict[str, int] = {
+        hcat: round(m) for hcat, m in tray_by_height.items() if round(m) > 0
+    }
+    if tray_lengths:
+        log(f"\n  [tray] Cable tray lengths by height:")
+        for hcat in HEIGHT_CATEGORIES:
+            if hcat in tray_lengths:
+                log(f"    {hcat}: {tray_lengths[hcat]}m")
+
     # ── Spec items (from СО.dxf ACAD_TABLE) ──────────────────────────
     spec_panels: list[SpecGroupedItem] = []
     grounding_items: list[SpecGroupedItem] = []
@@ -1267,6 +1454,40 @@ def aggregate_by_height(
             return False
         for en in existing_names:
             if ml in en:
+                return True
+        return False
+
+    _IND_NAME_RE = re.compile(
+        r'(?:светов\w*\s+указател\w*|указател\w*)',
+        re.IGNORECASE)
+    _VYKHOD_RE = re.compile(
+        r'[\s"«»\u201c\u201d]*["«\u201c]?выход["»\u201d]?'
+        r'[\s"«»\u201c\u201d]*', re.IGNORECASE)
+
+    def _strip_indicator_prefix(s: str) -> str:
+        """Strip common indicator prefixes to get the model core."""
+        r = _IND_NAME_RE.sub("", s).strip()
+        r = _VYKHOD_RE.sub(" ", r).strip()
+        return r.lower()
+
+    def _indicator_core_match(
+        name: str, existing_names: set[str],
+    ) -> bool:
+        """Check if indicator model core overlaps with any plan name.
+
+        Strips common prefixes like 'Световой указатель' / '"ВЫХОД"'
+        from both sides, then checks bidirectional substring containment.
+        """
+        if not name:
+            return False
+        core = _strip_indicator_prefix(name)
+        if len(core) < 6:
+            return False
+        for en in existing_names:
+            en_core = _strip_indicator_prefix(en)
+            if len(en_core) < 6:
+                continue
+            if core in en_core or en_core in core:
                 return True
         return False
 
@@ -1306,7 +1527,20 @@ def aggregate_by_height(
                     log(f"    [spec+] luminaire: {norm[:70]} × {si.quantity}")
             elif cat in ("indicator", "pictogram"):
                 norm = _normalize_equip_name(si.description)
-                if norm.lower() not in plan_indicator_names:
+                # Use model-core matching to detect duplicates.
+                # Plan legends use '"ВЫХОД" MERCURY ...' while spec uses
+                # 'Световой указатель MERCURY ...'.  Strip common
+                # prefixes to compare the model core.
+                _ind_dup = (
+                    _model_in_plan(si.model, plan_indicator_names)
+                    or _model_in_plan(norm, plan_indicator_names)
+                    or _indicator_core_match(si.model, plan_indicator_names)
+                    or _indicator_core_match(norm, plan_indicator_names)
+                )
+                if _ind_dup:
+                    log(f"    [spec=] indicator (plan has): "
+                        f"{si.model or norm[:40]}")
+                else:
                     indicators.append(AggregatedEquipment(
                         name=norm, category=cat,
                         counts_by_height={"до 5 метров": si.quantity},
@@ -1359,13 +1593,22 @@ def aggregate_by_height(
 
     total_cable_outlets = sum(co.total for co in cable_outlets)
 
-    log(f"\n  [derived] Deriving installation materials...")
+    # Count distinct floors from lighting plan files.
+    # Each освещение file corresponds to one physical floor.
+    # Used to de-duplicate cable data from schema DXFs that list cables
+    # for every floor of a multi-storey building.
+    _floor_count = max(1, sum(
+        1 for r in results if r.plan_type == "освещение"
+    ))
+
+    log(f"\n  [derived] Deriving installation materials (floors={_floor_count})...")
     derived = _derive_installation_materials(
         panels=schema_panels,
         cables=cables,
         luminaire_count=total_luminaires,
         lighting_groups=lighting_groups_count,
         cable_outlet_count=total_cable_outlets,
+        floor_count=_floor_count,
         log=log,
     )
 
@@ -1402,6 +1645,7 @@ def aggregate_by_height(
         "pvc_items": pvc_items,
         "spec_cables": spec_cables,
         "derived": derived,
+        "tray_lengths": tray_lengths,
     }
 
 
@@ -1491,6 +1735,7 @@ def generate_vor_docx(
     pvc_items: list[SpecGroupedItem] | None = None,
     spec_cables: list[SpecGroupedItem] | None = None,
     derived: DerivedMaterials | None = None,
+    tray_lengths: dict[str, int] | None = None,
 ) -> str:
     """Generate a VOR .docx file from aggregated data."""
     doc = Document()
@@ -1703,25 +1948,38 @@ def generate_vor_docx(
                     table, item_num, f"Монтаж {co.name}",
                     "шт", co.total, ref=drawing_ref,
                 )
-        # Derived junction boxes
-        if derived and derived.junction_boxes_power > 0:
-            item_num += 1
-            _add_work_row(
-                table, item_num,
-                "Монтаж коробки соединительной с кабельными "
-                "вводами 100x100x50 мм",
-                "шт", derived.junction_boxes_power, ref=drawing_ref,
-            )
-        if derived and derived.junction_boxes_lighting > 0:
-            item_num += 1
-            _add_work_row(
-                table, item_num,
-                "Монтаж коробки распределительной "
-                "85x85x40 мм",
-                "шт", derived.junction_boxes_lighting, ref=drawing_ref,
-            )
+        # Derived junction boxes — skip when spec/switches already contain
+        # junction box items ("коробк") to avoid double-counting.
+        _spec_has_boxes = any(
+            "коробк" in sw.name.lower()
+            for sw in (switches or [])
+        )
+        if not _spec_has_boxes:
+            if derived and derived.junction_boxes_power > 0:
+                item_num += 1
+                _add_work_row(
+                    table, item_num,
+                    "Монтаж коробки соединительной с кабельными "
+                    "вводами 100x100x50 мм",
+                    "шт", derived.junction_boxes_power, ref=drawing_ref,
+                )
+            if derived and derived.junction_boxes_lighting > 0:
+                item_num += 1
+                _add_work_row(
+                    table, item_num,
+                    "Монтаж коробки распределительной "
+                    "85x85x40 мм",
+                    "шт", derived.junction_boxes_lighting, ref=drawing_ref,
+                )
         # Derived crimping materials (sub-section)
-        if derived and derived.crimp_sleeves > 0:
+        # Skip derived GML when spec materials already contain ГМЛ/гильза items
+        # (spec quantities are authoritative and would duplicate the derived ones).
+        _spec_has_gml = any(
+            ("гмл" in m.name.lower() or
+             ("гильза" in m.name.lower() and "закладн" not in m.name.lower()))
+            for m in (materials or [])
+        )
+        if derived and derived.crimp_sleeves > 0 and not _spec_has_gml:
             item_num += 1
             _add_work_row(
                 table, item_num,
@@ -1810,6 +2068,23 @@ def generate_vor_docx(
                 _add_work_row(
                     table, item_num, f"Кабель {sc.description}",
                     sc.unit, sc.quantity, ref=drawing_ref,
+                )
+
+    # ── Section 4b: Cable tray installation ──
+    if tray_lengths:
+        _add_section_header(
+            table, "Монтаж кабельных лотков и соединительных деталей",
+        )
+        for hcat in HEIGHT_CATEGORIES:
+            length = tray_lengths.get(hcat)
+            if length and length > 0:
+                item_num += 1
+                _add_work_row(
+                    table, item_num,
+                    "Лоток металлический штампованный по установленным "
+                    f"конструкциям, ширина лотка: до 200 мм, "
+                    f"высота {hcat}:",
+                    "м", length, ref=drawing_ref,
                 )
 
     # ── Section 5: Cable penetrations (fire sealing) ──
@@ -1930,7 +2205,13 @@ def generate_vor_docx(
     # ── Section 8: Commissioning (PNR) ──
     _add_section_header(table, "Пусконаладочные работы")
 
+    _pnr_floor_count = derived.floor_count if derived else 1
     cable_line_count = sum(c.count for c in cables) if cables else 0
+    # For multi-floor buildings the schema DXF lists every cable for
+    # every floor, inflating the run count.  Divide by floor_count to
+    # get the per-panel-set value used for PNR testing.
+    if _pnr_floor_count > 1:
+        cable_line_count = round(cable_line_count / _pnr_floor_count)
     # Add panel feed cables (each panel with a feed_cable adds 1 line)
     cable_line_count += sum(1 for p in panels if p.feed_cable)
 
@@ -2071,6 +2352,7 @@ def generate_vor(
         pvc_items=agg["pvc_items"],
         spec_cables=agg["spec_cables"],
         derived=agg.get("derived"),
+        tray_lengths=agg.get("tray_lengths"),
     )
 
     elapsed = time.time() - t0
@@ -2188,6 +2470,7 @@ def generate_vor_combined(
         pvc_items=agg["pvc_items"],
         spec_cables=agg["spec_cables"],
         derived=agg.get("derived"),
+        tray_lengths=agg.get("tray_lengths"),
     )
 
     elapsed = time.time() - t0
