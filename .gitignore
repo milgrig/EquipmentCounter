@@ -20,3 +20,5 @@ nul
 
 # Temporary files
 *.tmp
+output_*.docx
+mass_test_report.xlsx
