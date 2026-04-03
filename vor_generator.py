@@ -92,6 +92,8 @@ _NON_EQUIPMENT_KEYWORDS = (
 _CABLE_SPEC_KEYWORDS = (
     "ппгнг", "ввгнг", "вбшвнг", "кгнг", "апвпу", "пвпу",
     "кабель силовой", "0,66кв", "1кв",
+    # T056: wire (Провод) types
+    "пувв", "пвс", "пв1 ", "пв3 ", "шввп", "ппв ", "апв ",
 )
 
 _GROUNDING_KEYWORDS = (
@@ -1158,6 +1160,34 @@ _CABLE_SECTION_RE = re.compile(
 )
 
 
+def _extract_brand_family(cable_type: str) -> str:
+    """Extract cable brand family from a cable_type string.
+
+    Examples:
+        'ППГнг-(А)-HF 3×1.5'   -> 'ППГнг-(А)-HF'
+        'ВБШвнг(А)-LS 5×2.5'   -> 'ВБШвнг(А)-LS'
+        'ВБШвнг(А)-FRLS 3×2.5' -> 'ВБШвнг(А)-FRLS'
+    """
+    # Strip the cross-section suffix (e.g. '3×1.5') to get the brand family
+    brand = _CABLE_SECTION_RE.sub('', cable_type).strip()
+    # Remove any trailing whitespace or stray punctuation
+    brand = brand.rstrip(' -')
+    return brand or cable_type
+
+
+
+# T056: Wire brand prefixes (Провод types)
+_WIRE_BRAND_PREFIXES = (
+    "ПуВВнг", "ПуВВ", "ПВС", "ПВ1", "ПВ3", "ШВВП", "ППВ", "АПВ",
+)
+
+
+def _is_wire_type(cable_type: str) -> bool:
+    """Return True if cable_type represents a wire (Провод) rather than cable (Кабель)."""
+    brand = _extract_brand_family(cable_type)
+    return any(brand.startswith(p) for p in _WIRE_BRAND_PREFIXES)
+
+
 def _conduit_diameter(cable_type: str) -> int:
     """Determine PVC conduit diameter (mm) from cable cross-section.
 
@@ -1437,6 +1467,34 @@ def aggregate_by_height(
                 )
     cables = sorted(all_cables.values(), key=lambda c: -c.total_length_m)
 
+    # ── Cable lengths by height category (for cable-laying section) ──
+    # Cables come from schema DXFs (no height_category).  Determine
+    # which height categories the building has from equipment/plan
+    # results and distribute total cable length proportionally.
+    equip_count_by_height: dict[str, int] = defaultdict(int)
+    for r in deduped:
+        if r.height_category and r.equipment:
+            for it in r.equipment:
+                equip_count_by_height[r.height_category] += it.count + it.count_ae
+
+    total_cable_m_agg = sum(c.total_length_m for c in cables)
+    cable_lengths_by_height: dict[str, int] = {}
+    if total_cable_m_agg > 0 and equip_count_by_height:
+        total_equip = sum(equip_count_by_height.values())
+        if total_equip > 0:
+            for hcat, ecnt in equip_count_by_height.items():
+                share = round(total_cable_m_agg * ecnt / total_equip)
+                if share > 0:
+                    cable_lengths_by_height[hcat] = share
+    elif total_cable_m_agg > 0:
+        # No equipment-based heights -- default to lowest category
+        cable_lengths_by_height["до 5 метров"] = round(total_cable_m_agg)
+    if cable_lengths_by_height:
+        log(f"\n  [cable-laying] Cable lengths by height:")
+        for hcat in HEIGHT_CATEGORIES:
+            if hcat in cable_lengths_by_height:
+                log(f"    {hcat}: {cable_lengths_by_height[hcat]}m")
+
     # ── Tray lengths by height category ─────────────────────────────
     tray_by_height: dict[str, float] = {}
     for r in deduped:
@@ -1678,9 +1736,11 @@ def aggregate_by_height(
 
     # T052: regex to parse spec cable description into cable_type string
     _SPEC_CABLE_DESC_RE = re.compile(
-        r"(\d+)[хx\u00d7](\d+[\.,]?\d*)\s*мм.*?"
+        r"(\d+)[хx×](\d+[\.,]?\d*)\s*мм.*?"
         r"((?:ВБШвнг|ВБбШвнг|ВВГнг|ППГнг|АВВГнг|КГнг|АПвПу|ПвПу)"
-        r"(?:\([А-Яа-яA-Za-z]+\))?-[A-Z]+)",
+        r"(?:\([А-Яа-яA-Za-z]+\))?-[A-Z]+"
+        r"|(?:ПуВВнг|ПуВВ|ПВС|ПВ[13]|ШВВП|ППВ|АПВ)"
+        r"(?:\([А-Яа-яA-Za-z]+\))?(?:-[A-Z]+)?)",
         re.IGNORECASE,
     )
 
@@ -1852,6 +1912,7 @@ def aggregate_by_height(
     log(f"  [VOR] Lightning:     {len(lightning_items)} items")
     log(f"  [VOR] PVC conduits:  {len(pvc_items)} items (spec_has_pvc={_spec_has_pvc})")
     log(f"  [VOR] Spec cables:   {len(spec_cables)} items")
+    log(f"  [VOR] Cable laying:  {len(cable_lengths_by_height)} height categories")
     log(f"  [VOR] Derived materials: connections={derived.cable_connections}, "
         f"boxes={derived.junction_boxes_lighting}+{derived.junction_boxes_power}, "
         f"sleeves={derived.crimp_sleeves}, steel={derived.steel_sleeves}")
@@ -1872,6 +1933,7 @@ def aggregate_by_height(
         "spec_cables": spec_cables,
         "derived": derived,
         "tray_lengths": tray_lengths,
+        "cable_lengths_by_height": cable_lengths_by_height,
     }
 
 
@@ -1962,6 +2024,7 @@ def generate_vor_docx(
     spec_cables: list[SpecGroupedItem] | None = None,
     derived: DerivedMaterials | None = None,
     tray_lengths: dict[str, int] | None = None,
+    cable_lengths_by_height: dict[str, int] | None = None,
 ) -> str:
     """Generate a VOR .docx file from aggregated data."""
     doc = Document()
@@ -2234,52 +2297,84 @@ def generate_vor_docx(
                 mat.unit, mat.total, ref=drawing_ref,
             )
 
-    # ── Section 4: Cables ──
+    # ── Section 4: Cables & Wires (grouped by brand family) ──
     if cables:
-        _add_section_header(table, "Кабельная продукция")
+        # T056: Separate wires (Провод) from cables (Кабель)
+        actual_cables = [c for c in cables if not _is_wire_type(c.cable_type)]
+        wire_items = [c for c in cables if _is_wire_type(c.cable_type)]
 
-        fire_cables = [c for c in cables if "FRHF" in c.cable_type or "FR" in c.cable_type]
-        normal_cables = [c for c in cables if c not in fire_cables]
+        # ── Cables sub-section ──
+        if actual_cables:
+            _add_section_header(table, "Кабельная продукция")
 
-        if normal_cables:
-            total_normal = sum(c.total_length_m for c in normal_cables)
+            total_cable_m = sum(c.total_length_m for c in actual_cables)
+            total_cable_cnt = sum(c.count for c in actual_cables)
             item_num += 1
             _add_work_row(
                 table, item_num,
                 "Прокладка кабеля в лотке/гофре/трубе:",
-                "м", total_normal, ref=drawing_ref,
+                "м", total_cable_m, ref=drawing_ref,
             )
-            for c in normal_cables:
-                _add_material_row(
-                    table, f"Кабель {c.cable_type}",
-                    "м", c.total_length_m, ref=drawing_ref,
-                )
 
-        if fire_cables:
-            total_fire = sum(c.total_length_m for c in fire_cables)
+            # Group cables by brand family
+            _cable_groups: dict[str, list[CableItem]] = {}
+            for c in actual_cables:
+                brand = _extract_brand_family(c.cable_type)
+                _cable_groups.setdefault(brand, []).append(c)
+
+            for brand, group in _cable_groups.items():
+                _add_section_header(table, f"Кабель {brand}")
+                for c in group:
+                    _add_material_row(
+                        table, f"Кабель {c.cable_type}",
+                        "м", c.total_length_m, ref=drawing_ref,
+                    )
+
             item_num += 1
             _add_work_row(
                 table, item_num,
-                "Прокладка огнестойкого кабеля в лотке/гофре/трубе:",
-                "м", total_fire, ref=drawing_ref,
+                "Затяжка кабеля в трубы, блоки и на лотки",
+                "м", total_cable_m,
+                formula=f"{total_cable_cnt} линий × средняя длина",
+                ref=drawing_ref,
             )
-            for c in fire_cables:
-                _add_material_row(
-                    table, f"Кабель {c.cable_type}",
-                    "м", c.total_length_m, ref=drawing_ref,
-                )
 
-        total_cable_m = sum(c.total_length_m for c in cables)
-        total_cable_cnt = sum(c.count for c in cables)
+        # T056: Wires sub-section (Провод)
+        if wire_items:
+            _add_section_header(table, "Проводная продукция")
 
-        item_num += 1
-        _add_work_row(
-            table, item_num,
-            "Затяжка кабеля в трубы, блоки и на лотки",
-            "м", total_cable_m,
-            formula=f"{total_cable_cnt} линий × средняя длина",
-            ref=drawing_ref,
-        )
+            total_wire_m = sum(c.total_length_m for c in wire_items)
+            total_wire_cnt = sum(c.count for c in wire_items)
+            item_num += 1
+            _add_work_row(
+                table, item_num,
+                "Прокладка провода в лотке/гофре/трубе:",
+                "м", total_wire_m, ref=drawing_ref,
+            )
+
+            # Group wires by brand family
+            _wire_groups: dict[str, list[CableItem]] = {}
+            for c in wire_items:
+                brand = _extract_brand_family(c.cable_type)
+                _wire_groups.setdefault(brand, []).append(c)
+
+            for brand, group in _wire_groups.items():
+                _add_section_header(table, f"Провод {brand}")
+                for c in group:
+                    _add_material_row(
+                        table, f"Провод {c.cable_type}",
+                        "м", c.total_length_m, ref=drawing_ref,
+                    )
+
+            item_num += 1
+            _add_work_row(
+                table, item_num,
+                "Затяжка провода в трубы, блоки и на лотки",
+                "м", total_wire_m,
+                formula=f"{total_wire_cnt} линий × средняя длина",
+                ref=drawing_ref,
+            )
+
     if spec_cables:
         if not cables:
             _add_section_header(table, "Кабельная продукция (по спецификации)")
@@ -2294,6 +2389,21 @@ def generate_vor_docx(
                 _add_work_row(
                     table, item_num, f"Кабель {sc.description}",
                     sc.unit, sc.quantity, ref=drawing_ref,
+                )
+
+    # ── Section 4a: Cable laying in trays (per height) ──
+    if cable_lengths_by_height:
+        _add_section_header(
+            table, "Прокладка кабеля в лотке",
+        )
+        for hcat in HEIGHT_CATEGORIES:
+            length = cable_lengths_by_height.get(hcat)
+            if length and length > 0:
+                item_num += 1
+                _add_work_row(
+                    table, item_num,
+                    f"Прокладка кабеля в лотке на высоте {hcat}:",
+                    "м", length, ref=drawing_ref,
                 )
 
     # ── Section 4b: Cable tray installation ──
@@ -2441,13 +2551,24 @@ def generate_vor_docx(
     # Add panel feed cables (each panel with a feed_cable adds 1 line)
     cable_line_count += sum(1 for p in panels if p.feed_cable)
 
-    if cable_line_count > 0:
+    # T057: When cable_line_count is 0 but panels exist, derive a
+    # fallback line count from total panel circuit count so that
+    # cable-based PNR items (insulation, continuity, grounding, lab)
+    # are still generated.
+    _pnr_line_count = cable_line_count
+    if _pnr_line_count == 0 and panels:
+        _pnr_line_count = sum(
+            p.circuit_count or len(p.circuit_cables) or 1
+            for p in panels
+        )
+
+    if _pnr_line_count > 0:
         # 1) Insulation resistance measurement
         item_num += 1
         _add_work_row(
             table, item_num,
             "Измерение сопротивления изоляции",
-            "каб.", cable_line_count,
+            "каб.", _pnr_line_count,
             ref=drawing_ref,
         )
 
@@ -2457,7 +2578,7 @@ def generate_vor_docx(
             table, item_num,
             "Определение целостности жил кабеля и фазировка "
             "кабельной линии",
-            "каб.", cable_line_count,
+            "каб.", _pnr_line_count,
             ref=drawing_ref,
         )
 
@@ -2467,12 +2588,12 @@ def generate_vor_docx(
             table, item_num,
             "Проверка наличия цепи между заземлителями "
             "и заземленными элементами",
-            "изм.", cable_line_count * 2,
+            "изм.", _pnr_line_count * 2,
             ref=drawing_ref,
         )
 
         # 4) Mobile testing lab
-        lab_hours = math.ceil(cable_line_count / 3)
+        lab_hours = math.ceil(_pnr_line_count / 3)
         item_num += 1
         _add_work_row(
             table, item_num,
@@ -2498,7 +2619,28 @@ def generate_vor_docx(
                 ref=drawing_ref,
             )
 
-    # 6) Lighting network verification
+    # 6) Luminaire commissioning (T057)
+    _luminaire_total = sum(lum.total for lum in luminaires) if luminaires else 0
+    if _luminaire_total > 0:
+        item_num += 1
+        _add_work_row(
+            table, item_num,
+            "Проверка и пуск светильников",
+            "шт", _luminaire_total,
+            ref=drawing_ref,
+        )
+
+    # 7) Grounding verification (T057)
+    if panels:
+        item_num += 1
+        _add_work_row(
+            table, item_num,
+            "Проверка заземления",
+            "изм.", len(panels),
+            ref=drawing_ref,
+        )
+
+    # 8) Lighting network verification
     if panels:
         item_num += 1
         _add_work_row(
@@ -2579,6 +2721,7 @@ def generate_vor(
         spec_cables=agg["spec_cables"],
         derived=agg.get("derived"),
         tray_lengths=agg.get("tray_lengths"),
+        cable_lengths_by_height=agg.get("cable_lengths_by_height"),
     )
 
     elapsed = time.time() - t0
@@ -2699,6 +2842,7 @@ def generate_vor_combined(
         spec_cables=agg["spec_cables"],
         derived=agg.get("derived"),
         tray_lengths=agg.get("tray_lengths"),
+        cable_lengths_by_height=agg.get("cable_lengths_by_height"),
     )
 
     elapsed = time.time() - t0
