@@ -64,7 +64,8 @@ HEIGHT_CATEGORIES: list[HeightCategory] = [
 DXF_EXTS = {".dxf", ".DXF"}
 
 _LUMINAIRE_PREFIXES = (
-    "Светильник ", "Световые указатели ", "Световой указатель ",
+    "Светодиодный светильник ", "Светильник ",
+    "Световые указатели ", "Световой указатель ",
 )
 
 _INDICATOR_KEYWORDS = ("указатель", "mercury", "atom", "выход", "exit")
@@ -99,12 +100,26 @@ _GROUNDING_KEYWORDS = (
     "забивная головка", "соединитель диагональн", "соединитель плоского",
     "проводника к точке", "скоба на ленте", "шина уравнивания",
     "пугвнг", "провод пугв",
+    # T049: additional grounding keywords
+    "пруток-полоса", "антикоррозийная лента", "антикоррозионная лента",
+    "спрей цинковый", "цинковый спрей", "свартон цинк",
+    "коробка уравнивания", "точка заземления",
+    "гидроизоляционн", "гидроизолирующ",
+    "ма-943", "мз-910", "мш-926", "мш-830",
+    "соединитель токоотвода с арматур",
+    "держатель пластиковый", "держатель клик",
+    "с бетоном для круглых проводников",
 )
 _LIGHTNING_KEYWORDS = (
     "молниезащит", "молниеприемни", "проводник круглый", "мостовая опора",
     "держатель на кровлю", "лента монтажная на кровельный",
     "зажим крепежный", "держатель для круглых",
     "болтовой на водосточный",
+    # T049: additional lightning keywords
+    "универсальный для прутка", "мс-021", "мс-022",
+    "мд-080", "ма-082", "мд-120", "мс-131",
+    "компенсатор, алюминий", "мс-090",
+    "обойма для круглого проводника на водосток",
 )
 _PVC_CONDUIT_KEYWORDS = (
     "труба пвх", "гофр.", "с протяжкой", "держатель с защелкой",
@@ -343,16 +358,20 @@ def _classify_spec_item(desc: str) -> str:
         return "socket"
     if any(kw in nl for kw in _CABLE_OUTLET_KEYWORDS):
         return "cable_outlet"
-    if any(kw in nl for kw in _SWITCH_KEYWORDS):
-        return "switch"
     if any(kw in nl for kw in _CABLE_SPEC_KEYWORDS):
         return "cable"
     if any(kw in nl for kw in _PVC_CONDUIT_KEYWORDS):
         return "pvc_conduit"
+    # T049: Check grounding/lightning BEFORE switch/material to avoid
+    # misclassifying items like "Коробка уравнивания потенциалов" as switch
+    # (because _SWITCH_KEYWORDS contains "коробк") or grounding connectors
+    # as generic materials.
     if any(kw in nl for kw in _LIGHTNING_KEYWORDS):
         return "lightning"
     if any(kw in nl for kw in _GROUNDING_KEYWORDS):
         return "grounding"
+    if any(kw in nl for kw in _SWITCH_KEYWORDS):
+        return "switch"
     if any(kw in nl for kw in _MATERIAL_KEYWORDS):
         return "material"
     return "material"
@@ -1328,6 +1347,7 @@ def _derive_installation_materials(
 def aggregate_by_height(
     results: list[FileParseResult],
     log=print,
+    file_list: list[tuple[Path, str, float | None]] | None = None,
 ) -> dict:
     """Aggregate parsed results into VOR sections.
 
@@ -1491,6 +1511,8 @@ def aggregate_by_height(
                 return True
         return False
 
+    _spec_luminaire_items: list[tuple] = []  # collected for post-loop processing
+
     if all_spec:
         log(f"\n  [spec] Processing {len(all_spec)} specification items")
 
@@ -1514,17 +1536,7 @@ def aggregate_by_height(
                 pvc_items.append(gi)
             elif cat == "luminaire":
                 norm = _normalize_equip_name(si.description)
-                if _model_in_plan(si.model, plan_luminaire_names):
-                    log(f"    [spec=] luminaire (plan has): "
-                        f"{si.model or norm[:40]}")
-                else:
-                    luminaires.append(AggregatedEquipment(
-                        name=norm, category="luminaire",
-                        counts_by_height={"до 5 метров": si.quantity},
-                        total=si.quantity,
-                    ))
-                    plan_luminaire_names.add(norm.lower())
-                    log(f"    [spec+] luminaire: {norm[:70]} × {si.quantity}")
+                _spec_luminaire_items.append((si, norm))
             elif cat in ("indicator", "pictogram"):
                 norm = _normalize_equip_name(si.description)
                 # Use model-core matching to detect duplicates.
@@ -1579,6 +1591,207 @@ def aggregate_by_height(
                     unit=si.unit,
                 ))
 
+    # ── T051: Spec-luminaire preference ──────────────────────────────
+    # When spec has luminaire items, they carry authoritative building-
+    # wide quantities.  Plan-derived luminaire counts are only partial
+    # (one plan per unique floor) and always under-count.  Strategy:
+    #   1. For each spec luminaire matching a plan model, distribute
+    #      the spec quantity across height categories using the plan's
+    #      height-ratio for that model.
+    #   2. Spec luminaires not in plan go to "до 5 метров".
+    #   3. Plan-only luminaires are dropped (spec is authoritative).
+    if _spec_luminaire_items:
+        log(f"\n  [spec-lum] {len(_spec_luminaire_items)} spec luminaire "
+            f"items — using spec quantities (plan had "
+            f"{sum(l.total for l in luminaires)} units)")
+
+        # Build plan height distribution per plan luminaire name
+        _plan_lum_heights: dict[str, dict[str, int]] = {}
+        for lum in luminaires:
+            _plan_lum_heights[lum.name.lower()] = dict(lum.counts_by_height)
+
+        new_luminaires: list[AggregatedEquipment] = []
+        for si, norm in _spec_luminaire_items:
+            qty = si.quantity if isinstance(si.quantity, (int, float)) else 0
+            if qty <= 0:
+                continue
+
+            # Find matching plan model to get height distribution
+            model_lower = (si.model or "").lower().strip()
+            matched_plan_name: str | None = None
+            if model_lower and len(model_lower) >= 3:
+                for pn in _plan_lum_heights:
+                    if model_lower in pn:
+                        matched_plan_name = pn
+                        break
+
+            if matched_plan_name and _plan_lum_heights[matched_plan_name]:
+                # Distribute spec qty proportionally across heights
+                plan_h = _plan_lum_heights[matched_plan_name]
+                plan_total = sum(plan_h.values())
+                if plan_total > 0:
+                    new_heights: dict[str, int] = {}
+                    remainder = qty
+                    sorted_cats = sorted(plan_h.items(),
+                                         key=lambda x: -x[1])
+                    for i, (hcat, hcount) in enumerate(sorted_cats):
+                        if i == len(sorted_cats) - 1:
+                            # last bucket gets remainder to avoid rounding loss
+                            new_heights[hcat] = remainder
+                        else:
+                            share = round(qty * hcount / plan_total)
+                            share = min(share, remainder)
+                            new_heights[hcat] = share
+                            remainder -= share
+                    new_heights = {h: c for h, c in new_heights.items()
+                                   if c > 0}
+                else:
+                    new_heights = {"до 5 метров": qty}
+                # Remove matched plan entry so it is not reused
+                del _plan_lum_heights[matched_plan_name]
+            else:
+                new_heights = {"до 5 метров": qty}
+
+            new_luminaires.append(AggregatedEquipment(
+                name=norm, category="luminaire",
+                counts_by_height=new_heights,
+                total=sum(new_heights.values()),
+            ))
+            log(f"    [spec-lum] {norm[:60]}  qty={qty}  "
+                f"heights={new_heights}")
+
+        luminaires = new_luminaires
+        luminaires.sort(key=lambda a: -a.total)
+        log(f"  [spec-lum] Result: {sum(l.total for l in luminaires)} "
+            f"luminaire units in {len(luminaires)} items")
+
+    # ── Detect cable inflation from project-wide schema DXFs ──────────
+    # When spec cables exist, they are authoritative (building-specific
+    # quantities from the СО.dxf specification table).  In many projects
+    # the schema DXF contains cable schedules for ALL buildings/panels,
+    # inflating derived cable totals by 5-100×.  When spec cables are
+    # available we suppress derived cables entirely.
+    _spec_cable_total_m = sum(
+        sc.quantity for sc in spec_cables if sc.unit in ("м", "м.", "м.п.", "м. п.")
+    )
+    _has_spec_cables = _spec_cable_total_m > 0
+
+    # T052: regex to parse spec cable description into cable_type string
+    _SPEC_CABLE_DESC_RE = re.compile(
+        r"(\d+)[хx\u00d7](\d+[\.,]?\d*)\s*мм.*?"
+        r"((?:ВБШвнг|ВБбШвнг|ВВГнг|ППГнг|АВВГнг|КГнг|АПвПу|ПвПу)"
+        r"(?:\([А-Яа-яA-Za-z]+\))?-[A-Z]+)",
+        re.IGNORECASE,
+    )
+
+    if _has_spec_cables and cables:
+        _derived_cable_total_m = sum(c.total_length_m for c in cables)
+        # T052: Spec cables are ALWAYS authoritative.  Derived cables
+        # from schema DXFs are unreliable (partial extraction, wrong
+        # type/cross-section assignments, project-wide schemas).
+        # Previous heuristic (3× threshold) kept wrong derived data
+        # when totals were close, causing cable type swaps.
+        #
+        # Convert spec cables → CableItem so they flow through the
+        # normal rendering pipeline (Прокладка + material rows).
+        log(f"\n  [cable-fix] Spec cables={_spec_cable_total_m}m, "
+            f"derived={_derived_cable_total_m}m — "
+            f"replacing derived cables with spec (authoritative)")
+        _new_cables: dict[str, CableItem] = {}
+        _unconverted: list[SpecGroupedItem] = []
+        for sc in spec_cables:
+            if sc.unit not in ("м", "м.", "м.п.", "м. п."):
+                _unconverted.append(sc)
+                continue
+            m = _SPEC_CABLE_DESC_RE.search(sc.description)
+            if m:
+                conductors = m.group(1)
+                section = m.group(2)
+                cable_brand = m.group(3)
+                ct = f"{cable_brand} {conductors}\u00d7{section}"
+                if ct in _new_cables:
+                    _new_cables[ct].count += 1
+                    _new_cables[ct].total_length_m += int(sc.quantity)
+                else:
+                    _new_cables[ct] = CableItem(
+                        cable_type=ct, count=1,
+                        total_length_m=int(sc.quantity),
+                    )
+                log(f"    [cable-spec] {ct} = {sc.quantity}m")
+            else:
+                _unconverted.append(sc)
+        cables = sorted(
+            _new_cables.values(), key=lambda c: -c.total_length_m,
+        )
+        # Keep only unconverted spec cables for the fallback section
+        spec_cables[:] = _unconverted
+
+    # When no spec cables exist but derived cables look massively inflated
+    # (e.g. project-wide schema containing all buildings), detect by
+    # counting spec panel count vs schema panel names in the DXF text.
+    if not _has_spec_cables and cables:
+        _derived_cable_total_m = sum(c.total_length_m for c in cables)
+        _spec_panel_count = len(spec_panels)
+        if _spec_panel_count > 0:
+            # Heuristic: if >200m per spec panel, check for multi-panel
+            # schema inflation
+            _m_per_panel = _derived_cable_total_m / max(1, _spec_panel_count)
+            if _m_per_panel > 5000:
+                # Likely a project-wide schema — scale down to match
+                # spec panel count.  Count distinct panel names in schema
+                # DXF text to estimate how many panels the schema covers.
+                _schema_panel_names: set[str] = set()
+                _SCHEMA_PANEL_RE = re.compile(
+                    r"^(ЩО|ЩР|РП|ЩАО|ЦСАО|ВРУ|ЩСН|ЩСО|ЩС|ЩУ|ЩН|ЩЭ|ГРЩ)\b",
+                )
+                for r in results:
+                    if r.plan_type == "схема" and r.cables:
+                        # Scan the DXF file for panel names
+                        _schema_path = None
+                        for fpath, pt, elev in (file_list or []):
+                            if fpath.name == r.filename:
+                                _schema_path = str(fpath)
+                                break
+                        if _schema_path:
+                            try:
+                                with open(
+                                    _schema_path, "r",
+                                    encoding="utf-8", errors="replace",
+                                ) as _sf:
+                                    for _line in _sf:
+                                        _ls = _line.strip()
+                                        if (
+                                            _SCHEMA_PANEL_RE.match(_ls)
+                                            and len(_ls) < 30
+                                        ):
+                                            _schema_panel_names.add(_ls)
+                            except OSError:
+                                pass
+
+                _n_schema = len(_schema_panel_names)
+                if _n_schema > _spec_panel_count * 2:
+                    _ratio = _spec_panel_count / _n_schema
+                    if _ratio < 0.2:
+                        # Ratio is very low — schema is almost certainly
+                        # project-wide with many irrelevant panels.
+                        # Suppress ALL derived cables since we cannot
+                        # determine which cables belong to this building.
+                        log(f"\n  [cable-fix] No spec cables. "
+                            f"Schema panels={_n_schema}, spec panels="
+                            f"{_spec_panel_count}, ratio={_ratio:.2f} "
+                            f"< 0.2 — suppressing all derived cables "
+                            f"(project-wide schema)")
+                        cables = []
+                    else:
+                        log(f"\n  [cable-fix] No spec cables. "
+                            f"Schema panels={_n_schema}, spec panels="
+                            f"{_spec_panel_count} — scaling cables by "
+                            f"{_ratio:.2f}")
+                        for c in cables:
+                            c.total_length_m = round(
+                                c.total_length_m * _ratio)
+                            c.count = max(1, round(c.count * _ratio))
+
     # ── Derive installation materials from cables/panels/luminaires ──
     total_luminaires = sum(lum.total for lum in luminaires)
     # Count lighting groups = number of unique lighting circuit cables
@@ -1612,6 +1825,19 @@ def aggregate_by_height(
         log=log,
     )
 
+    # ── PVC dedup: suppress derived PVC when spec already has PVC/gofra ──
+    # Spec PVC items are authoritative; derived PVC (computed from cable
+    # lengths) would duplicate them and inflate totals.  Same dedup pattern
+    # as GML (T040) and cables (T047).
+    _spec_has_pvc = bool(pvc_items)
+    if _spec_has_pvc and derived and derived.pvc_total_m > 0:
+        log(f"\n  [pvc-dedup] Spec has {len(pvc_items)} PVC items "
+            f"({sum(p.quantity for p in pvc_items if isinstance(p.quantity, (int, float)))}m) — "
+            f"suppressing derived PVC ({derived.pvc_total_m}m)")
+        derived.pvc_conduit = {}
+        derived.pvc_total_m = 0
+        derived.pvc_holders = {}
+
     log(f"\n  [VOR] Luminaires:    {len(luminaires)} types")
     log(f"  [VOR] Indicators:    {len(indicators)} types")
     log(f"  [VOR] Panels:        {len(schema_panels)} from schema")
@@ -1624,7 +1850,7 @@ def aggregate_by_height(
         f"{sum(c.total_length_m for c in cables):.0f}m")
     log(f"  [VOR] Grounding:     {len(grounding_items)} items")
     log(f"  [VOR] Lightning:     {len(lightning_items)} items")
-    log(f"  [VOR] PVC conduits:  {len(pvc_items)} items")
+    log(f"  [VOR] PVC conduits:  {len(pvc_items)} items (spec_has_pvc={_spec_has_pvc})")
     log(f"  [VOR] Spec cables:   {len(spec_cables)} items")
     log(f"  [VOR] Derived materials: connections={derived.cable_connections}, "
         f"boxes={derived.junction_boxes_lighting}+{derived.junction_boxes_power}, "
@@ -2170,7 +2396,7 @@ def generate_vor_docx(
 
     # ── Section 7: Grounding ──
     if grounding_items:
-        _add_section_header(table, "Заземление")
+        _add_section_header(table, "Монтаж системы заземления")
         for gi in grounding_items:
             item_num += 1
             _add_work_row(
@@ -2178,7 +2404,7 @@ def generate_vor_docx(
                 gi.unit, gi.quantity, ref=drawing_ref,
             )
     else:
-        _add_section_header(table, "Заземление")
+        _add_section_header(table, "Монтаж системы заземления")
         _add_material_row(
             table,
             "[Заполнить вручную из проекта заземления]",
@@ -2187,7 +2413,7 @@ def generate_vor_docx(
 
     # ── Section 7b: Lightning protection ──
     if lightning_items:
-        _add_section_header(table, "Молниезащита")
+        _add_section_header(table, "Монтаж системы молниезащиты")
         for li in lightning_items:
             item_num += 1
             _add_work_row(
@@ -2195,7 +2421,7 @@ def generate_vor_docx(
                 li.unit, li.quantity, ref=drawing_ref,
             )
     else:
-        _add_section_header(table, "Молниезащита")
+        _add_section_header(table, "Монтаж системы молниезащиты")
         _add_material_row(
             table,
             "[Заполнить вручную из проекта молниезащиты]",
@@ -2321,7 +2547,7 @@ def generate_vor(
     results = parse_all_files(file_list, log=log)
 
     log("\n[3] Агрегация по высотам")
-    agg = aggregate_by_height(results, log=log)
+    agg = aggregate_by_height(results, log=log, file_list=file_list)
 
     luminaires = agg["luminaires"]
     log("\n  --- Светильники по высотам ---")
@@ -2418,6 +2644,7 @@ def generate_vor_combined(
     t0 = time.time()
 
     all_results: list[FileParseResult] = []
+    all_file_list: list[tuple[Path, str, float | None]] = []
 
     for sec_name, sec_folder in sections:
         log(f"\n{'─' * 50}")
@@ -2426,6 +2653,7 @@ def generate_vor_combined(
 
         log("\n  [1] Сканирование файлов")
         file_list = scan_and_classify(sec_folder)
+        all_file_list.extend(file_list)
         by_type: dict[str, int] = defaultdict(int)
         for _, pt, _ in file_list:
             by_type[pt] += 1
@@ -2439,7 +2667,7 @@ def generate_vor_combined(
     log(f"\n{'─' * 50}")
     log(f"  Агрегация (все разделы)")
     log(f"{'─' * 50}")
-    agg = aggregate_by_height(all_results, log=log)
+    agg = aggregate_by_height(all_results, log=log, file_list=all_file_list)
 
     luminaires = agg["luminaires"]
     log("\n  --- Светильники по высотам ---")
