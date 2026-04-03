@@ -758,7 +758,10 @@ def _extract_plan_annotations(
 
 _CABLE_TYPE_RE = re.compile(
     r"((?:ВБШвнг|ВБбШвнг|ВВГнг|ППГнг|АВВГнг|КГнг|АПвПу|ПвПу)"
-    r"(?:\([А-Яа-яA-Za-z]+\))?-[A-Z]+\s+\d+[хx×]\d+[\.,]?\d*)"
+    r"(?:\([А-Яа-яA-Za-z]+\))?-[A-Z]+\s+\d+[хx×]\d+[\.,]?\d*"
+    r"|"
+    r"(?:ПуВВнг|ПуВВ|ПВС|ПВ[13]|ШВВП|ППВ|АПВ)"
+    r"(?:\([А-Яа-яA-Za-z]+\))?(?:-[A-Z]+)?\s+\d+[хx×]\d+[\.,]?\d*)"
 )
 _CABLE_LENGTH_RE = re.compile(r"L\s*=\s*(\d+)")
 
@@ -1208,7 +1211,9 @@ def parse_spec_dxf(dxf_path: str, log=print) -> list[SpecItem]:
                                        "SLICK", "MARS", "LUNA", "STAR",
                                        "INSEL", "NERO", "MERCURY",
                                        "ВБШвнг", "ППГнг", "ВВГнг",
-                                       "FRHF", "ПуГВнг"]
+                                       "FRHF", "ПуГВнг",
+                                       "ПуВВнг", "ПуВВ", "ПВС",
+                                       "ПВ1", "ПВ3", "ШВВП", "ППВ", "АПВ"]
             ):
                 catalog = part
                 continue
