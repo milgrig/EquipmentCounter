@@ -12,6 +12,7 @@ Usage:
 """
 
 import argparse
+import math
 import re
 import sys
 import time
@@ -114,6 +115,141 @@ _PVC_CONDUIT_KEYWORDS = (
 
 def _classify_plan(filename: str) -> str:
     return classify_plan(filename)
+
+
+_CONTENT_ELEV_RE = re.compile(
+    r"на\s+отм[.\s_]*([+-]?\d+[.,]\d+)", re.IGNORECASE,
+)
+_CONTENT_ELEV_MM_RE = re.compile(
+    r"на\s+отм[.\s_]*([+-]?\d{4,})\b", re.IGNORECASE,
+)
+_ATTRIB_ELEV_RE = re.compile(
+    r"^[+-]?\d+[.,]\d+$",
+)
+
+
+def _parse_elev_value(raw: str) -> float | None:
+    """Parse elevation string to float meters.
+
+    Handles formats: '+7.800' (m), '+7,800' (m with comma), '+7800' (mm).
+    Values >= 100 are treated as millimetres and divided by 1000.
+    """
+    s = raw.replace(",", ".")
+    if s.startswith("+"):
+        s = s[1:]
+    try:
+        val = float(s)
+    except ValueError:
+        return None
+    if val >= 100.0 or val <= -100.0:
+        val = val / 1000.0
+    return val
+
+
+def _classify_by_content(dxf_path: str) -> tuple[str, float | None]:
+    """Fallback classification by scanning MTEXT/TEXT content inside the DXF.
+
+    Returns (plan_type, elevation).  Used when filename-based classification
+    yields 'другое' (e.g. because of broken encoding).
+    """
+    if _ezdxf is None:
+        return "другое", None
+
+    try:
+        doc = _ezdxf.readfile(dxf_path)
+    except Exception:
+        return "другое", None
+
+    msp = doc.modelspace()
+
+    texts: list[str] = []
+    for e in msp:
+        plain: str | None = None
+        if e.dxftype() == "MTEXT":
+            plain = e.plain_text().strip()
+        elif e.dxftype() == "TEXT":
+            plain = e.dxf.text.strip() if hasattr(e.dxf, "text") else None
+        if plain:
+            texts.append(plain)
+
+        # Collect ATTRIB values from INSERT entities
+        if e.dxftype() == "INSERT":
+            try:
+                for attrib in e.attribs:
+                    val = attrib.dxf.text.strip()
+                    if val:
+                        texts.append(val)
+            except Exception:
+                pass
+
+    # Also scan block names for elevation info
+    block_texts: list[str] = []
+    for block in doc.blocks:
+        if "отм" in block.name.lower():
+            block_texts.append(block.name)
+
+    if not texts and not block_texts:
+        return "общие", None
+
+    combined = " ".join(texts).lower()
+
+    # Extract elevation from content, ATTRIBs, or block names
+    elev: float | None = None
+
+    # 1) Try decimal elevation in text/ATTRIB content: "на отм +7.800"
+    for t in texts:
+        m = _CONTENT_ELEV_RE.search(t)
+        if m:
+            elev = _parse_elev_value(m.group(1))
+            if elev is not None:
+                break
+
+    # 2) Try millimetre elevation in text/ATTRIB: "на отм +7800"
+    if elev is None:
+        for t in texts:
+            m = _CONTENT_ELEV_MM_RE.search(t)
+            if m:
+                elev = _parse_elev_value(m.group(1))
+                if elev is not None:
+                    break
+
+    # 3) Try block names: "План освещение на отм_ _7800"
+    if elev is None:
+        for bname in block_texts:
+            m = _CONTENT_ELEV_RE.search(bname)
+            if m:
+                elev = _parse_elev_value(m.group(1))
+                if elev is not None:
+                    break
+            m = _CONTENT_ELEV_MM_RE.search(bname)
+            if m:
+                elev = _parse_elev_value(m.group(1))
+                if elev is not None:
+                    break
+
+    # Classify by keywords found in content
+    if "принципиальная" in combined and "схема" in combined:
+        return "схема", elev
+    if "общие данные" in combined:
+        return "общие", elev
+    if "план освещения" in combined:
+        return "освещение", elev
+    if "план привязки" in combined:
+        return "привязка", elev
+    if "план расстановки" in combined or "план расположения" in combined:
+        return "расположение", elev
+    # Heuristic: luminaire mentions imply lighting plan
+    has_luminaire = "светильник" in combined
+    has_rozetka = "розетк" in combined
+    has_cable_route = "кабельная трасса" in combined
+    if has_rozetka and not has_luminaire:
+        return "расположение", elev
+    if has_luminaire and has_cable_route:
+        return "освещение", elev
+    if has_luminaire:
+        return "привязка", elev
+
+    return "другое", elev
 
 
 _ELEV_VALUE_RE = re.compile(r"[+-]?\d+[-.,]\d+")
@@ -231,7 +367,7 @@ class PanelInfo:
 
 
 _PANEL_NAME_RE = re.compile(
-    r"(ЩО[-\s]?\d+(?:\.\d+)?|ЩАО[-\s]?\d+(?:\.\d+)?|ЦСАО[-\s]?\d+)", re.IGNORECASE,
+    r"(ЩР[-\s]?\d+(?:\.\d+)?|ЩО[-\s]?\d+(?:\.\d+)?|ЩАО[-\s]?\d+(?:\.\d+)?|ЦСАО[-\s]?\d+|ВРУ[-\s]?\d+(?:\.\d+)?)", re.IGNORECASE,
 )
 _KM_RE = re.compile(r"^KM-\d+$")
 _CABLE_LEN_RE = re.compile(
@@ -317,7 +453,70 @@ def extract_panels_from_schema(dxf_path: str, log=print) -> list[PanelInfo]:
         if best_panel is not None:
             best_panel.circuit_cables.append((ctype, clen))
 
-    panels.sort(key=lambda p: p.name)
+    # Extract circuit breaker counts from ACAD_TABLE *T blocks.
+    # AutoCAD creates *T blocks and ACAD_TABLE entities in matching order
+    # (sorted by handle).  Count QF-x.y entries in each *T block, then
+    # use the corresponding ACAD_TABLE position to match to nearest panel.
+    _QF_CIRCUIT_RE = re.compile(r"^QF[-\s]?\d+\.\d+$")
+    t_blocks_sorted = sorted(
+        (b for b in doc.blocks if b.name.startswith("*T")),
+        key=lambda b: b.name,
+    )
+    acad_tables_sorted = sorted(
+        (e for e in msp if e.dxftype() == "ACAD_TABLE"),
+        key=lambda e: e.dxf.handle,
+    )
+    if len(t_blocks_sorted) == len(acad_tables_sorted):
+        for tblock, atable in zip(t_blocks_sorted, acad_tables_sorted):
+            qf_count = sum(
+                1 for ent in tblock
+                if ent.dxftype() == "MTEXT"
+                and _QF_CIRCUIT_RE.match(ent.plain_text().strip())
+            )
+            if qf_count == 0:
+                continue
+            try:
+                tx, ty = atable.dxf.insert[0], atable.dxf.insert[1]
+            except Exception:
+                continue
+            best_panel = None
+            best_d = float("inf")
+            for p in panels:
+                pos = panel_positions.get(p.name)
+                if pos is None:
+                    continue
+                d = abs(pos[0] - tx) + abs(pos[1] - ty)
+                if d < best_d:
+                    best_d = d
+                    best_panel = p
+            if best_panel is not None and best_panel.circuit_count == 0:
+                best_panel.circuit_count = qf_count
+
+    # Sort: emergency panels (АО/AO) first, then distribution panels
+    def _panel_sort_key(p: PanelInfo) -> tuple[int, str]:
+        nl = p.name.upper()
+        if "АО" in nl or "AO" in nl:
+            return (0, p.name)
+        return (1, p.name)
+    panels.sort(key=_panel_sort_key)
+
+    # Filter upstream/parent panels that don't belong to this building section.
+    # If ≥2 panels share a section suffix (e.g. "3.12"), drop any that lack it.
+    _SECTION_RE = re.compile(r"(\d+\.\d+)")
+    suffix_counts: dict[str, int] = {}
+    for p in panels:
+        m = _SECTION_RE.search(p.name)
+        if m:
+            suffix_counts[m.group(1)] = suffix_counts.get(m.group(1), 0) + 1
+    if suffix_counts:
+        dominant = max(suffix_counts, key=lambda s: suffix_counts[s])
+        if suffix_counts[dominant] >= 2:
+            before = len(panels)
+            panels = [p for p in panels if dominant in p.name]
+            if len(panels) < before:
+                log(f"    [panels] Filtered to section {dominant}: "
+                    f"{before} → {len(panels)}")
+
     for p in panels:
         total_cable_m = sum(ln for _, ln in p.circuit_cables)
         log(f"    Panel: {p.name} breaker={p.breaker}  "
@@ -399,12 +598,21 @@ def _detect_sheets(dxf_path: str, log=print) -> list[_SheetRegion] | None:
 
     legend_y_threshold = min(ly for _, ly in legend_positions) + 500
 
+    _LEGEND_LUMINAIRE_KW = ["SLICK", "ARCTIC", "CD LED", "NERO", "INSEL"]
+    _LEGEND_EQUIP_KW = [
+        "Розетк", "Выключатель", "Кабельный вывод", "Коробк", "Щит",
+        "Датчик", "Пост управления", "Блок аварийн",
+    ]
+    _ANNOTATION_LUMINAIRE_KW = [
+        "SLICK", "ARCTIC", "LED", "CD", "OPL", "INSEL", "NERO",
+    ]
+
     for sheet in sheets:
         for x, y, plain in all_mtext:
             if sheet.x_left <= x <= sheet.x_right and y < legend_y_threshold:
                 if "Светильник" in plain or any(
-                    kw in plain for kw in ["SLICK", "ARCTIC", "CD LED", "NERO", "INSEL"]
-                ):
+                    kw in plain for kw in _LEGEND_LUMINAIRE_KW
+                ) or any(kw in plain for kw in _LEGEND_EQUIP_KW):
                     sheet.legend_items.append(plain)
 
         equip_counts: dict[str, int] = defaultdict(int)
@@ -415,15 +623,17 @@ def _detect_sheets(dxf_path: str, log=print) -> list[_SheetRegion] | None:
                 if m:
                     count = int(m.group(1))
                     etype = m.group(2).strip()
-                    if any(kw in etype for kw in [
-                        "SLICK", "ARCTIC", "LED", "CD", "OPL", "INSEL", "NERO"
-                    ]):
+                    if any(kw in etype for kw in _ANNOTATION_LUMINAIRE_KW) or any(
+                        kw.lower() in etype.lower() for kw in _LEGEND_EQUIP_KW
+                    ):
                         matched_name = _match_annotation_to_legend(etype, sheet.legend_items)
                         equip_counts[matched_name] += count
                 elif plain and not plain.startswith(("Обозначен", "Наименован")):
-                    if any(kw in plain for kw in [
-                        "SLICK", "ARCTIC", "CD LED", "INSEL", "NERO"
-                    ]) and len(plain) < 60:
+                    if len(plain) < 60 and (
+                        any(kw in plain for kw in _LEGEND_LUMINAIRE_KW) or any(
+                            kw.lower() in plain.lower() for kw in _LEGEND_EQUIP_KW
+                        )
+                    ):
                         matched_name = _match_annotation_to_legend(plain, sheet.legend_items)
                         equip_counts[matched_name] += 1
 
@@ -507,6 +717,10 @@ def scan_and_classify(folder: Path) -> list[tuple[Path, str, float | None]]:
         plan_type = _classify_plan(f.name)
         elevs = _extract_all_elevations(f.name)
         elev = elevs[0] if elevs else None
+        if plan_type == "другое" and f.suffix.lower() == ".dxf":
+            plan_type, content_elev = _classify_by_content(str(f))
+            if elev is None and content_elev is not None:
+                elev = content_elev
         results.append((f, plan_type, elev))
     return results
 
@@ -666,7 +880,7 @@ def _merge_per_elevation(
     out: list[FileParseResult] = []
 
     for r in results:
-        if r.plan_type in dup_types and r.elevation is not None:
+        if r.plan_type in dup_types:
             dup_key = (
                 "light" if r.plan_type in ("освещение", "привязка") else "power",
                 r.elevation,
@@ -674,6 +888,16 @@ def _merge_per_elevation(
             groups[dup_key].append(r)
         else:
             out.append(r)
+
+    # Merge None-elevation groups into a known-elevation group of the same
+    # category when exactly one such group exists (e.g. привязка without
+    # elevation matched to освещение that has elevation).
+    none_keys = [k for k in groups if k[1] is None]
+    for nk in none_keys:
+        cat = nk[0]
+        peers = [k for k in groups if k[0] == cat and k[1] is not None]
+        if len(peers) == 1:
+            groups[peers[0]].extend(groups.pop(nk))
 
     for key in sorted(groups.keys(), key=lambda k: k[1] or 0):
         group = groups[key]
@@ -727,6 +951,208 @@ class SpecGroupedItem:
     description: str
     unit: str
     quantity: int
+
+
+@dataclass
+class DerivedMaterials:
+    """Installation materials derived from cables, panels, and luminaires."""
+    # Cable connections at panels: sum of conductor counts across all cables
+    cable_connections: int = 0
+    # Junction boxes for power circuits (FS 100x100x50)
+    junction_boxes_power: int = 0
+    # Junction/distribution boxes for lighting circuits (85x85x40)
+    junction_boxes_lighting: int = 0
+    # Crimp sleeves (ГМЛ) = total conductor connections at junction boxes
+    crimp_sleeves: int = 0
+    # Heat-shrink tubes (ТТК) = connections at feeder cable entries
+    heat_shrink_tubes: int = 0
+    # Fire-seal foam cartridges (DN1201)
+    fire_seal_foam: int = 0
+    # Foam gun (DN1202) — 1 if any foam needed
+    foam_gun: int = 0
+    # Steel conduit sleeves for wall penetrations (Ду20)
+    steel_sleeves: int = 0
+    # PVC conduit by diameter: {diameter_mm: length_m}
+    pvc_conduit: dict[int, int] = field(default_factory=dict)
+    # PVC conduit holders by diameter: {diameter_mm: count}
+    pvc_holders: dict[int, int] = field(default_factory=dict)
+    # Total PVC conduit length for work item
+    pvc_total_m: int = 0
+
+
+# Standard conduit diameter selection by cable cross-section (mm2)
+_CABLE_SECTION_RE = re.compile(
+    r"(\d+)\s*[хx×]\s*(\d+[.,]?\d*)", re.IGNORECASE,
+)
+
+
+def _conduit_diameter(cable_type: str) -> int:
+    """Determine PVC conduit diameter (mm) from cable cross-section.
+
+    Standard rule:
+      cross-section ≤ 1.5mm2 → d16
+      cross-section ≤ 2.5mm2 → d20
+      cross-section ≤ 6mm2   → d25
+      cross-section ≤ 10mm2  → d32
+    """
+    m = _CABLE_SECTION_RE.search(cable_type)
+    if not m:
+        return 20  # default
+    section = float(m.group(2).replace(",", "."))
+    if section <= 1.5:
+        return 16
+    if section <= 2.5:
+        return 20
+    if section <= 6.0:
+        return 25
+    return 32
+
+
+def _conductor_count(cable_type: str) -> int:
+    """Extract conductor count from cable type string (e.g. '3x2.5' → 3, '5x4' → 5)."""
+    m = _CABLE_SECTION_RE.search(cable_type)
+    if not m:
+        return 3  # default assumption
+    return int(m.group(1))
+
+
+def _derive_installation_materials(
+    panels: list[PanelInfo],
+    cables: list[CableItem],
+    luminaire_count: int,
+    lighting_groups: int,
+    cable_outlet_count: int = 0,
+    log=print,
+) -> DerivedMaterials:
+    """Derive installation material quantities from parsed cable/panel/luminaire data.
+
+    Rules (based on standard electrical installation practices):
+
+    1. Cable connections at panels = sum of conductor count per cable run
+       (each conductor is terminated individually at the panel).
+
+    2. Junction boxes for lighting = luminaire_count minus end-of-line
+       luminaires (1 per lighting group). Rule: "near each luminaire
+       except the last on the line".
+
+    3. Junction boxes for power circuits = number of non-lighting,
+       non-reserve cable runs (sockets, AC, etc.) that need junction boxes.
+       Typically 2 per socket/equipment circuit that branches.
+
+    4. Crimp sleeves (ГМЛ) = junction_box_count × conductors_per_cable (3).
+
+    5. Heat-shrink tubes (ТТК) = used at splice points where cable
+       cross-section changes. Typically at feeder-to-distribution transitions.
+
+    6. Steel conduit sleeves = number of cable runs (wall penetrations).
+
+    7. Fire-seal foam = 1 cartridge if any wall penetrations exist.
+       Foam gun = 1 if foam is needed.
+
+    8. PVC conduit = cable length by conduit diameter;
+       holders = length / 0.8m (standard step).
+    """
+    dm = DerivedMaterials()
+
+    if not cables:
+        return dm
+
+    total_cable_runs = sum(c.count for c in cables)
+
+    # ── 1. Cable connections at panels ──
+    # Each cable run has conductors terminated at both ends (panel + device)
+    # The VOR item "Подключение жил кабелей" counts individual conductor
+    # connections.  Each circuit cable: conductor_count × 1 (at panel end).
+    # Plus feeder cables: conductor_count × 1 each.
+    circuit_connections = 0
+    for c in cables:
+        n_cond = _conductor_count(c.cable_type)
+        circuit_connections += c.count * n_cond
+    # Add feeder cable connections (from panel feed_cable field)
+    feeder_connections = 0
+    for p in panels:
+        if p.feed_cable:
+            n_cond = _conductor_count(p.feed_cable)
+            feeder_connections += n_cond
+    dm.cable_connections = circuit_connections + feeder_connections
+    log(f"    [derived] Cable connections: {dm.cable_connections} "
+        f"(circuits={circuit_connections} + feeders={feeder_connections})")
+
+    # ── 2. Junction boxes ──
+    # Lighting: one per luminaire, minus end-of-line (1 per lighting group)
+    if luminaire_count > 0:
+        dm.junction_boxes_lighting = max(0, luminaire_count - lighting_groups)
+    # Power: junction boxes at cable outlet / branching points.
+    # Cable outlets are branch connection points on the equipment plan.
+    # If cable_outlet_count is available, use it directly.
+    # Otherwise estimate from power circuit count.
+    if cable_outlet_count > 0:
+        dm.junction_boxes_power = cable_outlet_count
+    else:
+        power_circuit_count = 0
+        for p in panels:
+            for ctype, clen in p.circuit_cables:
+                ct_lower = ctype.lower()
+                if "1,5" in ct_lower or "1.5" in ct_lower:
+                    continue
+                power_circuit_count += 1
+        dm.junction_boxes_power = min(power_circuit_count, 2) if power_circuit_count > 0 else 0
+    log(f"    [derived] Junction boxes: lighting={dm.junction_boxes_lighting}, "
+        f"power={dm.junction_boxes_power}")
+
+    # ── 3. Crimp sleeves ──
+    total_boxes = dm.junction_boxes_lighting + dm.junction_boxes_power
+    dm.crimp_sleeves = total_boxes * 3  # 3 conductors per 3-wire cable
+    log(f"    [derived] Crimp sleeves (ГМЛ): {dm.crimp_sleeves} "
+        f"({total_boxes} boxes × 3 conductors)")
+
+    # ── 4. Heat-shrink tubes ──
+    # Used at feeder cable entries to panels where cross-section changes.
+    # Typically 1 per feeder cable splice × number of spliced conductors,
+    # but in practice a small fixed count (reference shows 4).
+    # Rule: count of feeder cables that pass through wall penetrations
+    # and need splice protection.
+    dm.heat_shrink_tubes = len([p for p in panels if p.feed_cable]) * 2
+    if dm.heat_shrink_tubes == 0 and total_cable_runs > 0:
+        dm.heat_shrink_tubes = max(2, total_cable_runs // 3)
+    log(f"    [derived] Heat-shrink tubes (ТТК): {dm.heat_shrink_tubes}")
+
+    # ── 5. Steel conduit sleeves (wall penetrations) ──
+    dm.steel_sleeves = total_cable_runs
+    log(f"    [derived] Steel sleeves (Ду20): {dm.steel_sleeves}")
+
+    # ── 6. Fire-seal foam & gun ──
+    if dm.steel_sleeves > 0:
+        dm.fire_seal_foam = 1
+        dm.foam_gun = 1
+    log(f"    [derived] Fire-seal foam: {dm.fire_seal_foam}, "
+        f"gun: {dm.foam_gun}")
+
+    # ── 7. PVC conduit quantities ──
+    # Conduit length ≈ 0.9 × cable length (conduit route is ~10 % shorter
+    # than total cable length because cable has slack/loops at connection
+    # points).
+    _PVC_LENGTH_COEFF = 0.9
+    conduit_lengths: dict[int, int] = {}
+    for c in cables:
+        diam = _conduit_diameter(c.cable_type)
+        conduit_lengths[diam] = (
+            conduit_lengths.get(diam, 0)
+            + round(c.total_length_m * _PVC_LENGTH_COEFF)
+        )
+    dm.pvc_conduit = conduit_lengths
+    dm.pvc_total_m = sum(conduit_lengths.values())
+
+    # Holders: every 0.8m
+    dm.pvc_holders = {
+        diam: math.ceil(length / 0.8)
+        for diam, length in conduit_lengths.items()
+    }
+    for diam in sorted(conduit_lengths):
+        log(f"    [derived] PVC d.{diam}мм: {conduit_lengths[diam]}м, "
+            f"holders: {dm.pvc_holders[diam]}")
+
+    return dm
 
 
 def aggregate_by_height(
@@ -919,6 +1345,30 @@ def aggregate_by_height(
                     unit=si.unit,
                 ))
 
+    # ── Derive installation materials from cables/panels/luminaires ──
+    total_luminaires = sum(lum.total for lum in luminaires)
+    # Count lighting groups = number of unique lighting circuit cables
+    lighting_groups_count = 0
+    for p in schema_panels:
+        for ctype, clen in p.circuit_cables:
+            ct_lower = ctype.lower()
+            if "1,5" in ct_lower or "1.5" in ct_lower:
+                lighting_groups_count += 1
+    if lighting_groups_count == 0 and total_luminaires > 0:
+        lighting_groups_count = max(1, len(schema_panels))
+
+    total_cable_outlets = sum(co.total for co in cable_outlets)
+
+    log(f"\n  [derived] Deriving installation materials...")
+    derived = _derive_installation_materials(
+        panels=schema_panels,
+        cables=cables,
+        luminaire_count=total_luminaires,
+        lighting_groups=lighting_groups_count,
+        cable_outlet_count=total_cable_outlets,
+        log=log,
+    )
+
     log(f"\n  [VOR] Luminaires:    {len(luminaires)} types")
     log(f"  [VOR] Indicators:    {len(indicators)} types")
     log(f"  [VOR] Panels:        {len(schema_panels)} from schema")
@@ -933,6 +1383,9 @@ def aggregate_by_height(
     log(f"  [VOR] Lightning:     {len(lightning_items)} items")
     log(f"  [VOR] PVC conduits:  {len(pvc_items)} items")
     log(f"  [VOR] Spec cables:   {len(spec_cables)} items")
+    log(f"  [VOR] Derived materials: connections={derived.cable_connections}, "
+        f"boxes={derived.junction_boxes_lighting}+{derived.junction_boxes_power}, "
+        f"sleeves={derived.crimp_sleeves}, steel={derived.steel_sleeves}")
 
     return {
         "luminaires": luminaires,
@@ -948,6 +1401,7 @@ def aggregate_by_height(
         "lightning_items": lightning_items,
         "pvc_items": pvc_items,
         "spec_cables": spec_cables,
+        "derived": derived,
     }
 
 
@@ -956,7 +1410,7 @@ def aggregate_by_height(
 _COL_WIDTHS_CM = [1.2, 9.5, 1.5, 1.8, 4.5, 4.5, 3.0]
 _HEADERS = [
     "№ п/п", "Наименование вида работ", "Ед. изм.",
-    "РД", "Формула расчета объемов работ и расхода материалов",
+    "Объем работ", "Формула расчета объемов работ и расхода материалов",
     "Ссылка на чертежи, спецификации", "Дополнительная информация",
 ]
 _FONT_NAME = "Times New Roman"
@@ -1036,6 +1490,7 @@ def generate_vor_docx(
     lightning_items: list[SpecGroupedItem] | None = None,
     pvc_items: list[SpecGroupedItem] | None = None,
     spec_cables: list[SpecGroupedItem] | None = None,
+    derived: DerivedMaterials | None = None,
 ) -> str:
     """Generate a VOR .docx file from aggregated data."""
     doc = Document()
@@ -1126,6 +1581,14 @@ def generate_vor_docx(
                     f"Монтаж {sp.description}",
                     sp.unit, sp.quantity, ref=drawing_ref,
                 )
+        # Cable connections at panels (derived)
+        if derived and derived.cable_connections > 0:
+            item_num += 1
+            _add_work_row(
+                table, item_num,
+                "Подключение жил кабелей до 10 мм2",
+                "шт", derived.cable_connections, ref=drawing_ref,
+            )
 
     # ── Section 2: Lighting equipment by height ──
     has_lighting = any(
@@ -1208,8 +1671,16 @@ def generate_vor_docx(
         )
 
     # ── Section 3: Electrical devices ──
-    has_devices = switches or (sockets and any(s.total > 0 for s in sockets)) or (
-        cable_outlets and any(c.total > 0 for c in cable_outlets))
+    has_derived_boxes = (derived and (
+        derived.junction_boxes_power > 0
+        or derived.junction_boxes_lighting > 0
+        or derived.crimp_sleeves > 0
+        or derived.heat_shrink_tubes > 0
+    ))
+    has_devices = (switches
+                   or (sockets and any(s.total > 0 for s in sockets))
+                   or (cable_outlets and any(c.total > 0 for c in cable_outlets))
+                   or has_derived_boxes)
     if has_devices:
         _add_section_header(table, "Монтаж электроустановочных изделий")
         for sw in (switches or []):
@@ -1231,6 +1702,42 @@ def generate_vor_docx(
                 _add_work_row(
                     table, item_num, f"Монтаж {co.name}",
                     "шт", co.total, ref=drawing_ref,
+                )
+        # Derived junction boxes
+        if derived and derived.junction_boxes_power > 0:
+            item_num += 1
+            _add_work_row(
+                table, item_num,
+                "Монтаж коробки соединительной с кабельными "
+                "вводами 100x100x50 мм",
+                "шт", derived.junction_boxes_power, ref=drawing_ref,
+            )
+        if derived and derived.junction_boxes_lighting > 0:
+            item_num += 1
+            _add_work_row(
+                table, item_num,
+                "Монтаж коробки распределительной "
+                "85x85x40 мм",
+                "шт", derived.junction_boxes_lighting, ref=drawing_ref,
+            )
+        # Derived crimping materials (sub-section)
+        if derived and derived.crimp_sleeves > 0:
+            item_num += 1
+            _add_work_row(
+                table, item_num,
+                "Соединение жил кабелей методом опрессовки",
+                "", "", ref=drawing_ref,
+            )
+            _add_material_row(
+                table,
+                "Луженая гильза ГМЛ",
+                "шт", derived.crimp_sleeves, ref=drawing_ref,
+            )
+            if derived.heat_shrink_tubes > 0:
+                _add_material_row(
+                    table,
+                    "Термоусадочная трубка ТТК (4:1)",
+                    "шт", derived.heat_shrink_tubes, ref=drawing_ref,
                 )
 
     # ── Section 3b: Materials from spec ──
@@ -1305,22 +1812,64 @@ def generate_vor_docx(
                     sc.unit, sc.quantity, ref=drawing_ref,
                 )
 
-    # ── Section 5: Cable trays (placeholder) ──
-    _add_section_header(table, "Монтаж кабельных лотков и соединительных деталей")
-    _add_material_row(
-        table,
-        "[Заполнить вручную из планов кабеленесущих систем]",
-        "", "",
-    )
+    # ── Section 5: Cable penetrations (fire sealing) ──
+    has_penetrations = derived and derived.steel_sleeves > 0
+    if has_penetrations:
+        item_num += 1
+        _add_work_row(
+            table, item_num,
+            "Выполнение проходки кабеля через стены",
+            "", "", ref=drawing_ref,
+        )
+        if derived.fire_seal_foam > 0:
+            _add_material_row(
+                table,
+                "Двухкомпонентная огнестойкая пена, DN1201",
+                "шт", derived.fire_seal_foam, ref=drawing_ref,
+            )
+        if derived.foam_gun > 0:
+            _add_material_row(
+                table,
+                "Пистолет для двухкомпонентной пены, DN1202",
+                "шт", derived.foam_gun, ref=drawing_ref,
+            )
+        _add_material_row(
+            table,
+            "Гильза закладная труба сталь ВГП Ду 20 "
+            "(Дн 26,8x2,5) ГОСТ 3262-75",
+            "шт", derived.steel_sleeves, ref=drawing_ref,
+        )
 
     # ── Section 6: PVC conduits ──
-    _add_section_header(table, "ПВХ изделия и трубы")
+    _add_section_header(table, "Монтаж ПВХ изделий и труб")
     if pvc_items:
         for pv in pvc_items:
             item_num += 1
             _add_work_row(
                 table, item_num, pv.description,
                 pv.unit, pv.quantity, ref=drawing_ref,
+            )
+    elif derived and derived.pvc_total_m > 0:
+        # Use derived PVC quantities based on cable data
+        item_num += 1
+        _add_work_row(
+            table, item_num,
+            "Монтаж гофрированной трубы ПВХ гибкой с креплением "
+            "клипсами каждые 0,8 м",
+            "м", derived.pvc_total_m, ref=drawing_ref,
+        )
+        for diam in sorted(derived.pvc_conduit):
+            _add_material_row(
+                table,
+                f"Труба ПВХ гибкая гофр. д.{diam}мм",
+                "м", derived.pvc_conduit[diam], ref=drawing_ref,
+            )
+        for diam in sorted(derived.pvc_holders):
+            _add_material_row(
+                table,
+                f"Держатель оцинкованный двусторонний, "
+                f"д.{diam}мм",
+                "шт", derived.pvc_holders[diam], ref=drawing_ref,
             )
     elif cables:
         gofra_cnt = sum(c.count for c in cables)
@@ -1334,7 +1883,7 @@ def generate_vor_docx(
         )
         _add_material_row(
             table,
-            "[Гофротруба ПВХ — марка и количество по кабеленесущим планам]",
+            "[Гофротруба ПВХ -- марка и количество по кабеленесущим планам]",
             "м", "",
         )
     else:
@@ -1378,29 +1927,77 @@ def generate_vor_docx(
             "", "",
         )
 
-    # ── Section 8: Commissioning ──
+    # ── Section 8: Commissioning (PNR) ──
     _add_section_header(table, "Пусконаладочные работы")
-    total_equip = (
-        sum(l.total for l in luminaires)
-        + sum(ind.total for ind in indicators)
-        + sum(sw.total for sw in switches)
-        + sum(s.total for s in (sockets or []))
-        + sum(co.total for co in (cable_outlets or []))
-    )
-    if total_equip > 0:
+
+    cable_line_count = sum(c.count for c in cables) if cables else 0
+    # Add panel feed cables (each panel with a feed_cable adds 1 line)
+    cable_line_count += sum(1 for p in panels if p.feed_cable)
+
+    if cable_line_count > 0:
+        # 1) Insulation resistance measurement
         item_num += 1
         _add_work_row(
             table, item_num,
-            "Пусконаладочные работы электроосвещения",
-            "комплект", 1,
-            formula=f"оборудование: {total_equip} ед.",
+            "Измерение сопротивления изоляции",
+            "каб.", cable_line_count,
             ref=drawing_ref,
         )
+
+        # 2) Cable continuity and phasing
+        item_num += 1
+        _add_work_row(
+            table, item_num,
+            "Определение целостности жил кабеля и фазировка "
+            "кабельной линии",
+            "каб.", cable_line_count,
+            ref=drawing_ref,
+        )
+
+        # 3) Grounding continuity check
+        item_num += 1
+        _add_work_row(
+            table, item_num,
+            "Проверка наличия цепи между заземлителями "
+            "и заземленными элементами",
+            "изм.", cable_line_count * 2,
+            ref=drawing_ref,
+        )
+
+        # 4) Mobile testing lab
+        lab_hours = math.ceil(cable_line_count / 3)
+        item_num += 1
+        _add_work_row(
+            table, item_num,
+            "Лаборатория передвижная монтажно-измерительная",
+            "маш/час", lab_hours,
+            ref=drawing_ref,
+        )
+
+    # 5) Circuit breaker testing per panel
+    if panels:
+        for p in panels:
+            single_pole = p.circuit_count or len(p.circuit_cables) or 1
+            # The main panel breaker (QF in p.breaker) is three-pole (1 unit)
+            three_pole = 1 if p.breaker else 0
+            qty_str = (f"{single_pole}/{three_pole}"
+                       if three_pole else str(single_pole))
+            item_num += 1
+            _add_work_row(
+                table, item_num,
+                f"Проверка срабатывания автоматических выключателей "
+                f"в щите {p.name} (однополюсных/трехполюсных)",
+                "шт", qty_str,
+                ref=drawing_ref,
+            )
+
+    # 6) Lighting network verification
     if panels:
         item_num += 1
         _add_work_row(
             table, item_num,
-            "Пусконаладка распределительных щитов",
+            "Проверка осветительной сети на правильность "
+            "зажигания групп внутреннего освещения",
             "шт", len(panels),
             ref=drawing_ref,
         )
@@ -1473,6 +2070,7 @@ def generate_vor(
         lightning_items=agg["lightning_items"],
         pvc_items=agg["pvc_items"],
         spec_cables=agg["spec_cables"],
+        derived=agg.get("derived"),
     )
 
     elapsed = time.time() - t0
@@ -1589,6 +2187,7 @@ def generate_vor_combined(
         lightning_items=agg["lightning_items"],
         pvc_items=agg["pvc_items"],
         spec_cables=agg["spec_cables"],
+        derived=agg.get("derived"),
     )
 
     elapsed = time.time() - t0

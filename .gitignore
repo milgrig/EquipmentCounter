@@ -1,0 +1,22 @@
+# Task management / internal
+.tayfa/
+
+# Test data and large binary files
+Data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment
+.env
+
+# Plan file
+PLAN.md
+
+# Windows artifacts
+nul
+
+# Temporary files
+*.tmp

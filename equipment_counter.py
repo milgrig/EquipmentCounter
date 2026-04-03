@@ -998,6 +998,30 @@ _TABLE_SEPARATOR_VALUES = {"44", "172", "176", "91", "145", "290", "11",
                            "100", "62", "70", "40", "90"}
 
 
+def _strip_mtext_formatting(raw: str) -> str:
+    """Strip MTEXT formatting codes and return plain text.
+
+    Handles formats like:
+      {\\fFont|...;text}   — font prefix
+      {\\C7;text}          — color prefix
+      {\\W0.8;text}        — width-factor prefix
+      \\A1;text            — alignment prefix
+      {\\H0.83x; }         — inline height scaling
+      \\P                  — paragraph break
+    """
+    s = raw
+    # Strip braces-wrapped formatting: {\fFont;text} {\Cnn;text} {\Wn.n;text}
+    s = re.sub(r"\{\\[A-Za-z][^;]*;([^}]*)}", r"\1", s)
+    # Strip leading alignment codes: \A1;text
+    s = re.sub(r"^\\[Aa]\d;", "", s)
+    # Paragraph breaks → space
+    s = s.replace("\\P", " ")
+    # Strip remaining formatting escapes: \L, \O, etc.
+    s = re.sub(r"\\[A-Za-z][^;]*;", "", s)
+    s = s.replace("{", "").replace("}", "")
+    return s.strip()
+
+
 @dataclass
 class SpecItem:
     """One row from the equipment specification table."""
@@ -1010,43 +1034,100 @@ class SpecItem:
     quantity: int
 
 
+def _extract_table_cells_ezdxf(
+    dxf_path: str, log=print,
+) -> list[tuple[float, float, str]]:
+    """Extract table cell texts from *T blocks (ACAD_TABLE data) via ezdxf."""
+    cells: list[tuple[float, float, str]] = []
+    try:
+        doc = ezdxf.readfile(dxf_path)
+    except Exception as e:
+        log(f"    Spec ezdxf open error: {e}")
+        return cells
+    for block in doc.blocks:
+        if not block.name.startswith("*T"):
+            continue
+        for ent in block:
+            if ent.dxftype() != "MTEXT":
+                continue
+            try:
+                ins = ent.dxf.insert
+                x, y = float(ins[0]), float(ins[1])
+            except Exception:
+                continue
+            text = ent.plain_text().strip()
+            if text:
+                cells.append((x, y, text))
+    return cells
+
+
+def _extract_table_cells_raw(
+    dxf_path: str, log=print,
+) -> list[tuple[float, float, str]]:
+    """Fallback: extract cells from raw DXF scanning codes 1, 3, 10, 20."""
+    cells: list[tuple[float, float, str]] = []
+    try:
+        with open(dxf_path, "r", encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+    except Exception as e:
+        log(f"    Spec parse error (read): {e}")
+        return cells
+
+    i = 0
+    cur_x: float | None = None
+    cur_y: float | None = None
+    text_parts: list[str] = []
+
+    while i < len(lines) - 1:
+        code = lines[i].strip()
+        value = lines[i + 1].strip()
+        if code == "0":
+            # Flush accumulated text from previous entity
+            if text_parts and cur_x is not None and cur_y is not None:
+                full = _strip_mtext_formatting("".join(text_parts))
+                if full:
+                    cells.append((cur_x, cur_y, full))
+            text_parts = []
+            cur_x = None
+            cur_y = None
+        elif code == "10":
+            try:
+                cur_x = float(value)
+            except ValueError:
+                pass
+        elif code == "20":
+            try:
+                cur_y = float(value)
+            except ValueError:
+                pass
+        elif code == "3":
+            # MTEXT continuation chunk (comes BEFORE code 1)
+            text_parts.append(value)
+        elif code == "1":
+            text_parts.append(value)
+        i += 2
+
+    # Flush last entity
+    if text_parts and cur_x is not None and cur_y is not None:
+        full = _strip_mtext_formatting("".join(text_parts))
+        if full:
+            cells.append((cur_x, cur_y, full))
+    return cells
+
+
 def parse_spec_dxf(dxf_path: str, log=print) -> list[SpecItem]:
     """Parse equipment specification from ACAD_TABLE in a СО.dxf file.
 
-    Reads raw DXF text to extract MTEXT cell contents from the embedded
-    table block, reconstructs the grid layout, and extracts equipment
-    rows with names and quantities.
+    Uses ezdxf to extract MTEXT cell contents from embedded *T table
+    blocks, reconstructs the grid layout, and extracts equipment rows
+    with names and quantities.  Falls back to raw DXF scanning when
+    ezdxf yields no cells.
     """
-    cells: list[tuple[float, float, str]] = []
-    current_x: float | None = None
-    current_y: float | None = None
-    prev_code: str | None = None
-
-    try:
-        with open(dxf_path, "r", encoding="utf-8", errors="replace") as f:
-            for line in f:
-                ls = line.strip()
-                if prev_code == "10":
-                    try:
-                        current_x = float(ls)
-                    except ValueError:
-                        pass
-                elif prev_code == "20":
-                    try:
-                        current_y = float(ls)
-                    except ValueError:
-                        pass
-                elif prev_code == "1":
-                    m = _MTEXT_CONTENT_RE.search(ls)
-                    text = m.group(1).strip() if m else ""
-                    if text and current_x is not None and current_y is not None:
-                        cells.append((current_x, current_y, text))
-
-                code = ls.strip()
-                prev_code = code if code in ("1", "10", "20") else None
-    except Exception as e:
-        log(f"    Spec parse error (read): {e}")
-        return []
+    # Primary: ezdxf-based extraction from *T blocks
+    cells = _extract_table_cells_ezdxf(dxf_path, log)
+    if not cells:
+        # Fallback: raw DXF scan with code-1 + code-3 support
+        cells = _extract_table_cells_raw(dxf_path, log)
 
     if not cells:
         return []
@@ -1245,6 +1326,34 @@ def _count_equipment_by_geometry(
             continue
         cable_outlet_count += 1
 
+    # Count INSERT blocks that match equipment keywords from legend.
+    # This is more accurate than blue circles when blocks represent actual
+    # equipment instances (circles may be cable route markers).
+    # Match against base block name (strip viewport suffix like "-План ...").
+    _EQUIP_INSERT_KW = [
+        "розетк", "выключател", "датчик", "светильник",
+        "family", "пост управлен", "блок аварийн",
+    ]
+    _INSERT_SKIP_KW = [
+        "подключение", "трасс", "трубе", "последовательность",
+        "ось сетки", "помещени", "чертеж", "галерея",
+    ]
+    equip_insert_count = 0
+    for e in msp.query("INSERT"):
+        bname = e.dxf.name
+        # Strip viewport suffix: "Block-ID-План ..." → "Block-ID"
+        plan_idx = bname.find("-План ")
+        base_name = bname[:plan_idx] if plan_idx > 0 else bname
+        base_lower = base_name.lower()
+        if any(sk in base_lower for sk in _INSERT_SKIP_KW):
+            continue
+        if not any(kw in base_lower for kw in _EQUIP_INSERT_KW):
+            continue
+        x, y = e.dxf.insert.x, e.dxf.insert.y
+        if legend_bbox and xmin < x < xmax and ymin < y < ymax:
+            continue
+        equip_insert_count += 1
+
     shield_descs: list[tuple[str, str]] = []
     equip_descs: list[tuple[str, str]] = []
     cable_out_descs: list[tuple[str, str]] = []
@@ -1261,6 +1370,15 @@ def _count_equipment_by_geometry(
         else:
             equip_descs.append((sym, desc))
 
+    # Prefer INSERT block count over blue circles when INSERT blocks are
+    # found and circle count is suspiciously high (circles may be cable
+    # route junction markers, not equipment symbols).
+    use_blue = blue_total
+    if equip_insert_count > 0 and blue_total > equip_insert_count * 3:
+        print(f"  [geometry mode] INSERT blocks={equip_insert_count} << "
+              f"circles={blue_total} — using INSERT count")
+        use_blue = equip_insert_count
+
     items: list[EquipmentItem] = []
 
     if shield_descs:
@@ -1274,14 +1392,14 @@ def _count_equipment_by_geometry(
 
     if len(equip_descs) == 1:
         sym, desc = equip_descs[0]
-        items.append(EquipmentItem(symbol=sym, name=desc, count=blue_total))
+        items.append(EquipmentItem(symbol=sym, name=desc, count=use_blue))
     elif equip_descs:
         for sym, desc in equip_descs:
             items.append(EquipmentItem(symbol=sym, name=desc, count=0))
         items.append(EquipmentItem(
             symbol="⚙",
             name=f"Точечное оборудование на плане ({len(equip_descs)} видов)",
-            count=blue_total,
+            count=use_blue,
         ))
 
     for sym, desc in cable_out_descs:
@@ -1293,8 +1411,8 @@ def _count_equipment_by_geometry(
     for sym, desc in non_countable:
         items.append(EquipmentItem(symbol=sym, name=desc, count=0))
 
-    if red_total or blue_total:
-        print(f"  [geometry mode] red(щиты)={red_total}  blue(оборуд.)={blue_total}")
+    if red_total or use_blue:
+        print(f"  [geometry mode] red(щиты)={red_total}  blue(оборуд.)={use_blue}")
     if cable_outlet_count:
         print(f"  [geometry mode] Cable outlets (Подключение): {cable_outlet_count}")
 
@@ -1528,12 +1646,19 @@ def process_dxf(dxf_path: str) -> list[EquipmentItem]:
             if desc_legend:
                 geo_items = _count_equipment_by_geometry(msp, desc_legend, legend_bbox)
                 if geo_items:
-                    print("  Using geometric circle counting mode")
-                    return geo_items
+                    geo_total = sum(it.count for it in geo_items)
+                    ann_total = sum(it.count for it in annotation_items)
+                    if ann_total > 0 and geo_total > ann_total * 3:
+                        print(f"  [geometry skip] geo_total={geo_total} >> "
+                              f"annotation_total={ann_total} — preferring annotations")
+                    else:
+                        print("  Using geometric circle counting mode")
+                        return geo_items
 
     # --- Fallback: plan annotations + auto-detect ---
     if all_bboxes:
-        annotation_items = _extract_plan_annotations(entries, all_bboxes)
+        if not annotation_items:
+            annotation_items = _extract_plan_annotations(entries, all_bboxes)
         if annotation_items:
             print("  Using plan annotation mode (N-description)")
             return annotation_items
