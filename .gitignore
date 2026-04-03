@@ -22,3 +22,4 @@ nul
 *.tmp
 output_*.docx
 mass_test_report.xlsx
+mass_test.py
