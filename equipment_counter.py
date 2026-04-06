@@ -32,6 +32,7 @@ except ImportError:
 
 try:
     import ezdxf
+    from ezdxf.entities.acad_table import read_acad_table_content as _read_acad_table
 
     _HAS_DXF = True
 except ImportError:
@@ -197,20 +198,49 @@ class CableItem:
 #  DXF processing  (ezdxf)
 # ===================================================================
 
+def _strip_mtext_codes(s: str) -> str:
+    r"""Remove DXF MTEXT formatting codes, keeping readable text.
+
+    T080: Handles complex formatting found in real DXF schemas:
+      - {\fISOCPEUR|b0|i1|c0;text} -- font codes (keep text)
+      - {\C1;text} -- color codes (keep text)
+      - {\C256;\c0;HF} -- multi-code braced groups (keep text after last ;)
+      - \pxi-11.208,...; -- paragraph formatting codes
+      - \pi0,l0,...; -- inline paragraph codes
+      - \P -- paragraph break (replaced with newline)
+      - \W, \H, \A, \L, \O, \T, etc. -- other formatting codes
+      - Nested braces like {\C1;{\fFont;text}}
+    """
+    # Step 1: Handle braced font/color groups -- extract text content.
+    # Repeat to handle nesting like {\C1;{\fFont;text}}.
+    for _ in range(3):
+        # {\fFont|b0|i1|c0;text} -> text
+        s = re.sub(r"\{\\f[^;]*;([^}]*)\}", r"\1", s)
+        # {\C###;text} -> text  (color code with braces)
+        s = re.sub(r"\{\\C\d+;([^}]*)\}", r"\1", s)
+        # Generic braced code: {\X...;text} -> text
+        s = re.sub(r"\{\\[A-Za-z][^;]*;([^}]*)\}", r"\1", s)
+
+    # Step 2: Handle standalone (non-braced) formatting codes
+    # \P = paragraph break -> newline
+    s = re.sub(r"\\P", "\n", s)
+    # \fFont|...; -- font change (without braces)
+    s = re.sub(r"\\f[^;]*;", "", s)
+    # \pxi...; and \pi...; -- paragraph/tab codes
+    s = re.sub(r"\\p[^;]*;", "", s)
+    # \W, \H, \C, \A, etc. -- other single-letter codes with ;
+    s = re.sub(r"\\[A-Za-z][^;]*;", "", s)
+    # Remaining \L (underline toggle, no semicolon)
+    s = s.replace("\\L", "")
+
+    # Step 3: Remove remaining braces
+    s = s.replace("{", "").replace("}", "")
+    return s
+
+
 def _clean_mtext(raw: str) -> str:
     """Strip DXF MTEXT formatting codes, keep readable text."""
-    s = raw
-    # \\P = paragraph break
-    s = re.sub(r"\\P", "\n", s)
-    # \\fFont|...; — font change
-    s = re.sub(r"\\f[^;]*;", "", s)
-    # \\W, \\H, \\C, \\L, \\O, \\T, etc.
-    s = re.sub(r"\\[A-Za-z][^;]*;", "", s)
-    # \\pxt... tab/align codes
-    s = re.sub(r"\\p[^;]*;", "", s)
-    s = s.replace("{", "").replace("}", "")
-    s = re.sub(r"\\L", "", s)
-    return s.strip()
+    return _strip_mtext_codes(raw).strip()
 
 
 def _get_mtext_entries(dxf_path: str) -> list[tuple[str, float, float]]:
@@ -848,7 +878,7 @@ def _extract_cables_mtext(
     result: dict[str, CableItem] = {}
     for text, _, _ in entries:
         cm = _CABLE_TYPE_RE.search(text)
-        lm = _CABLE_LENGTH_RE.search(text)
+        lm = _CABLE_LENGTH_EXT_RE.search(text)
         if cm and lm:
             ct = cm.group(1).replace("х", "×").replace("x", "×")
             length = int(lm.group(1))
@@ -860,7 +890,12 @@ def _extract_cables_mtext(
 
 
 def _extract_cables_raw_dxf(dxf_path: str) -> dict[str, CableItem]:
-    """Extract cable lengths from raw DXF text.
+    """Extract cable lengths from raw DXF text (ENTITIES-only).
+
+    T079: Scans ONLY the ENTITIES section of the DXF file to avoid inflated
+    counts from serialized table duplicates in OBJECTS section.
+    If ENTITIES yields 0 cables, falls back to BLOCKS section.
+    NEVER scans OBJECTS section.
 
     P-005 fix: Uses a two-pass strategy:
       Pass 1: Same-line scan (cable type + L= on one line) — original approach
@@ -868,14 +903,17 @@ def _extract_cables_raw_dxf(dxf_path: str) -> dict[str, CableItem]:
               where cable type and L= are on separate lines (wrapped MTEXT,
               TABLE entities, different DXF versions).
 
-    First tries the ENTITIES section only (preferred: avoids XREF duplicates).
-    If that yields very few results, re-scans the full file (BLOCKS + ENTITIES)
-    to catch cable schedule tables that ezdxf can't parse.
-
     Deduplicates by (cable_type, length) pair to avoid double-counting from
     multiple DXF representations of the same table cell.
     """
-    def _scan_section(dxf_path: str, entities_only: bool) -> dict[str, CableItem]:
+    def _scan_section(dxf_path: str, target_section: str) -> dict[str, CableItem]:
+        """Scan a specific DXF section (ENTITIES or BLOCKS) for cable data.
+
+        Args:
+            dxf_path: Path to DXF file.
+            target_section: Section name to scan — "ENTITIES" or "BLOCKS".
+                            NEVER pass "OBJECTS".
+        """
         result: dict[str, CableItem] = {}
         seen_pairs: set[tuple[str, int]] = set()
 
@@ -891,7 +929,7 @@ def _extract_cables_raw_dxf(dxf_path: str) -> dict[str, CableItem]:
             result[ct].total_length_m += length
 
         try:
-            in_entities = not entities_only
+            in_section = False
             prev_line = ""
             # P-005 fix: Keep a sliding window of recent lines for multi-line matching
             recent_lines: list[str] = []
@@ -900,34 +938,40 @@ def _extract_cables_raw_dxf(dxf_path: str) -> dict[str, CableItem]:
             with open(dxf_path, "r", encoding="utf-8", errors="replace") as f:
                 for line in f:
                     ls = line.strip()
-                    if entities_only:
-                        if ls == "ENTITIES" and prev_line.strip() == "2":
-                            in_entities = True
-                            prev_line = line
-                            continue
-                        if in_entities and ls == "ENDSEC" and prev_line.strip() == "0":
-                            break
+                    # Detect section start: group code 2 followed by section name
+                    if ls == target_section and prev_line.strip() == "2":
+                        in_section = True
+                        prev_line = line
+                        recent_lines.clear()
+                        continue
+                    # Detect section end: group code 0 followed by ENDSEC
+                    if in_section and ls == "ENDSEC" and prev_line.strip() == "0":
+                        in_section = False
+                        prev_line = line
+                        continue
                     prev_line = line
 
-                    if not in_entities:
+                    if not in_section:
                         continue
 
-                    recent_lines.append(line)
+                    # T080: Strip MTEXT formatting codes before matching
+                    clean_line = _strip_mtext_codes(line)
+                    recent_lines.append(clean_line)
                     if len(recent_lines) > _WINDOW_SIZE:
                         recent_lines.pop(0)
 
                     # Pass 1: Same-line match (original approach)
-                    if "L=" in line:
-                        cm = _CABLE_TYPE_RE.search(line)
-                        lm = _CABLE_LENGTH_RE.search(line)
+                    if ("L=" in clean_line or "L-" in clean_line):
+                        cm = _CABLE_TYPE_RE.search(clean_line)
+                        lm = _CABLE_LENGTH_EXT_RE.search(clean_line)
                         if cm and lm:
                             _add_cable(cm.group(1), int(lm.group(1)))
                             continue
 
                     # Pass 2: Multi-line match — if this line has L=,
                     # look back in the window for a cable type
-                    if "L=" in line:
-                        lm = _CABLE_LENGTH_RE.search(line)
+                    if ("L=" in clean_line or "L-" in clean_line):
+                        lm = _CABLE_LENGTH_EXT_RE.search(clean_line)
                         if lm:
                             length = int(lm.group(1))
                             # Search recent lines backward for cable type
@@ -939,11 +983,11 @@ def _extract_cables_raw_dxf(dxf_path: str) -> dict[str, CableItem]:
 
                     # Pass 2b: If this line has a cable type,
                     # look back for L= (covers reversed order)
-                    cm = _CABLE_TYPE_RE.search(line)
+                    cm = _CABLE_TYPE_RE.search(clean_line)
                     if cm:
                         for prev in reversed(recent_lines[:-1]):
-                            if "L=" in prev:
-                                lm = _CABLE_LENGTH_RE.search(prev)
+                            if ("L=" in prev or "L-" in prev):
+                                lm = _CABLE_LENGTH_EXT_RE.search(prev)
                                 if lm:
                                     _add_cable(cm.group(1), int(lm.group(1)))
                                     break
@@ -952,22 +996,16 @@ def _extract_cables_raw_dxf(dxf_path: str) -> dict[str, CableItem]:
             pass
         return result
 
-    entities_result = _scan_section(dxf_path, entities_only=True)
-    full_result = _scan_section(dxf_path, entities_only=False)
+    # T079: ENTITIES-only scan — preferred, avoids OBJECTS inflation
+    entities_result = _scan_section(dxf_path, target_section="ENTITIES")
     ent_total = sum(c.total_length_m for c in entities_result.values())
-    full_total = sum(c.total_length_m for c in full_result.values())
 
-    # If entities has meaningful cable data and the full scan is much
-    # larger (>5×), the extra data is likely from project-wide schema
-    # tables embedded in OBJECTS/BLOCKS — not actual cable runs.
-    # T074: Lowered from 10× to 5× to catch more inflation cases
-    # (e.g. sklad_27 schema where ratio is ~7×).
-    if ent_total >= 100 and full_total > ent_total * 5:
+    if ent_total > 0:
         return entities_result
 
-    if full_total > ent_total * 1.5 or len(full_result) > len(entities_result) * 2:
-        return full_result
-    return entities_result
+    # Fallback: try BLOCKS section if ENTITIES yielded nothing
+    blocks_result = _scan_section(dxf_path, target_section="BLOCKS")
+    return blocks_result
 
 
 def _extract_cables_mtext_multiline(
@@ -985,7 +1023,7 @@ def _extract_cables_mtext_multiline(
     for text, _, _ in entries:
         # First try same-line (original behavior)
         cm = _CABLE_TYPE_RE.search(text)
-        lm = _CABLE_LENGTH_RE.search(text)
+        lm = _CABLE_LENGTH_EXT_RE.search(text)
         if cm and lm:
             ct = cm.group(1).replace("х", "×").replace("x", "×")
             length = int(lm.group(1))
@@ -1009,7 +1047,7 @@ def _extract_cables_mtext_multiline(
             cm2 = _CABLE_TYPE_RE.search(ln)
             if cm2:
                 found_types.append(cm2.group(1))
-            lm2 = _CABLE_LENGTH_RE.search(ln)
+            lm2 = _CABLE_LENGTH_EXT_RE.search(ln)
             if lm2:
                 found_lengths.append(int(lm2.group(1)))
 
@@ -1294,88 +1332,198 @@ def _extract_cables_all_blocks(dxf_path: str) -> dict[str, CableItem]:
     return result
 
 
+
+
+def _extract_cables_ezdxf_structured(dxf_path: str) -> dict[str, CableItem]:
+    """T082: Unified ezdxf structured cable extraction.
+
+    Single ezdxf.readfile() call, then extracts cables from ALL structured
+    sources with global dedup by (cable_type, length) tuple:
+
+      1. Modelspace MTEXT entities -- strip formatting, apply cable regex
+      2. Modelspace TEXT entities -- apply cable regex directly
+      3. ACAD_TABLE entities -- use read_acad_table_content() for cell text,
+         strip formatting, apply cable regex
+      4. Blocks INSERTed in modelspace -- scan MTEXT/TEXT in block defs
+         (only blocks actually referenced by INSERT in modelspace)
+
+    Returns dict keyed by normalized cable_type string.
+    """
+    result: dict[str, CableItem] = {}
+    seen_pairs: set[tuple[str, int]] = set()
+
+    def _add_cable(ct_raw: str, length: int) -> None:
+        ct = ct_raw.replace("х", "×").replace("x", "×")
+        pair = (ct, length)
+        if pair in seen_pairs:
+            return
+        seen_pairs.add(pair)
+        if ct not in result:
+            result[ct] = CableItem(cable_type=ct)
+        result[ct].count += 1
+        result[ct].total_length_m += length
+
+    def _scan_text(text: str) -> None:
+        """Apply cable regex to cleaned text, handling both single-line
+        and multi-line content."""
+        # Single-line: cable type + L= on same line
+        cm = _CABLE_TYPE_RE.search(text)
+        lm = _CABLE_LENGTH_EXT_RE.search(text)
+        if cm and lm:
+            _add_cable(cm.group(1), int(lm.group(1)))
+            return
+
+        # Multi-line: cable type and L= on different lines within same entity
+        if "\n" not in text:
+            return
+        text_lines = text.split("\n")
+        found_types: list[str] = []
+        found_lengths: list[int] = []
+        for ln in text_lines:
+            cm2 = _CABLE_TYPE_RE.search(ln)
+            if cm2:
+                found_types.append(cm2.group(1))
+            lm2 = _CABLE_LENGTH_EXT_RE.search(ln)
+            if lm2:
+                found_lengths.append(int(lm2.group(1)))
+        if found_types and found_lengths:
+            for i, ct_raw in enumerate(found_types):
+                length = found_lengths[i] if i < len(found_lengths) else found_lengths[-1]
+                _add_cable(ct_raw, length)
+
+    try:
+        doc = ezdxf.readfile(dxf_path)
+    except Exception:
+        return result
+
+    msp = doc.modelspace()
+
+    # -- Source 1: Modelspace MTEXT --
+    for ent in msp.query("MTEXT"):
+        try:
+            clean = _clean_mtext(ent.text)
+            if clean:
+                _scan_text(clean)
+        except Exception:
+            continue
+
+    # -- Source 2: Modelspace TEXT --
+    for ent in msp.query("TEXT"):
+        try:
+            text = ent.dxf.get("text", "")
+            if text and text.strip():
+                _scan_text(text.strip())
+        except Exception:
+            continue
+
+    # -- Source 3: ACAD_TABLE entities --
+    for ent in msp.query("ACAD_TABLE"):
+        try:
+            rows = _read_acad_table(ent)
+            for row in rows:
+                for cell in row:
+                    if not cell or not cell.strip():
+                        continue
+                    clean = _clean_mtext(cell)
+                    if clean:
+                        _scan_text(clean)
+        except Exception:
+            continue
+
+    # -- Source 4: Blocks INSERTed in modelspace --
+    # Collect all block names referenced by INSERT in modelspace
+    inserted_names: set[str] = set()
+    for ent in msp.query("INSERT"):
+        try:
+            inserted_names.add(ent.dxf.name)
+        except Exception:
+            continue
+
+    _SKIP_BLOCKS = {"*Model_Space", "*Paper_Space", "*Paper_Space0"}
+    for block in doc.blocks:
+        if block.name in _SKIP_BLOCKS:
+            continue
+        # Only scan blocks that are INSERTed in modelspace
+        if block.name not in inserted_names:
+            continue
+        for ent in block:
+            try:
+                if ent.dxftype() == "MTEXT":
+                    clean = _clean_mtext(ent.text)
+                    if clean:
+                        _scan_text(clean)
+                elif ent.dxftype() == "TEXT":
+                    text = ent.dxf.get("text", "")
+                    if text and text.strip():
+                        _scan_text(text.strip())
+            except Exception:
+                continue
+
+    return result
+
+
 def extract_cables_dxf(dxf_path: str) -> list[CableItem]:
     """Extract cable data from a DXF file.
 
-    P-005 fix: Uses dual strategy — raw DXF scanning AND MTEXT parsing
-    in parallel, then merges results (takes the better one).
+    T082: ezdxf structured parsing is the PRIMARY method.
+    Uses a single ezdxf.readfile() call to query:
+      - Modelspace MTEXT/TEXT entities
+      - ACAD_TABLE cell content (via read_acad_table_content)
+      - MTEXT/TEXT in blocks INSERTed in modelspace
+    Global dedup by (cable_type, length) tuple.
 
-    T065: Added MTEXT table parser for multi-sheet DWG schemas.
-    Scans *T blocks (ACAD_TABLE geometry) for cable journal tables,
-    handling both inline (cable+L= same MTEXT) and multi-MTEXT
-    (cable in one, length in adjacent) formats.
-
-    T074: Added all-blocks scanner that iterates over every block
-    definition (doc.blocks), not just modelspace and *T blocks.
-    Catches cable data in schema diagram blocks, layout blocks,
-    and other named blocks (A$C..., etc.).
+    Falls back to raw DXF line scan + legacy ezdxf helpers
+    only when the structured method finds nothing.
     """
-    cables_raw = _extract_cables_raw_dxf(dxf_path)
-    entries = _get_mtext_entries(dxf_path)
-    cables_mtext = _extract_cables_mtext(entries)
+    # -- PRIMARY: ezdxf structured extraction (T082) --
+    cables_structured = _extract_cables_ezdxf_structured(dxf_path)
+    struct_total = sum(c.total_length_m for c in cables_structured.values())
 
-    # P-005 fix: Also try multi-line MTEXT extraction
-    cables_mtext_ml = _extract_cables_mtext_multiline(entries)
-
-    # Merge MTEXT results (multi-line may catch more)
-    for ct, item in cables_mtext_ml.items():
-        if ct not in cables_mtext:
-            cables_mtext[ct] = item
-        elif item.total_length_m > cables_mtext[ct].total_length_m:
-            cables_mtext[ct] = item
-
-    # T065: MTEXT table parser for multi-sheet DWG schemas
+    # -- LEGACY: *T block scanner + all-blocks scanner --
+    # These catch cables in *T blocks (ACAD_TABLE geometry) and
+    # non-INSERTed blocks that the structured method skips.
+    cables_legacy: dict[str, CableItem] = {}
     cables_table = _extract_cables_mtext_table(dxf_path)
-    table_total = sum(c.total_length_m for c in cables_table.values())
-
-    # Merge table results into MTEXT results (table may find cables
-    # in *T blocks that modelspace MTEXT parsing misses)
     for ct, item in cables_table.items():
-        if ct not in cables_mtext:
-            cables_mtext[ct] = item
-        elif item.total_length_m > cables_mtext[ct].total_length_m:
-            cables_mtext[ct] = item
+        if ct not in cables_legacy:
+            cables_legacy[ct] = item
+        elif item.total_length_m > cables_legacy[ct].total_length_m:
+            cables_legacy[ct] = item
 
-    # T074: Scan ALL block definitions for cable data (catches cables
-    # in schema diagram blocks, layout blocks, and other non-*T blocks)
     cables_blocks = _extract_cables_all_blocks(dxf_path)
     for ct, item in cables_blocks.items():
-        if ct not in cables_mtext:
-            cables_mtext[ct] = item
-        elif item.total_length_m > cables_mtext[ct].total_length_m:
-            cables_mtext[ct] = item
+        if ct not in cables_legacy:
+            cables_legacy[ct] = item
+        elif item.total_length_m > cables_legacy[ct].total_length_m:
+            cables_legacy[ct] = item
 
-    # Choose the best result: pick whichever found more cable data
+    # Merge: structured is primary, supplement from legacy
+    cables_ezdxf = dict(cables_structured)
+    for ct, item in cables_legacy.items():
+        if ct not in cables_ezdxf:
+            cables_ezdxf[ct] = item
+        elif item.total_length_m > cables_ezdxf[ct].total_length_m:
+            cables_ezdxf[ct] = item
+
+    ezdxf_total = sum(c.total_length_m for c in cables_ezdxf.values())
+
+    # -- FALLBACK: raw DXF scan --
+    cables_raw = _extract_cables_raw_dxf(dxf_path)
     raw_total = sum(c.total_length_m for c in cables_raw.values())
-    mtext_total = sum(c.total_length_m for c in cables_mtext.values())
 
-    if raw_total == 0 and mtext_total == 0:
+    if ezdxf_total == 0 and raw_total == 0:
         return []
 
-    # T074: When ezdxf-based *T block parser found substantial data and
-    # raw scanner result is much larger (>3×), the raw scanner likely
-    # picked up inflated data from BLOCKS/OBJECTS section duplication.
-    # Prefer ezdxf result which properly parses ACAD_TABLE content.
-    if table_total >= 100 and raw_total > table_total * 3:
-        cables = cables_mtext
-    elif mtext_total > raw_total:
-        cables = cables_mtext
-    else:
-        cables = cables_raw
-        # Supplement raw results with any cable types only found in MTEXT
-        for ct, item in cables_mtext.items():
+    # ezdxf is primary -- use it when it found data
+    if ezdxf_total > 0:
+        cables = cables_ezdxf
+        # Supplement with raw results for cable types ezdxf missed
+        for ct, item in cables_raw.items():
             if ct not in cables:
                 cables[ct] = item
-
-    # T065: Also supplement with table results not found elsewhere
-    for ct, item in cables_table.items():
-        if ct not in cables:
-            cables[ct] = item
-
-    # T074: Also supplement with all-blocks results not found elsewhere
-    for ct, item in cables_blocks.items():
-        if ct not in cables:
-            cables[ct] = item
+    else:
+        # ezdxf found nothing -- use raw scan as fallback
+        cables = cables_raw
 
     return sorted(cables.values(), key=lambda c: -c.total_length_m)
 
@@ -1388,26 +1536,15 @@ _TABLE_SEPARATOR_VALUES = {"44", "172", "176", "91", "145", "290", "11",
 
 
 def _strip_mtext_formatting(raw: str) -> str:
-    """Strip MTEXT formatting codes and return plain text.
+    r"""Strip MTEXT formatting codes and return plain text (single-line).
 
-    Handles formats like:
-      {\\fFont|...;text}   — font prefix
-      {\\C7;text}          — color prefix
-      {\\W0.8;text}        — width-factor prefix
-      \\A1;text            — alignment prefix
-      {\\H0.83x; }         — inline height scaling
-      \\P                  — paragraph break
+    T080: Uses _strip_mtext_codes() for robust stripping, then converts
+    newlines to spaces (for spec table cells where single-line output
+    is needed).
     """
-    s = raw
-    # Strip braces-wrapped formatting: {\fFont;text} {\Cnn;text} {\Wn.n;text}
-    s = re.sub(r"\{\\[A-Za-z][^;]*;([^}]*)}", r"\1", s)
-    # Strip leading alignment codes: \A1;text
-    s = re.sub(r"^\\[Aa]\d;", "", s)
-    # Paragraph breaks → space
-    s = s.replace("\\P", " ")
-    # Strip remaining formatting escapes: \L, \O, etc.
-    s = re.sub(r"\\[A-Za-z][^;]*;", "", s)
-    s = s.replace("{", "").replace("}", "")
+    s = _strip_mtext_codes(raw)
+    # Spec table cells need single-line output: \P → space
+    s = s.replace("\n", " ")
     return s.strip()
 
 
