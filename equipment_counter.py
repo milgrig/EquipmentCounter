@@ -192,6 +192,7 @@ class CableItem:
     cable_type: str
     count: int = 0
     total_length_m: int = 0
+    elevation_m: float | None = None
 
 
 # ===================================================================
