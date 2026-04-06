@@ -934,6 +934,9 @@ def parse_all_files(
                 try:
                     cables = extract_cables_dxf(fkey)
                     if cables:
+                        _elev_stamp = extract_elevation_float(fpath.name)
+                        for c in cables:
+                            c.elevation_m = _elev_stamp
                         total_m = sum(c.total_length_m for c in cables)
                         log(f"    Cables: {len(cables)} types, {total_m}m")
                 except Exception as e:
@@ -982,6 +985,9 @@ def parse_all_files(
                 cables = extract_cables_dxf(str(fpath))
                 result.cables = cables
                 if cables:
+                    _elev_stamp = extract_elevation_float(fpath.name)
+                    for c in cables:
+                        c.elevation_m = _elev_stamp
                     total_m = sum(c.total_length_m for c in cables)
                     log(f"    Cables: {len(cables)} types, {total_m}m")
             except Exception as e:
@@ -1575,27 +1581,48 @@ def aggregate_by_height(
     cables = sorted(all_cables.values(), key=lambda c: -c.total_length_m)
 
     # ── Cable lengths by height category (for cable-laying section) ──
-    # Cables come from schema DXFs (no height_category).  Determine
-    # which height categories the building has from equipment/plan
-    # results and distribute total cable length proportionally.
+    # Two-phase distribution:
+    #   Phase 1 — cables with known elevation_m are assigned to the
+    #             correct height category via elevation_to_height().
+    #   Phase 2 — cables with elevation_m=None are distributed
+    #             proportionally across heights (legacy heuristic).
     equip_count_by_height: dict[str, int] = defaultdict(int)
     for r in deduped:
         if r.height_category and r.equipment:
             for it in r.equipment:
                 equip_count_by_height[r.height_category] += it.count + it.count_ae
 
-    total_cable_m_agg = sum(c.total_length_m for c in cables)
     cable_lengths_by_height: dict[str, int] = {}
-    if total_cable_m_agg > 0 and equip_count_by_height:
+
+    # Phase 1: cables with known elevation
+    unknown_elevation_m = 0
+    for r in deduped:
+        for c in r.cables:
+            if c.elevation_m is not None:
+                hcat = elevation_to_height(c.elevation_m)
+                cable_lengths_by_height[hcat] = (
+                    cable_lengths_by_height.get(hcat, 0) + c.total_length_m
+                )
+            else:
+                unknown_elevation_m += c.total_length_m
+
+    # Phase 2: cables without elevation — distribute proportionally
+    if unknown_elevation_m > 0 and equip_count_by_height:
         total_equip = sum(equip_count_by_height.values())
         if total_equip > 0:
             for hcat, ecnt in equip_count_by_height.items():
-                share = round(total_cable_m_agg * ecnt / total_equip)
+                share = round(unknown_elevation_m * ecnt / total_equip)
                 if share > 0:
-                    cable_lengths_by_height[hcat] = share
-    elif total_cable_m_agg > 0:
+                    cable_lengths_by_height[hcat] = (
+                        cable_lengths_by_height.get(hcat, 0) + share
+                    )
+    elif unknown_elevation_m > 0:
         # No equipment-based heights -- default to lowest category
-        cable_lengths_by_height["до 5 метров"] = round(total_cable_m_agg)
+        cable_lengths_by_height["до 5 метров"] = (
+            cable_lengths_by_height.get("до 5 метров", 0)
+            + round(unknown_elevation_m)
+        )
+
     if cable_lengths_by_height:
         log(f"\n  [cable-laying] Cable lengths by height:")
         for hcat in HEIGHT_CATEGORIES:
