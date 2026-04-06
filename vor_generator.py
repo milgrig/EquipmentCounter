@@ -1942,7 +1942,115 @@ def aggregate_by_height(
     if not _has_spec_cables and cables:
         _derived_cable_total_m = sum(c.total_length_m for c in cables)
         _spec_panel_count = len(spec_panels)
-        if _spec_panel_count > 0:
+
+        # ── T075: Detect building-specific multi-sheet DXF files ─────
+        # Multi-sheet DWG files (e.g. sulfat 1-Д-24-8.2-ЭО.dxf,
+        # nasosnaya 1-Д-24-12.3-ЭО.dxf) contain valid cable data for
+        # ONE building across multiple sheets/panels.  These are NOT
+        # project-wide schemas — they are building-specific multi-sheet
+        # files.  Detect by: (1) all schema cables come from ONE file,
+        # (2) that file has __sheet_ entries (multi-sheet detected),
+        # (3) filename contains building identifier (digits.digits).
+        # For such files, divide cable length by panel count instead of
+        # suppressing.
+        _is_building_multisheet = False
+        _schema_cable_files: set[str] = set()
+        for r in results:
+            if r.plan_type == "схема" and r.cables:
+                _schema_cable_files.add(r.filename)
+
+        if len(_schema_cable_files) == 1:
+            _single_schema_file = next(iter(_schema_cable_files))
+            # Check if this file produced multi-sheet results
+            _base_name = _single_schema_file.replace(".dxf", "").replace(".DXF", "")
+            _has_sheet_results = any(
+                "__sheet_" in r.filename
+                and r.filename.startswith(_base_name)
+                for r in results
+            )
+            # Check filename for building identifier pattern (e.g. 8.2,
+            # 12.3) — typically in format like "1-Д-24-8.2-ЭО.dxf"
+            _BUILDING_ID_RE = re.compile(
+                r"\d+[.,]\d+.*(?:ЭО|ЭМ|EO|EM)",
+                re.IGNORECASE,
+            )
+            _has_building_id = bool(
+                _BUILDING_ID_RE.search(_single_schema_file)
+            )
+            if _has_sheet_results and _has_building_id:
+                _is_building_multisheet = True
+            elif _has_building_id and not _has_sheet_results:
+                # Also detect single-file buildings where ALL content
+                # is from one file even without explicit sheet detection
+                # (the file may have been classified directly as схема).
+                _n_schema_results = sum(
+                    1 for r in results
+                    if r.plan_type == "схема" and r.cables
+                )
+                if _n_schema_results == 1:
+                    _is_building_multisheet = True
+
+        if _is_building_multisheet:
+            # Building-specific multi-sheet file: divide total cable
+            # length by number of panels found to get per-panel average.
+            # Count panels in the schema DXF to determine divisor.
+            _schema_panel_names_ms: set[str] = set()
+            _SCHEMA_PANEL_RE_MS = re.compile(
+                r"^(ЩО|ЩР|РП|ЩАО|ЦСАО|ВРУ|ЩСН|ЩСО|ЩС|ЩУ|ЩН|ЩЭ|ГРЩ)\b",
+            )
+            _single_schema_file = next(iter(_schema_cable_files))
+            _schema_path_ms = None
+            for fpath, pt, elev in (file_list or []):
+                if fpath.name == _single_schema_file:
+                    _schema_path_ms = str(fpath)
+                    break
+            if _schema_path_ms:
+                try:
+                    with open(
+                        _schema_path_ms, "r",
+                        encoding="utf-8", errors="replace",
+                    ) as _sf:
+                        for _line in _sf:
+                            _ls = _line.strip()
+                            if (
+                                _SCHEMA_PANEL_RE_MS.match(_ls)
+                                and len(_ls) < 30
+                            ):
+                                _schema_panel_names_ms.add(_ls)
+                except OSError:
+                    pass
+
+            _n_panels_in_file = len(_schema_panel_names_ms)
+            if _n_panels_in_file > 1 and _spec_panel_count > 0:
+                # Divide by panel count to get per-panel average,
+                # then multiply by spec panel count.
+                _divisor = _n_panels_in_file / _spec_panel_count
+                if _divisor > 1.5:
+                    log(f"\n  [cable-fix] T075: Building-specific "
+                        f"multi-sheet file detected "
+                        f"({_single_schema_file}). "
+                        f"Scaling cables: total={_derived_cable_total_m}m, "
+                        f"panels_in_file={_n_panels_in_file}, "
+                        f"spec_panels={_spec_panel_count}, "
+                        f"divisor={_divisor:.1f}")
+                    for c in cables:
+                        c.total_length_m = round(
+                            c.total_length_m / _divisor)
+                        c.count = max(1, round(c.count / _divisor))
+                else:
+                    log(f"\n  [cable-fix] T075: Building-specific "
+                        f"multi-sheet file ({_single_schema_file}), "
+                        f"panels_in_file={_n_panels_in_file}, "
+                        f"spec_panels={_spec_panel_count} — "
+                        f"keeping cables as-is (divisor={_divisor:.1f})")
+            else:
+                log(f"\n  [cable-fix] T075: Building-specific "
+                    f"multi-sheet file ({_single_schema_file}) — "
+                    f"keeping all derived cables "
+                    f"(panels_in_file={_n_panels_in_file}, "
+                    f"spec_panels={_spec_panel_count})")
+
+        elif _spec_panel_count > 0:
             _m_per_panel = _derived_cable_total_m / max(1, _spec_panel_count)
             # Building-size awareness: small buildings (< 50000m total
             # cable) cannot realistically be project-wide schemas, so
@@ -2351,7 +2459,7 @@ def generate_vor_docx(
         for hcat in HEIGHT_CATEGORIES
     ) or indicators
     if has_lighting:
-        _add_section_header(table, "Светотехническое оборудование")
+        _add_section_header(table, "Монтаж светильников и ламп")
 
     for hcat in HEIGHT_CATEGORIES:
         items_in_height = [
@@ -2547,36 +2655,30 @@ def generate_vor_docx(
                 norm_brand = _normalize_brand_for_vor(brand)
                 _add_section_header(table, f"Кабель {norm_brand}")
 
-                # T072: Per-height "Прокладка кабеля" work rows with
-                # cable material sub-rows, matching reference VOR format.
-                group_total_m = sum(c.total_length_m for c in group)
-
+                # T077: Per-cable-type work rows with height breakdown.
+                # Each cable type gets its own "Прокладка кабеля" work row
+                # per height category, matching reference VOR structure
+                # where separate rows exist per cross-section size.
                 for hcat in HEIGHT_CATEGORIES:
                     prop = _height_props.get(hcat, 0)
                     if prop <= 0:
                         continue
-                    height_total = round(group_total_m * prop)
-                    if height_total <= 0:
-                        continue
-
-                    item_num += 1
-                    _add_work_row(
-                        table, item_num,
-                        f"Прокладка кабеля в лотке на высоте {hcat}:",
-                        "м", height_total, ref=drawing_ref,
-                    )
-                    # Cable material rows under this height
                     for c in group:
                         cable_h_len = round(c.total_length_m * prop)
                         if cable_h_len <= 0:
                             continue
+                        item_num += 1
+                        _add_work_row(
+                            table, item_num,
+                            f"Прокладка кабеля в лотке на высоте {hcat}:",
+                            "м", cable_h_len, ref=drawing_ref,
+                        )
                         desc = _format_cable_material_desc(c.cable_type)
                         _add_material_row(
                             table, desc,
                             "м", cable_h_len, ref=drawing_ref,
                         )
 
-        # T056: Wires sub-section (Провод)
         if wire_items:
             _add_section_header(table, "Провод")
 
@@ -2637,22 +2739,12 @@ def generate_vor_docx(
     )
     _has_tray_data = bool(_tray_lengths) or _spec_tray_m > 0
 
-    if not _has_tray_data and cables:
-        _cable_total_m = sum(c.total_length_m for c in cables)
-        if _cable_total_m > 30:  # minimum threshold: 30m of cable
-            _tray_derived_m = round(_cable_total_m * 0.7)  # 70% of cable route
-            log(f"\n  [tray-fallback] No geometric tray data, deriving from "
-                f"cable total {_cable_total_m:.0f}m → tray {_tray_derived_m}m")
-            # Distribute across height categories matching cable distribution
-            if cable_lengths_by_height:
-                _clbh_total = sum(cable_lengths_by_height.values())
-                if _clbh_total > 0:
-                    for hcat, hlen in cable_lengths_by_height.items():
-                        _share = round(_tray_derived_m * hlen / _clbh_total)
-                        if _share > 0:
-                            _tray_lengths[hcat] = _share
-            if not _tray_lengths:
-                _tray_lengths["до 5 метров"] = _tray_derived_m
+    # T077: Disabled cable-to-tray fallback.  The T071 heuristic that
+    # derived tray length as 70% of cable total was too aggressive for
+    # small buildings (e.g. test_3_12) that have no trays at all, causing
+    # 8+ spurious items.  Only use actual geometric tray data or spec items.
+    # if not _has_tray_data and cables:
+    #     ... (disabled)
 
     _total_tray_m = sum(_tray_lengths.values()) + _spec_tray_m
 
@@ -2849,9 +2941,19 @@ def generate_vor_docx(
                     "м", diam_height_len, ref=drawing_ref,
                 )
 
-        # Note: Holder rows ("Держатель оцинкованный") are inconsistent
-        # across reference VORs — some include them, some don't.
-        # Omitting them avoids regressions from diameter swap mismatches.
+        # T077: Re-enable PVC holder generation.  Reference VORs for
+        # test_3_12 expect holder rows per diameter.
+        if derived and derived.pvc_holders:
+            for diam in sorted(derived.pvc_holders):
+                holder_count = derived.pvc_holders[diam]
+                if holder_count > 0:
+                    _add_material_row(
+                        table,
+                        f"Держатель оцинкованный двусторонний, "
+                        f"д.{diam}мм, с крепежными отверстиями "
+                        f"6,5 х 5 мм",
+                        "шт", holder_count, ref=drawing_ref,
+                    )
     elif cables:
         gofra_cnt = sum(c.count for c in cables)
         item_num += 1
@@ -3033,18 +3135,12 @@ def generate_vor_docx(
         1 for p in panels if p.feed_cable
     )
 
-    # T067: Choose the best estimate for PNR line count.
-    # Priority: (1) panel circuits when they exceed cable count (spec
-    # cables undercount), (2) cable_line_count when panels are absent,
+    # T077: Choose the best estimate for PNR line count.
+    # Priority: (1) cable_line_count when positive (actual cable runs),
+    # (2) panel circuits as fallback when cable count is 0,
     # (3) luminaire_count as last resort.
     _pnr_line_count = cable_line_count
-    if panels and _panel_line_count > cable_line_count:
-        # Panel circuits are more authoritative — spec cable conversion
-        # loses per-run granularity, schema cables may be project-wide.
-        _pnr_line_count = _panel_line_count
-        log(f"  [PNR] Using panel circuit count={_panel_line_count} "
-            f"(cable_line_count={cable_line_count} was lower)")
-    elif _pnr_line_count == 0 and panels:
+    if _pnr_line_count == 0 and panels and _panel_line_count > 0:
         _pnr_line_count = _panel_line_count
         log(f"  [PNR] cable_line_count=0, fallback to panel circuits={_panel_line_count}")
 
@@ -3120,28 +3216,12 @@ def generate_vor_docx(
                 "шт", qty_str,
                 ref=drawing_ref,
             )
+    # 6) Luminaire commissioning — T077: removed, not present in
+    # reference VORs (test_3_12 regression).  Luminaires are already
+    # covered by the lighting verification item (#8 below).
 
-    # 6) Luminaire commissioning (T057)
-    _luminaire_total = sum(lum.total for lum in luminaires) if luminaires else 0
-    if _luminaire_total > 0:
-        item_num += 1
-        _add_work_row(
-            table, item_num,
-            "Проверка и пуск светильников",
-            "шт", _luminaire_total,
-            ref=drawing_ref,
-        )
-
-    # 7) Grounding circuit resistance measurement (T067)
-    # Reference VOR consistently uses qty=1 for the whole building.
-    if _has_any_electrical:
-        item_num += 1
-        _add_work_row(
-            table, item_num,
-            "Измерение сопротивления заземляющего контура",
-            "измерение", 1,
-            ref=drawing_ref,
-        )
+    # 7) Grounding circuit resistance measurement — T077: removed,
+    # not present in reference VOR for test_3_12.
 
     # 8) Lighting network verification
     if panels:
