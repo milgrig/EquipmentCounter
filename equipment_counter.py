@@ -111,6 +111,9 @@ def _classify_filename(fl: str) -> str:
         return "освещение"
     if "кабеленесущ" in fl:
         return "кабеленесущие"
+    # T076: "схем" catches all schema variants including:
+    #   Схемы ЩО, ЩАО (abk_eo), Схемы АБК РД (abk_em),
+    #   Схемы РД (sklad), Схема ВРУ (kpp_30)
     if "схем" in fl:
         return "схема"
     if "общие данные" in fl:
@@ -138,6 +141,8 @@ def classify_plan(filename: str) -> str:
     """
     fl = filename.lower()
     result = _classify_filename(fl)
+    # T076: debug-log every classification to help diagnose misclassified files
+    _logger.debug("classify_plan: %r -> %s", filename, result)
     if result != "другое":
         return result
     # Try recovering garbled Cyrillic on the ORIGINAL (pre-lower) filename
@@ -952,10 +957,12 @@ def _extract_cables_raw_dxf(dxf_path: str) -> dict[str, CableItem]:
     ent_total = sum(c.total_length_m for c in entities_result.values())
     full_total = sum(c.total_length_m for c in full_result.values())
 
-    # If entities has meaningful cable data and the full scan is vastly
-    # larger (>10×), the extra data is likely from project-wide schema
+    # If entities has meaningful cable data and the full scan is much
+    # larger (>5×), the extra data is likely from project-wide schema
     # tables embedded in OBJECTS/BLOCKS — not actual cable runs.
-    if ent_total >= 100 and full_total > ent_total * 10:
+    # T074: Lowered from 10× to 5× to catch more inflation cases
+    # (e.g. sklad_27 schema where ratio is ~7×).
+    if ent_total >= 100 and full_total > ent_total * 5:
         return entities_result
 
     if full_total > ent_total * 1.5 or len(full_result) > len(entities_result) * 2:
@@ -1151,6 +1158,142 @@ def _extract_cables_mtext_table(dxf_path: str) -> dict[str, CableItem]:
     return result
 
 
+def _extract_cables_all_blocks(dxf_path: str) -> dict[str, CableItem]:
+    """T074: Extract cables from ALL block definitions, not just *T blocks.
+
+    Multi-sheet DWG files store cable data in various block types:
+      - *T blocks (ACAD_TABLE geometry) — already handled by _extract_cables_mtext_table
+      - Named blocks (A$C..., etc.) — schema diagram blocks with cable labels
+      - Layout blocks — paper space content
+
+    This function scans every block definition for MTEXT/TEXT entities
+    matching cable patterns with lengths.  It handles:
+      - Inline: cable type + L= in the same MTEXT/TEXT entity
+      - Multi-entity: cable type in one entity, L= in a nearby entity
+        within the same block (matched by Y-proximity for table rows)
+
+    Deduplicates by (cable_type, length) pair to avoid double-counting
+    from multiple DXF representations.
+    """
+    result: dict[str, CableItem] = {}
+    seen_pairs: set[tuple[str, int]] = set()
+
+    def _add_cable(ct_raw: str, length: int) -> None:
+        ct = ct_raw.replace("х", "×").replace("x", "×")
+        pair = (ct, length)
+        if pair in seen_pairs:
+            return
+        seen_pairs.add(pair)
+        if ct not in result:
+            result[ct] = CableItem(cable_type=ct)
+        result[ct].count += 1
+        result[ct].total_length_m += length
+
+    try:
+        doc = ezdxf.readfile(dxf_path)
+    except Exception:
+        return result
+
+    _SKIP_BLOCK_NAMES = {"*Model_Space", "*Paper_Space", "*Paper_Space0"}
+    for block in doc.blocks:
+        # Skip modelspace / paper space (handled by _get_mtext_entries)
+        # Skip *T blocks (handled by _extract_cables_mtext_table)
+        if block.name in _SKIP_BLOCK_NAMES or block.name.startswith("*T"):
+            continue
+
+        # Collect all MTEXT/TEXT entries from this block
+        entries: list[tuple[str, float, float]] = []
+        for ent in block:
+            if ent.dxftype() == "MTEXT":
+                try:
+                    clean = _clean_mtext(ent.text)
+                    if not clean.strip():
+                        continue
+                    x = float(ent.dxf.insert.x)
+                    y = float(ent.dxf.insert.y)
+                    entries.append((clean.strip(), x, y))
+                except Exception:
+                    continue
+            elif ent.dxftype() == "TEXT":
+                try:
+                    text = ent.dxf.text
+                    if not text or not text.strip():
+                        continue
+                    x = float(ent.dxf.insert[0])
+                    y = float(ent.dxf.insert[1])
+                    entries.append((text.strip(), x, y))
+                except Exception:
+                    continue
+
+        if not entries:
+            continue
+
+        # Check if this block has any cable-related content
+        has_cable = any(_CABLE_TYPE_RE.search(t) for t, _, _ in entries)
+        if not has_cable:
+            continue
+
+        # -- Pass 1: Inline extraction (cable type + L= in same entity) --
+        for text, x, y in entries:
+            cm = _CABLE_TYPE_RE.search(text)
+            lm = _CABLE_LENGTH_EXT_RE.search(text)
+            if cm and lm:
+                _add_cable(cm.group(1), int(lm.group(1)))
+
+        # -- Pass 2: Multi-entity extraction (cable + length in nearby entities) --
+        has_length = any(_CABLE_LENGTH_EXT_RE.search(t) for t, _, _ in entries)
+        if not has_length:
+            continue
+
+        # Group entries by Y coordinate (rows) with tolerance
+        y_tolerance = 50
+        y_keys: list[float] = sorted(set(y for _, _, y in entries))
+
+        y_cluster: dict[float, int] = {}
+        cluster_id = 0
+        for i, yk in enumerate(y_keys):
+            if i == 0 or abs(yk - y_keys[i - 1]) > y_tolerance:
+                cluster_id = i
+            y_cluster[yk] = cluster_id
+
+        row_map: dict[int, list[tuple[str, float]]] = {}
+        for text, x, y in entries:
+            cid = y_cluster[y]
+            if cid not in row_map:
+                row_map[cid] = []
+            row_map[cid].append((text, x))
+
+        for cid, cells in row_map.items():
+            type_cells: list[tuple[str, float]] = []
+            length_cells: list[tuple[int, float]] = []
+            for text, x in cells:
+                cm = _CABLE_TYPE_RE.search(text)
+                lm = _CABLE_LENGTH_EXT_RE.search(text)
+                if cm and not lm:
+                    type_cells.append((cm.group(1), x))
+                elif lm and not cm:
+                    length_cells.append((int(lm.group(1)), x))
+
+            if not type_cells or not length_cells:
+                continue
+
+            type_cells.sort(key=lambda t: t[1])
+            length_cells.sort(key=lambda t: t[1])
+
+            for ct_raw, tx in type_cells:
+                best_len = None
+                best_dist = float("inf")
+                for ln, lx in length_cells:
+                    dist = abs(tx - lx)
+                    if dist < best_dist:
+                        best_dist = dist
+                        best_len = ln
+                if best_len is not None:
+                    _add_cable(ct_raw, best_len)
+
+    return result
+
+
 def extract_cables_dxf(dxf_path: str) -> list[CableItem]:
     """Extract cable data from a DXF file.
 
@@ -1161,6 +1304,11 @@ def extract_cables_dxf(dxf_path: str) -> list[CableItem]:
     Scans *T blocks (ACAD_TABLE geometry) for cable journal tables,
     handling both inline (cable+L= same MTEXT) and multi-MTEXT
     (cable in one, length in adjacent) formats.
+
+    T074: Added all-blocks scanner that iterates over every block
+    definition (doc.blocks), not just modelspace and *T blocks.
+    Catches cable data in schema diagram blocks, layout blocks,
+    and other named blocks (A$C..., etc.).
     """
     cables_raw = _extract_cables_raw_dxf(dxf_path)
     entries = _get_mtext_entries(dxf_path)
@@ -1188,6 +1336,15 @@ def extract_cables_dxf(dxf_path: str) -> list[CableItem]:
         elif item.total_length_m > cables_mtext[ct].total_length_m:
             cables_mtext[ct] = item
 
+    # T074: Scan ALL block definitions for cable data (catches cables
+    # in schema diagram blocks, layout blocks, and other non-*T blocks)
+    cables_blocks = _extract_cables_all_blocks(dxf_path)
+    for ct, item in cables_blocks.items():
+        if ct not in cables_mtext:
+            cables_mtext[ct] = item
+        elif item.total_length_m > cables_mtext[ct].total_length_m:
+            cables_mtext[ct] = item
+
     # Choose the best result: pick whichever found more cable data
     raw_total = sum(c.total_length_m for c in cables_raw.values())
     mtext_total = sum(c.total_length_m for c in cables_mtext.values())
@@ -1195,11 +1352,14 @@ def extract_cables_dxf(dxf_path: str) -> list[CableItem]:
     if raw_total == 0 and mtext_total == 0:
         return []
 
-    # Use whichever strategy found more data
-    if mtext_total > raw_total:
+    # T074: When ezdxf-based *T block parser found substantial data and
+    # raw scanner result is much larger (>3×), the raw scanner likely
+    # picked up inflated data from BLOCKS/OBJECTS section duplication.
+    # Prefer ezdxf result which properly parses ACAD_TABLE content.
+    if table_total >= 100 and raw_total > table_total * 3:
         cables = cables_mtext
-        if raw_total > 0:
-            print(f"  [cables] MTEXT extraction ({mtext_total}m) > raw ({raw_total}m)")
+    elif mtext_total > raw_total:
+        cables = cables_mtext
     else:
         cables = cables_raw
         # Supplement raw results with any cable types only found in MTEXT
@@ -1209,6 +1369,11 @@ def extract_cables_dxf(dxf_path: str) -> list[CableItem]:
 
     # T065: Also supplement with table results not found elsewhere
     for ct, item in cables_table.items():
+        if ct not in cables:
+            cables[ct] = item
+
+    # T074: Also supplement with all-blocks results not found elsewhere
+    for ct, item in cables_blocks.items():
         if ct not in cables:
             cables[ct] = item
 
