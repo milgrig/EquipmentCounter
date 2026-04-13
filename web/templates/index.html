@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Legend Viewer</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-page="index">
+    <header>
+        <div class="header-inner">
+            <div class="header-left">
+                <h1>PDF Legend Viewer</h1>
+                <p class="subtitle">Анализ условных обозначений &mdash; {{ total }} файлов</p>
+            </div>
+            <div class="header-right">
+                <button id="btn-theme" class="btn btn-icon" title="Тёмная / светлая тема">&#9789;</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="index-container">
+        <!-- Controls Bar -->
+        <div class="controls-bar">
+            <input type="text" id="search-input" placeholder="Поиск по имени файла или папке..." />
+            <div class="controls-right">
+                <span class="file-counter" id="file-counter">{{ total }} файлов</span>
+            </div>
+        </div>
+
+        <!-- File Table grouped by folder -->
+        <div class="table-wrap">
+            <table class="file-table" id="file-table">
+                <thead>
+                    <tr>
+                        <th class="th-name">Имя файла</th>
+                        <th class="th-type">Тип</th>
+                        <th class="th-size">Размер</th>
+                        <th class="th-date">Изменён</th>
+                    </tr>
+                </thead>
+                <tbody id="file-tbody">
+                    {# Group files by folder using Jinja2 groupby #}
+                    {% set ns = namespace(prev_folder='__NONE__') %}
+                    {% for f in files %}
+                        {% if f.folder != ns.prev_folder %}
+                            {% set ns.prev_folder = f.folder %}
+                            <tr class="folder-row" data-folder="{{ f.folder }}">
+                                <td colspan="4">
+                                    <span class="folder-toggle">&#9660;</span>
+                                    <span class="folder-icon">&#128193;</span>
+                                    <span class="folder-name">{{ f.folder if f.folder else '(корневая папка)' }}</span>
+                                    <span class="folder-count"></span>
+                                </td>
+                            </tr>
+                        {% endif %}
+                        <tr class="file-row" data-id="{{ f.id }}" data-folder="{{ f.folder }}" data-path="{{ f.path }}" data-name="{{ f.filename }}">
+                            <td class="td-name">
+                                <a href="/viewer/{{ f.id }}" class="file-link">{{ f.filename }}</a>
+                            </td>
+                            <td class="td-type">
+                                {% if f.type_guess %}
+                                <span class="type-badge type-{{ f.type_guess }}">{{ f.type_guess }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="td-size">{{ f.size_kb }} КБ</td>
+                            <td class="td-date">{{ f.modified }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+    // ── Theme toggle ──
+    const themeBtn = document.getElementById('btn-theme');
+    function applyTheme(dark) {
+        document.body.classList.toggle('dark', dark);
+        localStorage.setItem('theme', dark ? 'dark' : 'light');
+        themeBtn.textContent = dark ? '\u2600' : '\u263D';
+    }
+    themeBtn.addEventListener('click', () => {
+        applyTheme(!document.body.classList.contains('dark'));
+    });
+    applyTheme(localStorage.getItem('theme') === 'dark');
+
+    // ── Folder collapse ──
+    document.querySelectorAll('.folder-row').forEach(row => {
+        // Count files in this folder
+        const folder = row.dataset.folder;
+        const fileRows = document.querySelectorAll(`.file-row[data-folder="${CSS.escape(folder)}"]`);
+        const countEl = row.querySelector('.folder-count');
+        if (countEl) countEl.textContent = `(${fileRows.length})`;
+
+        row.addEventListener('click', () => {
+            const collapsed = row.classList.toggle('collapsed');
+            const toggle = row.querySelector('.folder-toggle');
+            toggle.textContent = collapsed ? '\u25B6' : '\u25BC';
+            fileRows.forEach(fr => fr.classList.toggle('hidden', collapsed));
+        });
+    });
+
+    // ── Search / Filter ──
+    const searchInput = document.getElementById('search-input');
+    const fileCounter = document.getElementById('file-counter');
+    const totalFiles = {{ total }};
+
+    searchInput.addEventListener('input', () => {
+        const q = searchInput.value.toLowerCase();
+        let visible = 0;
+        const folderVisible = {};
+
+        document.querySelectorAll('.file-row').forEach(row => {
+            const name = (row.dataset.name || '').toLowerCase();
+            const path = (row.dataset.path || '').toLowerCase();
+            const show = !q || name.includes(q) || path.includes(q);
+            row.classList.toggle('hidden', !show);
+            if (show) {
+                visible++;
+                folderVisible[row.dataset.folder] = (folderVisible[row.dataset.folder] || 0) + 1;
+            }
+        });
+
+        // Hide folder rows with no visible files
+        document.querySelectorAll('.folder-row').forEach(row => {
+            const folder = row.dataset.folder;
+            const hasVisible = (folderVisible[folder] || 0) > 0;
+            row.classList.toggle('hidden', !hasVisible);
+            if (hasVisible) {
+                row.classList.remove('collapsed');
+                row.querySelector('.folder-toggle').textContent = '\u25BC';
+            }
+        });
+
+        fileCounter.textContent = q ? `${visible} / ${totalFiles} файлов` : `${totalFiles} файлов`;
+    });
+    </script>
+</body>
+</html>
