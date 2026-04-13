@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ filename }} — PDF Legend Viewer</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-page="viewer">
+    <header>
+        <div class="header-inner">
+            <div class="header-left">
+                <a href="/" class="back-link" title="К списку файлов">&larr;</a>
+                <div>
+                    <h1 class="viewer-title">{{ filename }}</h1>
+                    <p class="subtitle">{{ filepath }}</p>
+                </div>
+            </div>
+            <div class="header-right">
+                <button id="btn-theme" class="btn btn-icon" title="Тёмная / светлая тема">&#9789;</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Split layout -->
+    <div class="viewer-container">
+        <!-- LEFT: PDF render panel (60%) -->
+        <div class="panel pdf-panel" id="pdf-panel">
+            <!-- PDF toolbar -->
+            <div class="pdf-toolbar">
+                <div class="pdf-toolbar-left">
+                    <button id="btn-prev-page" class="btn btn-sm" title="Предыдущая страница">&laquo;</button>
+                    <span class="page-info">
+                        Стр. <span id="current-page">1</span> / <span id="total-pages">{{ page_count }}</span>
+                    </span>
+                    <button id="btn-next-page" class="btn btn-sm" title="Следующая страница">&raquo;</button>
+                </div>
+                <div class="pdf-toolbar-center">
+                    <button id="btn-zoom-out" class="btn btn-sm" title="Уменьшить">&#8722;</button>
+                    <span class="zoom-info" id="zoom-info">100%</span>
+                    <button id="btn-zoom-in" class="btn btn-sm" title="Увеличить">&#43;</button>
+                    <button id="btn-zoom-fit" class="btn btn-sm" title="По ширине">&#8596;</button>
+                    <button id="btn-zoom-reset" class="btn btn-sm" title="Сбросить">1:1</button>
+                </div>
+                <div class="pdf-toolbar-right">
+                    <label class="toggle-label" title="Показать наложение легенды">
+                        <input type="checkbox" id="chk-overlay" checked />
+                        <span>Легенда</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- PDF image viewport -->
+            <div class="pdf-viewport" id="pdf-viewport">
+                <div class="pdf-scroll" id="pdf-scroll">
+                    <img id="pdf-image" src="" alt="PDF страница" draggable="false" />
+                    <!-- Canvas overlay for highlight rectangles -->
+                    <canvas id="highlight-canvas"></canvas>
+                </div>
+                <!-- Loading overlay -->
+                <div class="pdf-loading hidden" id="pdf-loading">
+                    <div class="spinner"></div>
+                    <span>Загрузка страницы...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resizer handle -->
+        <div class="resizer" id="resizer" title="Изменить размер панелей"></div>
+
+        <!-- RIGHT: Legend panel (40%) -->
+        <div class="panel legend-panel" id="legend-panel">
+            <!-- Legend header -->
+            <div class="legend-header">
+                <h2>Условные обозначения</h2>
+                <div class="legend-toolbar">
+                    <button id="btn-export" class="btn btn-sm" title="Экспорт JSON">&#128190; JSON</button>
+                    <button id="btn-debug-toggle" class="btn btn-sm btn-ghost" title="Отладка слов">&#128270; Debug</button>
+                </div>
+            </div>
+
+            <!-- Legend loading -->
+            <div class="legend-loading" id="legend-loading">
+                <div class="spinner"></div>
+                <span>Анализ легенды...</span>
+            </div>
+
+            <!-- Legend status -->
+            <div class="legend-status hidden" id="legend-status">
+                <div class="status-badges">
+                    <span class="status-badge" id="badge-found"></span>
+                    <span class="status-badge" id="badge-type"></span>
+                    <span class="status-badge" id="badge-count"></span>
+                </div>
+            </div>
+
+            <!-- Legend items table -->
+            <div class="legend-table-wrap hidden" id="legend-table-wrap">
+                <table class="legend-items-table">
+                    <thead>
+                        <tr>
+                            <th class="th-num">#</th>
+                            <th class="th-sym">Обозначение</th>
+                            <th class="th-desc">Наименование</th>
+                            <th class="th-cat">Категория</th>
+                        </tr>
+                    </thead>
+                    <tbody id="legend-tbody"></tbody>
+                </table>
+            </div>
+
+            <!-- Debug words panel (hidden by default) -->
+            <div class="debug-panel hidden" id="debug-panel">
+                <div class="debug-header">
+                    <h3>&#128270; Отладка: слова pdfplumber</h3>
+                    <span class="debug-info" id="debug-info"></span>
+                </div>
+                <div class="debug-table-wrap">
+                    <table class="debug-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Текст</th>
+                                <th>x0</th>
+                                <th>top</th>
+                                <th>x1</th>
+                                <th>bottom</th>
+                            </tr>
+                        </thead>
+                        <tbody id="debug-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom status bar -->
+    <footer class="status-bar" id="status-bar">
+        <div class="status-left">
+            <span id="stat-items">Элементов: —</span>
+            <span class="sep">|</span>
+            <span id="stat-bbox">BBox: —</span>
+        </div>
+        <div class="status-right">
+            <span id="stat-time">Время: —</span>
+            <span class="sep">|</span>
+            <span id="stat-words">Слов: —</span>
+        </div>
+    </footer>
+
+    <script>
+        // Pass server-side data to JS
+        window.__FILE_ID__ = "{{ file_id }}";
+        window.__FILENAME__ = "{{ filename }}";
+        window.__PAGE_COUNT__ = {{ page_count }};
+    </script>
+    <script src="/static/app.js"></script>
+</body>
+</html>
