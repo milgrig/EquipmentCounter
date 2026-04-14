@@ -1,17 +1,17 @@
 {
-  "timestamp": "2026-04-14 16:45:11",
+  "timestamp": "2026-04-14 20:16:09",
   "summary": {
-    "pairs": 32,
-    "dxf_items": 270,
-    "pdf_items": 248,
-    "name_matches": 143,
-    "exact_matches": 84,
-    "missing": 127,
-    "extra": 105
+    "pairs": 56,
+    "dxf_items": 390,
+    "pdf_items": 470,
+    "name_matches": 233,
+    "exact_matches": 120,
+    "missing": 157,
+    "extra": 237
   },
   "summary_rates": {
-    "name_match_rate_pct": 53.0,
-    "exact_match_rate_pct": 31.1
+    "name_match_rate_pct": 59.7,
+    "exact_match_rate_pct": 30.8
   },
   "cases": [
     {
@@ -6172,6 +6172,4294 @@
               }
             ],
             "extra_items": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "gpk_z3",
+      "section": "ЭО",
+      "pairs": [
+        {
+          "drawing_num": "001",
+          "dxf_file": "001 - Общие данные (начало).dxf",
+          "pdf_file": "001-Общие данные начало.pdf",
+          "dxf_items": [],
+          "pdf_items": [
+            {
+              "symbol": "",
+              "name": "работ(на 8-ми листах)",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Ссылочные документы",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 0,
+            "pdf_item_count": 2,
+            "name_matches": 0,
+            "exact_matches": 0,
+            "name_match_rate": 0,
+            "exact_match_rate": 0,
+            "missing_in_pdf": 0,
+            "extra_in_pdf": 2,
+            "matched_items": [],
+            "missing_items": [],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "работ(на 8-ми листах)",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Ссылочные документы",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "002",
+          "dxf_file": "002 - Общие данные (окончание).dxf",
+          "pdf_file": "002-Общие данные окончание.pdf",
+          "dxf_items": [],
+          "pdf_items": [
+            {
+              "symbol": "",
+              "name": "работ(на 11-ти листах)",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Ссылочные документы",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 0,
+            "pdf_item_count": 2,
+            "name_matches": 0,
+            "exact_matches": 0,
+            "name_match_rate": 0,
+            "exact_match_rate": 0,
+            "missing_in_pdf": 0,
+            "extra_in_pdf": 2,
+            "matched_items": [],
+            "missing_items": [],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "работ(на 11-ти листах)",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Ссылочные документы",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "003",
+          "dxf_file": "003, 004 - Схемы ЩО, ЩАО.dxf",
+          "pdf_file": "003 - Схемы ЩО, ЩАО-ЩО-3.pdf",
+          "dxf_items": [
+            {
+              "symbol": "0",
+              "name": "[Auto 0]",
+              "count": 2
+            },
+            {
+              "symbol": "1",
+              "name": "[Auto 1]",
+              "count": 404
+            },
+            {
+              "symbol": "10",
+              "name": "[Auto 10]",
+              "count": 1
+            },
+            {
+              "symbol": "11",
+              "name": "[Auto 11]",
+              "count": 1
+            },
+            {
+              "symbol": "12",
+              "name": "[Auto 12]",
+              "count": 1
+            },
+            {
+              "symbol": "1НЗ",
+              "name": "[Auto 1НЗ]",
+              "count": 1
+            },
+            {
+              "symbol": "1НО",
+              "name": "[Auto 1НО]",
+              "count": 1
+            },
+            {
+              "symbol": "2",
+              "name": "[Auto 2]",
+              "count": 42
+            },
+            {
+              "symbol": "20А",
+              "name": "[Auto 20А]",
+              "count": 3
+            },
+            {
+              "symbol": "3",
+              "name": "[Auto 3]",
+              "count": 37
+            },
+            {
+              "symbol": "4",
+              "name": "[Auto 4]",
+              "count": 35
+            },
+            {
+              "symbol": "5",
+              "name": "[Auto 5]",
+              "count": 14
+            },
+            {
+              "symbol": "6",
+              "name": "[Auto 6]",
+              "count": 6
+            },
+            {
+              "symbol": "7",
+              "name": "[Auto 7]",
+              "count": 1
+            },
+            {
+              "symbol": "8",
+              "name": "[Auto 8]",
+              "count": 1
+            },
+            {
+              "symbol": "9",
+              "name": "[Auto 9]",
+              "count": 1
+            }
+          ],
+          "pdf_items": [],
+          "comparison": {
+            "dxf_item_count": 16,
+            "pdf_item_count": 0,
+            "name_matches": 0,
+            "exact_matches": 0,
+            "name_match_rate": 0.0,
+            "exact_match_rate": 0.0,
+            "missing_in_pdf": 16,
+            "extra_in_pdf": 0,
+            "matched_items": [],
+            "missing_items": [
+              {
+                "symbol": "0",
+                "name": "[Auto 0]",
+                "count": 2
+              },
+              {
+                "symbol": "1",
+                "name": "[Auto 1]",
+                "count": 404
+              },
+              {
+                "symbol": "10",
+                "name": "[Auto 10]",
+                "count": 1
+              },
+              {
+                "symbol": "11",
+                "name": "[Auto 11]",
+                "count": 1
+              },
+              {
+                "symbol": "12",
+                "name": "[Auto 12]",
+                "count": 1
+              },
+              {
+                "symbol": "1НЗ",
+                "name": "[Auto 1НЗ]",
+                "count": 1
+              },
+              {
+                "symbol": "1НО",
+                "name": "[Auto 1НО]",
+                "count": 1
+              },
+              {
+                "symbol": "2",
+                "name": "[Auto 2]",
+                "count": 42
+              },
+              {
+                "symbol": "20А",
+                "name": "[Auto 20А]",
+                "count": 3
+              },
+              {
+                "symbol": "3",
+                "name": "[Auto 3]",
+                "count": 37
+              }
+            ],
+            "extra_items": []
+          }
+        },
+        {
+          "drawing_num": "005",
+          "dxf_file": "005 - План  освещения на отм- 0-000.dxf",
+          "pdf_file": "005-Планы освещения-отм. 0.000.pdf",
+          "dxf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 33
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 15
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 7
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 4
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Светильник светодиодный аварийный CD LED 27 4000K+Emergency CONVERSION KIT POWER LED 8-40W IP20",
+              "count": 4
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 6
+            },
+            {
+              "symbol": "7АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 7
+            },
+            {
+              "symbol": "ВЫХОД",
+              "name": "Пиктограмма \"Выход/Exit\"",
+              "count": 14
+            },
+            {
+              "symbol": "50ЛК",
+              "name": "[? 50ЛК]",
+              "count": 1
+            }
+          ],
+          "pdf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 38,
+              "color": "blue"
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 4,
+              "color": "blue"
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 9,
+              "color": "blue"
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 6,
+              "color": "blue"
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Светильник светодиодный аварийный CD LED 27 4000K+Emergency CONVERSION KIT POWER LED 8-40W IP20",
+              "count": 4,
+              "color": "red"
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 6,
+              "color": "red"
+            },
+            {
+              "symbol": "7АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 7,
+              "color": "red"
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса аварийного освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса рабочего освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая на лотке",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе скрыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе открыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Пост управления рабочим освещением",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 8,
+            "pdf_item_count": 15,
+            "name_matches": 7,
+            "exact_matches": 3,
+            "name_match_rate": 87.5,
+            "exact_match_rate": 37.5,
+            "missing_in_pdf": 1,
+            "extra_in_pdf": 8,
+            "matched_items": [
+              {
+                "dxf_symbol": "1",
+                "pdf_symbol": "1",
+                "dxf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 33,
+                "pdf_count": 38,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": 5
+              },
+              {
+                "dxf_symbol": "2",
+                "pdf_symbol": "2",
+                "dxf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "pdf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "dxf_count": 15,
+                "pdf_count": 4,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -11
+              },
+              {
+                "dxf_symbol": "3",
+                "pdf_symbol": "3",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 7,
+                "pdf_count": 9,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": 2
+              },
+              {
+                "dxf_symbol": "4",
+                "pdf_symbol": "4",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "dxf_count": 4,
+                "pdf_count": 6,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": 2
+              },
+              {
+                "dxf_symbol": "5АЭ",
+                "pdf_symbol": "5АЭ",
+                "dxf_name": "Светильник светодиодный аварийный CD LED 27 4000K+Emergency CONVERSION KIT POWER LED 8-40W IP20",
+                "pdf_name": "Светильник светодиодный аварийный CD LED 27 4000K+Emergency CONVERSION KIT POWER LED 8-40W IP20",
+                "dxf_count": 4,
+                "pdf_count": 4,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "6АЭ",
+                "pdf_symbol": "6АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "pdf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "dxf_count": 6,
+                "pdf_count": 6,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "7АЭ",
+                "pdf_symbol": "7АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "pdf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "dxf_count": 7,
+                "pdf_count": 7,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              }
+            ],
+            "missing_items": [
+              {
+                "symbol": "ВЫХОД",
+                "name": "Пиктограмма \"Выход/Exit\"",
+                "count": 14
+              }
+            ],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная трасса аварийного освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная трасса рабочего освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая на лотке",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе скрыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе открыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Пост управления рабочим освещением",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "006",
+          "dxf_file": "006 - План освещения на отм- +4-200.dxf",
+          "pdf_file": "006-Планы освещения-отм. +4.200.pdf",
+          "dxf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 30
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник CD LED 27 4000K",
+              "count": 2
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 TH 5000K",
+              "count": 9
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 5
+            },
+            {
+              "symbol": "5",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 11
+            },
+            {
+              "symbol": "6",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 2
+            },
+            {
+              "symbol": "7АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 2
+            },
+            {
+              "symbol": "8АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 4
+            },
+            {
+              "symbol": "ВЫХОД",
+              "name": "Пиктограмма \"Выход/Exit\"",
+              "count": 6
+            }
+          ],
+          "pdf_items": [
+            {
+              "symbol": "",
+              "name": "Щит аварийного освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Щит рабочего освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 30,
+              "color": "blue"
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник CD LED 27 4000K",
+              "count": 1,
+              "color": "blue"
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 TH 5000K",
+              "count": 4,
+              "color": "blue"
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 3,
+              "color": "blue"
+            },
+            {
+              "symbol": "5",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 2,
+              "color": "blue"
+            },
+            {
+              "symbol": "6",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 1,
+              "color": "blue"
+            },
+            {
+              "symbol": "7АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 2,
+              "color": "red"
+            },
+            {
+              "symbol": "8АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 4,
+              "color": "red"
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса аварийного освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса рабочего освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая на лотке",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе скрыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе открыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Пост управления рабочим освещением",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 9,
+            "pdf_item_count": 18,
+            "name_matches": 8,
+            "exact_matches": 3,
+            "name_match_rate": 88.9,
+            "exact_match_rate": 33.3,
+            "missing_in_pdf": 1,
+            "extra_in_pdf": 10,
+            "matched_items": [
+              {
+                "dxf_symbol": "1",
+                "pdf_symbol": "1",
+                "dxf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 30,
+                "pdf_count": 30,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "2",
+                "pdf_symbol": "2",
+                "dxf_name": "Светильник CD LED 27 4000K",
+                "pdf_name": "Светильник CD LED 27 4000K",
+                "dxf_count": 2,
+                "pdf_count": 1,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "3",
+                "pdf_symbol": "3",
+                "dxf_name": "Светильник ARCTIC.OPL ECO LED 1200 TH 5000K",
+                "pdf_name": "Светильник ARCTIC.OPL ECO LED 1200 TH 5000K",
+                "dxf_count": 9,
+                "pdf_count": 4,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -5
+              },
+              {
+                "dxf_symbol": "4",
+                "pdf_symbol": "4",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "dxf_count": 5,
+                "pdf_count": 3,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -2
+              },
+              {
+                "dxf_symbol": "5",
+                "pdf_symbol": "5",
+                "dxf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "pdf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "dxf_count": 11,
+                "pdf_count": 2,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -9
+              },
+              {
+                "dxf_symbol": "6",
+                "pdf_symbol": "6",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 2,
+                "pdf_count": 1,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "7АЭ",
+                "pdf_symbol": "7АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "pdf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "dxf_count": 2,
+                "pdf_count": 2,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "8АЭ",
+                "pdf_symbol": "8АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "pdf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "dxf_count": 4,
+                "pdf_count": 4,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              }
+            ],
+            "missing_items": [
+              {
+                "symbol": "ВЫХОД",
+                "name": "Пиктограмма \"Выход/Exit\"",
+                "count": 6
+              }
+            ],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Щит аварийного освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Щит рабочего освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная трасса аварийного освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная трасса рабочего освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая на лотке",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе скрыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе открыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Пост управления рабочим освещением",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "007",
+          "dxf_file": "007 - План освещения на отм- +7-800, +9-000.dxf",
+          "pdf_file": "007-Планы освещения-отм. +7.800 +9.000.pdf",
+          "dxf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 28
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 5
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 11
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 2
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 3
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 4
+            },
+            {
+              "symbol": "ВЫХОД",
+              "name": "Пиктограмма \"Выход/Exit\"",
+              "count": 7
+            }
+          ],
+          "pdf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 26,
+              "color": "blue"
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 2,
+              "color": "blue"
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 7,
+              "color": "blue"
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 1,
+              "color": "blue"
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 3,
+              "color": "red"
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 4,
+              "color": "red"
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса аварийного освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса рабочего освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая на лотке",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе скрыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе открыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Пост управления рабочим освещением",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 7,
+            "pdf_item_count": 14,
+            "name_matches": 6,
+            "exact_matches": 2,
+            "name_match_rate": 85.7,
+            "exact_match_rate": 28.6,
+            "missing_in_pdf": 1,
+            "extra_in_pdf": 8,
+            "matched_items": [
+              {
+                "dxf_symbol": "1",
+                "pdf_symbol": "1",
+                "dxf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 28,
+                "pdf_count": 26,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -2
+              },
+              {
+                "dxf_symbol": "2",
+                "pdf_symbol": "2",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "dxf_count": 5,
+                "pdf_count": 2,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -3
+              },
+              {
+                "dxf_symbol": "3",
+                "pdf_symbol": "3",
+                "dxf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "pdf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "dxf_count": 11,
+                "pdf_count": 7,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -4
+              },
+              {
+                "dxf_symbol": "4",
+                "pdf_symbol": "4",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 2,
+                "pdf_count": 1,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "5АЭ",
+                "pdf_symbol": "5АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "pdf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "dxf_count": 3,
+                "pdf_count": 3,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "6АЭ",
+                "pdf_symbol": "6АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "pdf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "dxf_count": 4,
+                "pdf_count": 4,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              }
+            ],
+            "missing_items": [
+              {
+                "symbol": "ВЫХОД",
+                "name": "Пиктограмма \"Выход/Exit\"",
+                "count": 7
+              }
+            ],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная трасса аварийного освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная трасса рабочего освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая на лотке",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе скрыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе открыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Пост управления рабочим освещением",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "008",
+          "dxf_file": "008 - План освещения на отм- +13-800.dxf",
+          "pdf_file": "008-Планы освещения-отм. +13.800.pdf",
+          "dxf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 28
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 7
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 1
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 1
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 2
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 4
+            },
+            {
+              "symbol": "ВЫХОД",
+              "name": "Пиктограмма \"Выход/Exit\"",
+              "count": 6
+            }
+          ],
+          "pdf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 38,
+              "color": "blue"
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 3,
+              "color": "blue"
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 0,
+              "color": "blue"
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 0,
+              "color": "blue"
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 2,
+              "color": "red"
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 4,
+              "color": "red"
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса аварийного освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса рабочего освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая на лотке",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе скрыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе открыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Пост управления рабочим освещением",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 7,
+            "pdf_item_count": 14,
+            "name_matches": 6,
+            "exact_matches": 2,
+            "name_match_rate": 85.7,
+            "exact_match_rate": 28.6,
+            "missing_in_pdf": 1,
+            "extra_in_pdf": 8,
+            "matched_items": [
+              {
+                "dxf_symbol": "1",
+                "pdf_symbol": "1",
+                "dxf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 28,
+                "pdf_count": 38,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": 10
+              },
+              {
+                "dxf_symbol": "2",
+                "pdf_symbol": "2",
+                "dxf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "pdf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "dxf_count": 7,
+                "pdf_count": 3,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -4
+              },
+              {
+                "dxf_symbol": "3",
+                "pdf_symbol": "3",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 1,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "4",
+                "pdf_symbol": "4",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "dxf_count": 1,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "5АЭ",
+                "pdf_symbol": "5АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "pdf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "dxf_count": 2,
+                "pdf_count": 2,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "6АЭ",
+                "pdf_symbol": "6АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "pdf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "dxf_count": 4,
+                "pdf_count": 4,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              }
+            ],
+            "missing_items": [
+              {
+                "symbol": "ВЫХОД",
+                "name": "Пиктограмма \"Выход/Exit\"",
+                "count": 6
+              }
+            ],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная трасса аварийного освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная трасса рабочего освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая на лотке",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе скрыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе открыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Пост управления рабочим освещением",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "009",
+          "dxf_file": "009 - План освещения на отм- +18-600.dxf",
+          "pdf_file": "009-Планы освещения-отм. +18.600.pdf",
+          "dxf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 27
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 7
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 2
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 1
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 2
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 4
+            },
+            {
+              "symbol": "ВЫХОД",
+              "name": "Пиктограмма \"Выход/Exit\"",
+              "count": 6
+            }
+          ],
+          "pdf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 36,
+              "color": "blue"
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 3,
+              "color": "blue"
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 1,
+              "color": "blue"
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 0,
+              "color": "blue"
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 2,
+              "color": "red"
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 4,
+              "color": "red"
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса аварийного освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса рабочего освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая на лотке",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе скрыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе открыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Пост управления рабочим освещением",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 7,
+            "pdf_item_count": 14,
+            "name_matches": 6,
+            "exact_matches": 2,
+            "name_match_rate": 85.7,
+            "exact_match_rate": 28.6,
+            "missing_in_pdf": 1,
+            "extra_in_pdf": 8,
+            "matched_items": [
+              {
+                "dxf_symbol": "1",
+                "pdf_symbol": "1",
+                "dxf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 27,
+                "pdf_count": 36,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": 9
+              },
+              {
+                "dxf_symbol": "2",
+                "pdf_symbol": "2",
+                "dxf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "pdf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "dxf_count": 7,
+                "pdf_count": 3,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -4
+              },
+              {
+                "dxf_symbol": "3",
+                "pdf_symbol": "3",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 2,
+                "pdf_count": 1,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "4",
+                "pdf_symbol": "4",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "dxf_count": 1,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "5АЭ",
+                "pdf_symbol": "5АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "pdf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "dxf_count": 2,
+                "pdf_count": 2,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "6АЭ",
+                "pdf_symbol": "6АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "pdf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "dxf_count": 4,
+                "pdf_count": 4,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              }
+            ],
+            "missing_items": [
+              {
+                "symbol": "ВЫХОД",
+                "name": "Пиктограмма \"Выход/Exit\"",
+                "count": 6
+              }
+            ],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная трасса аварийного освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная трасса рабочего освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая на лотке",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе скрыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе открыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Пост управления рабочим освещением",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "010",
+          "dxf_file": "010 - План освещения на отм- +23-400.dxf",
+          "pdf_file": "010-Планы освещения-отм. +23.400.pdf",
+          "dxf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 33
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 7
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 2
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 1
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 2
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 4
+            },
+            {
+              "symbol": "ВЫХОД",
+              "name": "Пиктограмма \"Выход/Exit\"",
+              "count": 6
+            },
+            {
+              "symbol": "28",
+              "name": "[? 28]",
+              "count": 1
+            }
+          ],
+          "pdf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 32,
+              "color": "blue"
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 3,
+              "color": "blue"
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 1,
+              "color": "blue"
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 0,
+              "color": "blue"
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 2,
+              "color": "red"
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 4,
+              "color": "red"
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса аварийного освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса рабочего освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая на лотке",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе скрыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе открыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Пост управления рабочим освещением",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 7,
+            "pdf_item_count": 14,
+            "name_matches": 6,
+            "exact_matches": 2,
+            "name_match_rate": 85.7,
+            "exact_match_rate": 28.6,
+            "missing_in_pdf": 1,
+            "extra_in_pdf": 8,
+            "matched_items": [
+              {
+                "dxf_symbol": "1",
+                "pdf_symbol": "1",
+                "dxf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 33,
+                "pdf_count": 32,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "2",
+                "pdf_symbol": "2",
+                "dxf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "pdf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "dxf_count": 7,
+                "pdf_count": 3,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -4
+              },
+              {
+                "dxf_symbol": "3",
+                "pdf_symbol": "3",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 2,
+                "pdf_count": 1,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "4",
+                "pdf_symbol": "4",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "dxf_count": 1,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "5АЭ",
+                "pdf_symbol": "5АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "pdf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "dxf_count": 2,
+                "pdf_count": 2,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "6АЭ",
+                "pdf_symbol": "6АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "pdf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "dxf_count": 4,
+                "pdf_count": 4,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              }
+            ],
+            "missing_items": [
+              {
+                "symbol": "ВЫХОД",
+                "name": "Пиктограмма \"Выход/Exit\"",
+                "count": 6
+              }
+            ],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная трасса аварийного освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная трасса рабочего освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая на лотке",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе скрыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе открыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Пост управления рабочим освещением",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "011",
+          "dxf_file": "011 - План освещения на отм- +28-200.dxf",
+          "pdf_file": "011-Планы освещения-отм. +28.200.pdf",
+          "dxf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник INSEL LB/S LED 120 D60 Ex 5000K",
+              "count": 8
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 0
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 7
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 20
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 0
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 0
+            },
+            {
+              "symbol": "ВЫХОД",
+              "name": "Пиктограмма \"Выход/Exit\"",
+              "count": 5
+            }
+          ],
+          "pdf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник INSEL LB/S LED 120 D60 Ex 5000K",
+              "count": 3,
+              "color": "blue"
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 0,
+              "color": "blue"
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 3,
+              "color": "blue"
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 18,
+              "color": "blue"
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 0,
+              "color": "red"
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 0,
+              "color": "red"
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса аварийного освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса рабочего освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая на лотке",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе скрыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе открыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Пост управления рабочим освещением",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 7,
+            "pdf_item_count": 13,
+            "name_matches": 6,
+            "exact_matches": 3,
+            "name_match_rate": 85.7,
+            "exact_match_rate": 42.9,
+            "missing_in_pdf": 1,
+            "extra_in_pdf": 7,
+            "matched_items": [
+              {
+                "dxf_symbol": "1",
+                "pdf_symbol": "1",
+                "dxf_name": "Светильник INSEL LB/S LED 120 D60 Ex 5000K",
+                "pdf_name": "Светильник INSEL LB/S LED 120 D60 Ex 5000K",
+                "dxf_count": 8,
+                "pdf_count": 3,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -5
+              },
+              {
+                "dxf_symbol": "2",
+                "pdf_symbol": "2",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "3",
+                "pdf_symbol": "3",
+                "dxf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "pdf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "dxf_count": 7,
+                "pdf_count": 3,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -4
+              },
+              {
+                "dxf_symbol": "4",
+                "pdf_symbol": "4",
+                "dxf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 20,
+                "pdf_count": 18,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -2
+              },
+              {
+                "dxf_symbol": "5АЭ",
+                "pdf_symbol": "5АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "pdf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "6АЭ",
+                "pdf_symbol": "6АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "pdf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              }
+            ],
+            "missing_items": [
+              {
+                "symbol": "ВЫХОД",
+                "name": "Пиктограмма \"Выход/Exit\"",
+                "count": 5
+              }
+            ],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная трасса аварийного освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная трасса рабочего освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая на лотке",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе скрыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе открыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Пост управления рабочим освещением",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "012",
+          "dxf_file": "012 - План привязки светильников на отм- 0-000.dxf",
+          "pdf_file": "012-План привязки на отм. 0.000.pdf",
+          "dxf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 33
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 15
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 7
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 7
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Светильник светодиодный аварийный CD LED 27 4000K+Emergency CONVERSION KIT POWER LED 8-40W IP20",
+              "count": 4
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 0
+            },
+            {
+              "symbol": "7АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 0
+            },
+            {
+              "symbol": "ВЫХОД",
+              "name": "Пиктограмма \"Выход/Exit\"",
+              "count": 13
+            }
+          ],
+          "pdf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 36,
+              "color": "blue"
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 6,
+              "color": "blue"
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 9,
+              "color": "blue"
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 6,
+              "color": "blue"
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Светильник светодиодный аварийный CD LED 27 4000K+Emergency CONVERSION KIT POWER LED 8-40W IP20",
+              "count": 4,
+              "color": "red"
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 0,
+              "color": "red"
+            },
+            {
+              "symbol": "7АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 0,
+              "color": "red"
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса аварийного освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса рабочего освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая на лотке",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе скрыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе открыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Пост управления рабочим освещением",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 8,
+            "pdf_item_count": 15,
+            "name_matches": 7,
+            "exact_matches": 3,
+            "name_match_rate": 87.5,
+            "exact_match_rate": 37.5,
+            "missing_in_pdf": 1,
+            "extra_in_pdf": 8,
+            "matched_items": [
+              {
+                "dxf_symbol": "1",
+                "pdf_symbol": "1",
+                "dxf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 33,
+                "pdf_count": 36,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": 3
+              },
+              {
+                "dxf_symbol": "2",
+                "pdf_symbol": "2",
+                "dxf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "pdf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "dxf_count": 15,
+                "pdf_count": 6,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -9
+              },
+              {
+                "dxf_symbol": "3",
+                "pdf_symbol": "3",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 7,
+                "pdf_count": 9,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": 2
+              },
+              {
+                "dxf_symbol": "4",
+                "pdf_symbol": "4",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "dxf_count": 7,
+                "pdf_count": 6,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "5АЭ",
+                "pdf_symbol": "5АЭ",
+                "dxf_name": "Светильник светодиодный аварийный CD LED 27 4000K+Emergency CONVERSION KIT POWER LED 8-40W IP20",
+                "pdf_name": "Светильник светодиодный аварийный CD LED 27 4000K+Emergency CONVERSION KIT POWER LED 8-40W IP20",
+                "dxf_count": 4,
+                "pdf_count": 4,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "6АЭ",
+                "pdf_symbol": "6АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "pdf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "7АЭ",
+                "pdf_symbol": "7АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "pdf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              }
+            ],
+            "missing_items": [
+              {
+                "symbol": "ВЫХОД",
+                "name": "Пиктограмма \"Выход/Exit\"",
+                "count": 13
+              }
+            ],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная трасса аварийного освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная трасса рабочего освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая на лотке",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе скрыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе открыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Пост управления рабочим освещением",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "013",
+          "dxf_file": "013 - План привязки светильников на отм- +4-200.dxf",
+          "pdf_file": "013-План привязки на отм. +4.200.pdf",
+          "dxf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 31
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник CD LED 27 4000K",
+              "count": 12
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 TH 5000K",
+              "count": 11
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 4
+            },
+            {
+              "symbol": "5",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 0
+            },
+            {
+              "symbol": "6",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 0
+            },
+            {
+              "symbol": "7АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 0
+            },
+            {
+              "symbol": "8АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 0
+            },
+            {
+              "symbol": "ВЫХОД",
+              "name": "Пиктограмма \"Выход/Exit\"",
+              "count": 6
+            }
+          ],
+          "pdf_items": [
+            {
+              "symbol": "",
+              "name": "Щит аварийного освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Щит рабочего освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 30,
+              "color": "blue"
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник CD LED 27 4000K",
+              "count": 4,
+              "color": "blue"
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 TH 5000K",
+              "count": 6,
+              "color": "blue"
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 3,
+              "color": "blue"
+            },
+            {
+              "symbol": "5",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 0,
+              "color": "blue"
+            },
+            {
+              "symbol": "6",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 0,
+              "color": "blue"
+            },
+            {
+              "symbol": "7АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 0,
+              "color": "red"
+            },
+            {
+              "symbol": "8АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 0,
+              "color": "red"
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса аварийного освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса рабочего освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая на лотке",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе скрыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе открыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Пост управления рабочим освещением",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 9,
+            "pdf_item_count": 18,
+            "name_matches": 8,
+            "exact_matches": 4,
+            "name_match_rate": 88.9,
+            "exact_match_rate": 44.4,
+            "missing_in_pdf": 1,
+            "extra_in_pdf": 10,
+            "matched_items": [
+              {
+                "dxf_symbol": "1",
+                "pdf_symbol": "1",
+                "dxf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 31,
+                "pdf_count": 30,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "2",
+                "pdf_symbol": "2",
+                "dxf_name": "Светильник CD LED 27 4000K",
+                "pdf_name": "Светильник CD LED 27 4000K",
+                "dxf_count": 12,
+                "pdf_count": 4,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -8
+              },
+              {
+                "dxf_symbol": "3",
+                "pdf_symbol": "3",
+                "dxf_name": "Светильник ARCTIC.OPL ECO LED 1200 TH 5000K",
+                "pdf_name": "Светильник ARCTIC.OPL ECO LED 1200 TH 5000K",
+                "dxf_count": 11,
+                "pdf_count": 6,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -5
+              },
+              {
+                "dxf_symbol": "4",
+                "pdf_symbol": "4",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "dxf_count": 4,
+                "pdf_count": 3,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "5",
+                "pdf_symbol": "5",
+                "dxf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "pdf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "6",
+                "pdf_symbol": "6",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "7АЭ",
+                "pdf_symbol": "7АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "pdf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "8АЭ",
+                "pdf_symbol": "8АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "pdf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              }
+            ],
+            "missing_items": [
+              {
+                "symbol": "ВЫХОД",
+                "name": "Пиктограмма \"Выход/Exit\"",
+                "count": 6
+              }
+            ],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Щит аварийного освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Щит рабочего освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная трасса аварийного освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная трасса рабочего освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая на лотке",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе скрыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе открыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Пост управления рабочим освещением",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "014",
+          "dxf_file": "014 - План привязки светильников на отм- +9-000.dxf",
+          "pdf_file": "014-План привязки на отм. +9.000.pdf",
+          "dxf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 28
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 7
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 8
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 2
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 0
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 0
+            },
+            {
+              "symbol": "ВЫХОД",
+              "name": "Пиктограмма \"Выход/Exit\"",
+              "count": 7
+            }
+          ],
+          "pdf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 23,
+              "color": "blue"
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 13,
+              "color": "blue"
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 4,
+              "color": "blue"
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 1,
+              "color": "blue"
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 0,
+              "color": "red"
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 0,
+              "color": "red"
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса аварийного освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса рабочего освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая на лотке",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе скрыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе открыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Пост управления рабочим освещением",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 7,
+            "pdf_item_count": 14,
+            "name_matches": 6,
+            "exact_matches": 2,
+            "name_match_rate": 85.7,
+            "exact_match_rate": 28.6,
+            "missing_in_pdf": 1,
+            "extra_in_pdf": 8,
+            "matched_items": [
+              {
+                "dxf_symbol": "1",
+                "pdf_symbol": "1",
+                "dxf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 28,
+                "pdf_count": 23,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -5
+              },
+              {
+                "dxf_symbol": "2",
+                "pdf_symbol": "2",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "dxf_count": 7,
+                "pdf_count": 13,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": 6
+              },
+              {
+                "dxf_symbol": "3",
+                "pdf_symbol": "3",
+                "dxf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "pdf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "dxf_count": 8,
+                "pdf_count": 4,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -4
+              },
+              {
+                "dxf_symbol": "4",
+                "pdf_symbol": "4",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 2,
+                "pdf_count": 1,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "5АЭ",
+                "pdf_symbol": "5АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "pdf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "6АЭ",
+                "pdf_symbol": "6АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "pdf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              }
+            ],
+            "missing_items": [
+              {
+                "symbol": "ВЫХОД",
+                "name": "Пиктограмма \"Выход/Exit\"",
+                "count": 7
+              }
+            ],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная трасса аварийного освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная трасса рабочего освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая на лотке",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе скрыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе открыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Пост управления рабочим освещением",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "015",
+          "dxf_file": "015 - План привязки светильников на отм- +13-800.dxf",
+          "pdf_file": "015-План приявязки на отм. +13.800.pdf",
+          "dxf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 28
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 8
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 1
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 0
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 0
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 0
+            },
+            {
+              "symbol": "ВЫХОД",
+              "name": "Пиктограмма \"Выход/Exit\"",
+              "count": 6
+            }
+          ],
+          "pdf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 38,
+              "color": "blue"
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 3,
+              "color": "blue"
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 0,
+              "color": "blue"
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 0,
+              "color": "blue"
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 0,
+              "color": "red"
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 0,
+              "color": "red"
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса аварийного освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса рабочего освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая на лотке",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе скрыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе открыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Пост управления рабочим освещением",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 7,
+            "pdf_item_count": 14,
+            "name_matches": 6,
+            "exact_matches": 3,
+            "name_match_rate": 85.7,
+            "exact_match_rate": 42.9,
+            "missing_in_pdf": 1,
+            "extra_in_pdf": 8,
+            "matched_items": [
+              {
+                "dxf_symbol": "1",
+                "pdf_symbol": "1",
+                "dxf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 28,
+                "pdf_count": 38,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": 10
+              },
+              {
+                "dxf_symbol": "2",
+                "pdf_symbol": "2",
+                "dxf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "pdf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "dxf_count": 8,
+                "pdf_count": 3,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -5
+              },
+              {
+                "dxf_symbol": "3",
+                "pdf_symbol": "3",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 1,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "4",
+                "pdf_symbol": "4",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "5АЭ",
+                "pdf_symbol": "5АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "pdf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "6АЭ",
+                "pdf_symbol": "6АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "pdf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              }
+            ],
+            "missing_items": [
+              {
+                "symbol": "ВЫХОД",
+                "name": "Пиктограмма \"Выход/Exit\"",
+                "count": 6
+              }
+            ],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная трасса аварийного освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная трасса рабочего освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая на лотке",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе скрыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе открыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Пост управления рабочим освещением",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "016",
+          "dxf_file": "016 - План привязки светильников на отм- +18-600.dxf",
+          "pdf_file": "016-План привязки на отм. +18.600.pdf",
+          "dxf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 27
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 7
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 2
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 1
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 0
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 0
+            },
+            {
+              "symbol": "ВЫХОД",
+              "name": "Пиктограмма \"Выход/Exit\"",
+              "count": 6
+            }
+          ],
+          "pdf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 34,
+              "color": "blue"
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 5,
+              "color": "blue"
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 1,
+              "color": "blue"
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 0,
+              "color": "blue"
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 0,
+              "color": "red"
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 0,
+              "color": "red"
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса аварийного освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса рабочего освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая на лотке",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе скрыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе открыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Пост управления рабочим освещением",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 7,
+            "pdf_item_count": 14,
+            "name_matches": 6,
+            "exact_matches": 2,
+            "name_match_rate": 85.7,
+            "exact_match_rate": 28.6,
+            "missing_in_pdf": 1,
+            "extra_in_pdf": 8,
+            "matched_items": [
+              {
+                "dxf_symbol": "1",
+                "pdf_symbol": "1",
+                "dxf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 27,
+                "pdf_count": 34,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": 7
+              },
+              {
+                "dxf_symbol": "2",
+                "pdf_symbol": "2",
+                "dxf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "pdf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "dxf_count": 7,
+                "pdf_count": 5,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -2
+              },
+              {
+                "dxf_symbol": "3",
+                "pdf_symbol": "3",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 2,
+                "pdf_count": 1,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "4",
+                "pdf_symbol": "4",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "dxf_count": 1,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "5АЭ",
+                "pdf_symbol": "5АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "pdf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "6АЭ",
+                "pdf_symbol": "6АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "pdf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              }
+            ],
+            "missing_items": [
+              {
+                "symbol": "ВЫХОД",
+                "name": "Пиктограмма \"Выход/Exit\"",
+                "count": 6
+              }
+            ],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная трасса аварийного освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная трасса рабочего освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая на лотке",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе скрыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе открыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Пост управления рабочим освещением",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "017",
+          "dxf_file": "017 - План привязки светильников на отм- +23-400.dxf",
+          "pdf_file": "017-План привязки на отм. +23.400.pdf",
+          "dxf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 33
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 7
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 2
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 1
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 0
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 0
+            },
+            {
+              "symbol": "ВЫХОД",
+              "name": "Пиктограмма \"Выход/Exit\"",
+              "count": 6
+            }
+          ],
+          "pdf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 32,
+              "color": "blue"
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 4,
+              "color": "blue"
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 1,
+              "color": "blue"
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+              "count": 0,
+              "color": "blue"
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 0,
+              "color": "red"
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 0,
+              "color": "red"
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса аварийного освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса рабочего освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая на лотке",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе скрыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе открыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Пост управления рабочим освещением",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 7,
+            "pdf_item_count": 14,
+            "name_matches": 6,
+            "exact_matches": 2,
+            "name_match_rate": 85.7,
+            "exact_match_rate": 28.6,
+            "missing_in_pdf": 1,
+            "extra_in_pdf": 8,
+            "matched_items": [
+              {
+                "dxf_symbol": "1",
+                "pdf_symbol": "1",
+                "dxf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 33,
+                "pdf_count": 32,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "2",
+                "pdf_symbol": "2",
+                "dxf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "pdf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "dxf_count": 7,
+                "pdf_count": 4,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -3
+              },
+              {
+                "dxf_symbol": "3",
+                "pdf_symbol": "3",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 2,
+                "pdf_count": 1,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "4",
+                "pdf_symbol": "4",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K",
+                "dxf_count": 1,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -1
+              },
+              {
+                "dxf_symbol": "5АЭ",
+                "pdf_symbol": "5АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "pdf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "6АЭ",
+                "pdf_symbol": "6АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "pdf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              }
+            ],
+            "missing_items": [
+              {
+                "symbol": "ВЫХОД",
+                "name": "Пиктограмма \"Выход/Exit\"",
+                "count": 6
+              }
+            ],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная трасса аварийного освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная трасса рабочего освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая на лотке",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе скрыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе открыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Пост управления рабочим освещением",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "018",
+          "dxf_file": "018 - План привязки светильников на отм- +28-200.dxf",
+          "pdf_file": "018-План привязки на отм. +28.200.pdf",
+          "dxf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник INSEL LB/S LED 120 D60 Ex 5000K",
+              "count": 6
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 0
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 7
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 20
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 0
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 0
+            },
+            {
+              "symbol": "ВЫХОД",
+              "name": "Пиктограмма \"Выход/Exit\"",
+              "count": 5
+            }
+          ],
+          "pdf_items": [
+            {
+              "symbol": "1",
+              "name": "Светильник INSEL LB/S LED 120 D60 Ex 5000K",
+              "count": 2,
+              "color": "blue"
+            },
+            {
+              "symbol": "2",
+              "name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+              "count": 0,
+              "color": "blue"
+            },
+            {
+              "symbol": "3",
+              "name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+              "count": 3,
+              "color": "blue"
+            },
+            {
+              "symbol": "4",
+              "name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+              "count": 17,
+              "color": "blue"
+            },
+            {
+              "symbol": "5АЭ",
+              "name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+              "count": 0,
+              "color": "red"
+            },
+            {
+              "symbol": "6АЭ",
+              "name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+              "count": 0,
+              "color": "red"
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса аварийного освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная трасса рабочего освещения",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая на лотке",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе скрыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Проводка прокладываемая в трубе открыто",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Пост управления рабочим освещением",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 7,
+            "pdf_item_count": 13,
+            "name_matches": 6,
+            "exact_matches": 3,
+            "name_match_rate": 85.7,
+            "exact_match_rate": 42.9,
+            "missing_in_pdf": 1,
+            "extra_in_pdf": 7,
+            "matched_items": [
+              {
+                "dxf_symbol": "1",
+                "pdf_symbol": "1",
+                "dxf_name": "Светильник INSEL LB/S LED 120 D60 Ex 5000K",
+                "pdf_name": "Светильник INSEL LB/S LED 120 D60 Ex 5000K",
+                "dxf_count": 6,
+                "pdf_count": 2,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -4
+              },
+              {
+                "dxf_symbol": "2",
+                "pdf_symbol": "2",
+                "dxf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "3",
+                "pdf_symbol": "3",
+                "dxf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "pdf_name": "Светильник ARCTIC.OPL ECO LED 1200 5000K",
+                "dxf_count": 7,
+                "pdf_count": 3,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -4
+              },
+              {
+                "dxf_symbol": "4",
+                "pdf_symbol": "4",
+                "dxf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "pdf_name": "Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K",
+                "dxf_count": 20,
+                "pdf_count": 17,
+                "name_ratio": 1.0,
+                "count_match": false,
+                "count_delta": -3
+              },
+              {
+                "dxf_symbol": "5АЭ",
+                "pdf_symbol": "5АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "pdf_name": "Световые указатели \"ВЫХОД\" MERCURY LED Ex 20W DLW",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              },
+              {
+                "dxf_symbol": "6АЭ",
+                "pdf_symbol": "6АЭ",
+                "dxf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "pdf_name": "Световые указатели \"ВЫХОД\" ATOM 6500-3 LED SP AT FP",
+                "dxf_count": 0,
+                "pdf_count": 0,
+                "name_ratio": 1.0,
+                "count_match": true,
+                "count_delta": 0
+              }
+            ],
+            "missing_items": [
+              {
+                "symbol": "ВЫХОД",
+                "name": "Пиктограмма \"Выход/Exit\"",
+                "count": 5
+              }
+            ],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная трасса аварийного освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная трасса рабочего освещения",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая на лотке",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе скрыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Проводка прокладываемая в трубе открыто",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Пост управления рабочим освещением",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "019",
+          "dxf_file": "019 - План кабеленесущих систем на отм- 0-000.dxf",
+          "pdf_file": "019-Лотки отм. 0.000.pdf",
+          "dxf_items": [],
+          "pdf_items": [
+            {
+              "symbol": "",
+              "name": "Кабельная конструкция ОКЛ (огнестойкая кабельная линия)",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная конструкция силовых кабелей ~400/230В",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 0,
+            "pdf_item_count": 2,
+            "name_matches": 0,
+            "exact_matches": 0,
+            "name_match_rate": 0,
+            "exact_match_rate": 0,
+            "missing_in_pdf": 0,
+            "extra_in_pdf": 2,
+            "matched_items": [],
+            "missing_items": [],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная конструкция ОКЛ (огнестойкая кабельная линия)",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная конструкция силовых кабелей ~400/230В",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "020",
+          "dxf_file": "020 - План кабеленесущих систем на отм- +4-200.dxf",
+          "pdf_file": "020-Лотки отм. +4.200.pdf",
+          "dxf_items": [],
+          "pdf_items": [
+            {
+              "symbol": "",
+              "name": "Кабельная конструкция ОКЛ (огнестойкая кабельная линия)",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная конструкция силовых кабелей ~400/230В",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 0,
+            "pdf_item_count": 2,
+            "name_matches": 0,
+            "exact_matches": 0,
+            "name_match_rate": 0,
+            "exact_match_rate": 0,
+            "missing_in_pdf": 0,
+            "extra_in_pdf": 2,
+            "matched_items": [],
+            "missing_items": [],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная конструкция ОКЛ (огнестойкая кабельная линия)",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная конструкция силовых кабелей ~400/230В",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "021",
+          "dxf_file": "021 - План кабеленесущих систем на отм- +9-000.dxf",
+          "pdf_file": "021-Лотки на отм. +9.000.pdf",
+          "dxf_items": [],
+          "pdf_items": [
+            {
+              "symbol": "",
+              "name": "Кабельная конструкция ОКЛ (огнестойкая кабельная линия)",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная конструкция силовых кабелей ~400/230В",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 0,
+            "pdf_item_count": 2,
+            "name_matches": 0,
+            "exact_matches": 0,
+            "name_match_rate": 0,
+            "exact_match_rate": 0,
+            "missing_in_pdf": 0,
+            "extra_in_pdf": 2,
+            "matched_items": [],
+            "missing_items": [],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная конструкция ОКЛ (огнестойкая кабельная линия)",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная конструкция силовых кабелей ~400/230В",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "022",
+          "dxf_file": "022 - План кабеленесущих систем на отм- +13-800.dxf",
+          "pdf_file": "022-Лотки на отм. +13.800.pdf",
+          "dxf_items": [],
+          "pdf_items": [
+            {
+              "symbol": "",
+              "name": "Кабельная конструкция ОКЛ (огнестойкая кабельная линия)",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная конструкция силовых кабелей ~400/230В",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 0,
+            "pdf_item_count": 2,
+            "name_matches": 0,
+            "exact_matches": 0,
+            "name_match_rate": 0,
+            "exact_match_rate": 0,
+            "missing_in_pdf": 0,
+            "extra_in_pdf": 2,
+            "matched_items": [],
+            "missing_items": [],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная конструкция ОКЛ (огнестойкая кабельная линия)",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная конструкция силовых кабелей ~400/230В",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "023",
+          "dxf_file": "023 - План кабеленесущих систем на отм- +18-600.dxf",
+          "pdf_file": "023-Лотки на отм. +18.600.pdf",
+          "dxf_items": [],
+          "pdf_items": [
+            {
+              "symbol": "",
+              "name": "Кабельная конструкция ОКЛ (огнестойкая кабельная линия)",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная конструкция силовых кабелей ~400/230В",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 0,
+            "pdf_item_count": 2,
+            "name_matches": 0,
+            "exact_matches": 0,
+            "name_match_rate": 0,
+            "exact_match_rate": 0,
+            "missing_in_pdf": 0,
+            "extra_in_pdf": 2,
+            "matched_items": [],
+            "missing_items": [],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная конструкция ОКЛ (огнестойкая кабельная линия)",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная конструкция силовых кабелей ~400/230В",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "024",
+          "dxf_file": "024 - План кабеленесущих систем на отм- +23-400.dxf",
+          "pdf_file": "024-Лотки на отм. +23.400.pdf",
+          "dxf_items": [],
+          "pdf_items": [
+            {
+              "symbol": "",
+              "name": "Кабельная конструкция ОКЛ (огнестойкая кабельная линия)",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная конструкция силовых кабелей ~400/230В",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 0,
+            "pdf_item_count": 2,
+            "name_matches": 0,
+            "exact_matches": 0,
+            "name_match_rate": 0,
+            "exact_match_rate": 0,
+            "missing_in_pdf": 0,
+            "extra_in_pdf": 2,
+            "matched_items": [],
+            "missing_items": [],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная конструкция ОКЛ (огнестойкая кабельная линия)",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная конструкция силовых кабелей ~400/230В",
+                "count": 0
+              }
+            ]
+          }
+        },
+        {
+          "drawing_num": "025",
+          "dxf_file": "025 - План кабеленесущих систем на отм- +28-200.dxf",
+          "pdf_file": "025-Лотки на отм. +28.200.pdf",
+          "dxf_items": [],
+          "pdf_items": [
+            {
+              "symbol": "",
+              "name": "Кабельная конструкция ОКЛ (огнестойкая кабельная линия)",
+              "count": 0,
+              "color": ""
+            },
+            {
+              "symbol": "",
+              "name": "Кабельная конструкция силовых кабелей ~400/230В",
+              "count": 0,
+              "color": ""
+            }
+          ],
+          "comparison": {
+            "dxf_item_count": 0,
+            "pdf_item_count": 2,
+            "name_matches": 0,
+            "exact_matches": 0,
+            "name_match_rate": 0,
+            "exact_match_rate": 0,
+            "missing_in_pdf": 0,
+            "extra_in_pdf": 2,
+            "matched_items": [],
+            "missing_items": [],
+            "extra_items": [
+              {
+                "symbol": "",
+                "name": "Кабельная конструкция ОКЛ (огнестойкая кабельная линия)",
+                "count": 0
+              },
+              {
+                "symbol": "",
+                "name": "Кабельная конструкция силовых кабелей ~400/230В",
+                "count": 0
+              }
+            ]
           }
         }
       ]

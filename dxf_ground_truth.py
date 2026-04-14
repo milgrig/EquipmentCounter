@@ -165,6 +165,12 @@ MATCH_CASES: list[dict] = [
         "pdf_dir": str(DBT_DIR / "8.2 Участок хранения сульфата аммония"
                        / "ЭМ" / "02_PDF"),
     },
+    {
+        "name": "gpk_z3",
+        "section": "ЭО",
+        "dxf_dir": str(DBT_DIR / "03_ГПК_" / "3-я захватка" / "_converted_dxf" / "01_DWG"),
+        "pdf_dir": str(DBT_DIR / "03_ГПК_" / "3-я захватка" / "02_PDF"),
+    },
 ]
 
 

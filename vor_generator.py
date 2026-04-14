@@ -1570,13 +1570,25 @@ def aggregate_by_height(
     for r in deduped:
         for c in r.cables:
             if c.cable_type in all_cables:
-                all_cables[c.cable_type].count += c.count
-                all_cables[c.cable_type].total_length_m += c.total_length_m
+                existing = all_cables[c.cable_type]
+                existing.count += c.count
+                existing.total_length_m += c.total_length_m
+                # Merge length_by_laying dictionaries
+                if c.length_by_laying:
+                    if existing.length_by_laying is None:
+                        existing.length_by_laying = {}
+                    for lay, length in c.length_by_laying.items():
+                        existing.length_by_laying[lay] = (
+                            existing.length_by_laying.get(lay, 0) + length
+                        )
             else:
                 all_cables[c.cable_type] = CableItem(
                     cable_type=c.cable_type,
                     count=c.count,
                     total_length_m=c.total_length_m,
+                    length_by_laying=(
+                        dict(c.length_by_laying) if c.length_by_laying else None
+                    ),
                 )
     cables = sorted(all_cables.values(), key=lambda c: -c.total_length_m)
 
@@ -2694,17 +2706,41 @@ def generate_vor_docx(
                         cable_h_len = round(c.total_length_m * prop)
                         if cable_h_len <= 0:
                             continue
-                        item_num += 1
-                        _add_work_row(
-                            table, item_num,
-                            f"Прокладка кабеля в лотке на высоте {hcat}:",
-                            "м", cable_h_len, ref=drawing_ref,
-                        )
-                        desc = _format_cable_material_desc(c.cable_type)
-                        _add_material_row(
-                            table, desc,
-                            "м", cable_h_len, ref=drawing_ref,
-                        )
+
+                        # Use actual laying methods from DXF when available,
+                        # otherwise fall back to "в лотке".
+                        laying_rows: list[tuple[str, int]] = []
+                        if c.length_by_laying:
+                            for lay_method, lay_len in c.length_by_laying.items():
+                                lay_h_len = round(lay_len * prop)
+                                if lay_h_len > 0:
+                                    laying_rows.append((lay_method, lay_h_len))
+                        if not laying_rows:
+                            laying_rows = [("в лотке", cable_h_len)]
+
+                        for lay_method, lay_len in laying_rows:
+                            # Format the laying description for VOR.
+                            # Underground methods don't use height categories.
+                            lay_lower = lay_method.lower()
+                            if "в трубе" in lay_lower or "в земле" in lay_lower or "в траншее" in lay_lower:
+                                work_desc = (
+                                    f"Прокладка кабеля {lay_method} в земле:"
+                                )
+                            else:
+                                work_desc = (
+                                    f"Прокладка кабеля {lay_method} "
+                                    f"на высоте {hcat}:"
+                                )
+                            item_num += 1
+                            _add_work_row(
+                                table, item_num, work_desc,
+                                "м", lay_len, ref=drawing_ref,
+                            )
+                            desc = _format_cable_material_desc(c.cable_type)
+                            _add_material_row(
+                                table, desc,
+                                "м", lay_len, ref=drawing_ref,
+                            )
 
         if wire_items:
             _add_section_header(table, "Провод")

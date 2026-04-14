@@ -193,6 +193,10 @@ class CableItem:
     count: int = 0
     total_length_m: int = 0
     elevation_m: float | None = None
+    # T-cable-dedup: length breakdown by laying method.
+    # Keys are normalized laying method strings (e.g. "в гофре", "в кабель-канале").
+    # Empty dict means laying method is unknown.
+    length_by_laying: dict[str, int] | None = None
 
 
 # ===================================================================
@@ -871,6 +875,65 @@ _CABLE_LENGTH_RE = re.compile(r"L\s*=\s*(\d+)")
 # T065: Extended length regex — also matches L-N (dash) and L=Nм (with units)
 _CABLE_LENGTH_EXT_RE = re.compile(r"L\s*[=\-]\s*(\d+)")
 
+# T-cable-dedup: ΔU regex for smarter deduplication
+_DELTA_U_RE = re.compile(r"[\u0394\u2206]U\s*=\s*(\d+[.,]\d+)\s*%")
+
+# T-cable-dedup: Laying method regex (способ прокладки)
+_LAYING_METHOD_RE = re.compile(
+    r"(в\s+(?:кабель[- ]канале|гофре|лотке|трубе\s+ПНД|траншее)"
+    r"(?:\s*,\s*в\s+(?:кабель[- ]канале|гофре|лотке|трубе\s+ПНД|траншее))*)",
+    re.IGNORECASE,
+)
+
+
+def _extract_dedup_suffix(text: str) -> str:
+    """Build a dedup suffix from ΔU and laying method found in *text*.
+
+    Two physically-different cables of the same type and length will almost
+    always differ in at least one of:
+      - ΔU  (voltage drop depends on load current × length)
+      - laying method  (в гофре / в кабель-канале / …)
+
+    Returns a canonical string such as ``'0.1|в кабель-канале'`` or ``''``
+    when neither marker is present (falls back to old behaviour).
+    """
+    parts: list[str] = []
+
+    m_du = _DELTA_U_RE.search(text)
+    if m_du:
+        val = m_du.group(1).replace(",", ".")
+        try:
+            parts.append(str(float(val)))
+        except ValueError:
+            parts.append(val)
+
+    m_lay = _LAYING_METHOD_RE.search(text)
+    if m_lay:
+        parts.append(m_lay.group(1).strip().lower())
+
+    return "|".join(parts)
+
+
+def _extract_laying_method(text: str) -> str:
+    """Extract laying method string from cable text.
+
+    Returns normalized lowercase string like 'в гофре', 'в кабель-канале',
+    'в лотке, в гофре', or '' if not found.
+    """
+    m = _LAYING_METHOD_RE.search(text)
+    return m.group(1).strip().lower() if m else ""
+
+
+def _add_laying(item: CableItem, laying: str, length: int) -> None:
+    """Record *length* metres under *laying* method inside *item*."""
+    if not laying:
+        return
+    if item.length_by_laying is None:
+        item.length_by_laying = {}
+    item.length_by_laying[laying] = (
+        item.length_by_laying.get(laying, 0) + length
+    )
+
 
 def _extract_cables_mtext(
     entries: list[tuple[str, float, float]],
@@ -904,8 +967,8 @@ def _extract_cables_raw_dxf(dxf_path: str) -> dict[str, CableItem]:
               where cable type and L= are on separate lines (wrapped MTEXT,
               TABLE entities, different DXF versions).
 
-    Deduplicates by (cable_type, length) pair to avoid double-counting from
-    multiple DXF representations of the same table cell.
+    T-cable-dedup: dedup key now includes ΔU + laying method so that
+    physically-different cables with the same type and length are kept.
     """
     def _scan_section(dxf_path: str, target_section: str) -> dict[str, CableItem]:
         """Scan a specific DXF section (ENTITIES or BLOCKS) for cable data.
@@ -916,11 +979,12 @@ def _extract_cables_raw_dxf(dxf_path: str) -> dict[str, CableItem]:
                             NEVER pass "OBJECTS".
         """
         result: dict[str, CableItem] = {}
-        seen_pairs: set[tuple[str, int]] = set()
+        seen_pairs: set[tuple[str, int, str]] = set()
 
-        def _add_cable(ct_raw: str, length: int) -> None:
+        def _add_cable(ct_raw: str, length: int, suffix: str = "",
+                        laying: str = "") -> None:
             ct = ct_raw.replace("х", "×").replace("x", "×")
-            pair = (ct, length)
+            pair = (ct, length, suffix)
             if pair in seen_pairs:
                 return
             seen_pairs.add(pair)
@@ -928,6 +992,7 @@ def _extract_cables_raw_dxf(dxf_path: str) -> dict[str, CableItem]:
                 result[ct] = CableItem(cable_type=ct)
             result[ct].count += 1
             result[ct].total_length_m += length
+            _add_laying(result[ct], laying, length)
 
         try:
             in_section = False
@@ -966,7 +1031,9 @@ def _extract_cables_raw_dxf(dxf_path: str) -> dict[str, CableItem]:
                         cm = _CABLE_TYPE_RE.search(clean_line)
                         lm = _CABLE_LENGTH_EXT_RE.search(clean_line)
                         if cm and lm:
-                            _add_cable(cm.group(1), int(lm.group(1)))
+                            _add_cable(cm.group(1), int(lm.group(1)),
+                                       _extract_dedup_suffix(clean_line),
+                                       _extract_laying_method(clean_line))
                             continue
 
                     # Pass 2: Multi-line match — if this line has L=,
@@ -979,7 +1046,11 @@ def _extract_cables_raw_dxf(dxf_path: str) -> dict[str, CableItem]:
                             for prev in reversed(recent_lines[:-1]):
                                 cm = _CABLE_TYPE_RE.search(prev)
                                 if cm:
-                                    _add_cable(cm.group(1), length)
+                                    # Combine context from both lines
+                                    ctx = prev + " " + clean_line
+                                    _add_cable(cm.group(1), length,
+                                               _extract_dedup_suffix(ctx),
+                                               _extract_laying_method(ctx))
                                     break
 
                     # Pass 2b: If this line has a cable type,
@@ -990,7 +1061,10 @@ def _extract_cables_raw_dxf(dxf_path: str) -> dict[str, CableItem]:
                             if ("L=" in prev or "L-" in prev):
                                 lm = _CABLE_LENGTH_EXT_RE.search(prev)
                                 if lm:
-                                    _add_cable(cm.group(1), int(lm.group(1)))
+                                    ctx = clean_line + " " + prev
+                                    _add_cable(cm.group(1), int(lm.group(1)),
+                                               _extract_dedup_suffix(ctx),
+                                               _extract_laying_method(ctx))
                                     break
 
         except Exception:
@@ -1017,9 +1091,11 @@ def _extract_cables_mtext_multiline(
     Updated DXF files may wrap cable type and L= into multi-line MTEXT.
     This function handles both same-line and cross-line matches within
     a single MTEXT entity.
+
+    T-cable-dedup: dedup key includes ΔU + laying method.
     """
     result: dict[str, CableItem] = {}
-    seen_pairs: set[tuple[str, int]] = set()
+    seen_pairs: set[tuple[str, int, str]] = set()
 
     for text, _, _ in entries:
         # First try same-line (original behavior)
@@ -1028,13 +1104,16 @@ def _extract_cables_mtext_multiline(
         if cm and lm:
             ct = cm.group(1).replace("х", "×").replace("x", "×")
             length = int(lm.group(1))
-            pair = (ct, length)
+            sfx = _extract_dedup_suffix(text)
+            lay = _extract_laying_method(text)
+            pair = (ct, length, sfx)
             if pair not in seen_pairs:
                 seen_pairs.add(pair)
                 if ct not in result:
                     result[ct] = CableItem(cable_type=ct)
                 result[ct].count += 1
                 result[ct].total_length_m += length
+                _add_laying(result[ct], lay, length)
             continue
 
         # Multi-line: search all lines in MTEXT for cable type,
@@ -1044,10 +1123,14 @@ def _extract_cables_mtext_multiline(
         lines = text.replace("\\P", "\n").split("\n")
         found_types: list[str] = []
         found_lengths: list[int] = []
+        found_suffixes: list[str] = []
+        found_layings: list[str] = []
         for ln in lines:
             cm2 = _CABLE_TYPE_RE.search(ln)
             if cm2:
                 found_types.append(cm2.group(1))
+                found_suffixes.append(_extract_dedup_suffix(ln))
+                found_layings.append(_extract_laying_method(ln))
             lm2 = _CABLE_LENGTH_EXT_RE.search(ln)
             if lm2:
                 found_lengths.append(int(lm2.group(1)))
@@ -1057,13 +1140,16 @@ def _extract_cables_mtext_multiline(
             for i, ct_raw in enumerate(found_types):
                 ct = ct_raw.replace("х", "×").replace("x", "×")
                 length = found_lengths[i] if i < len(found_lengths) else found_lengths[-1]
-                pair = (ct, length)
+                sfx = found_suffixes[i] if i < len(found_suffixes) else ""
+                lay = found_layings[i] if i < len(found_layings) else ""
+                pair = (ct, length, sfx)
                 if pair not in seen_pairs:
                     seen_pairs.add(pair)
                     if ct not in result:
                         result[ct] = CableItem(cable_type=ct)
                     result[ct].count += 1
                     result[ct].total_length_m += length
+                    _add_laying(result[ct], lay, length)
 
     return result
 
@@ -1083,14 +1169,15 @@ def _extract_cables_mtext_table(dxf_path: str) -> dict[str, CableItem]:
         at the same Y coordinate (same table row)
         e.g. MTEXT1='ППГнг(А)-HF 3х2,5' MTEXT2='L=13'
 
-    Deduplicates by (cable_type, length) pair.
+    T-cable-dedup: dedup key includes ΔU + laying method.
     """
     result: dict[str, CableItem] = {}
-    seen_pairs: set[tuple[str, int]] = set()
+    seen_pairs: set[tuple[str, int, str]] = set()
 
-    def _add_cable(ct_raw: str, length: int) -> None:
+    def _add_cable(ct_raw: str, length: int, suffix: str = "",
+                    laying: str = "") -> None:
         ct = ct_raw.replace("х", "×").replace("x", "×")
-        pair = (ct, length)
+        pair = (ct, length, suffix)
         if pair in seen_pairs:
             return
         seen_pairs.add(pair)
@@ -1098,6 +1185,7 @@ def _extract_cables_mtext_table(dxf_path: str) -> dict[str, CableItem]:
             result[ct] = CableItem(cable_type=ct)
         result[ct].count += 1
         result[ct].total_length_m += length
+        _add_laying(result[ct], laying, length)
 
     try:
         doc = ezdxf.readfile(dxf_path)
@@ -1138,7 +1226,9 @@ def _extract_cables_mtext_table(dxf_path: str) -> dict[str, CableItem]:
             cm = _CABLE_TYPE_RE.search(text)
             lm = _CABLE_LENGTH_EXT_RE.search(text)
             if cm and lm:
-                _add_cable(cm.group(1), int(lm.group(1)))
+                _add_cable(cm.group(1), int(lm.group(1)),
+                           _extract_dedup_suffix(text),
+                           _extract_laying_method(text))
 
         # -- Multi-MTEXT extraction: cable type and length in adjacent cells --
         if not has_length:
@@ -1165,13 +1255,15 @@ def _extract_cables_mtext_table(dxf_path: str) -> dict[str, CableItem]:
 
         # For each row, try to pair cable types with lengths
         for cid, cells in row_map.items():
-            type_cells: list[tuple[str, float]] = []
+            type_cells: list[tuple[str, float, str, str]] = []
             length_cells: list[tuple[int, float]] = []
             for text, x in cells:
                 cm = _CABLE_TYPE_RE.search(text)
                 lm = _CABLE_LENGTH_EXT_RE.search(text)
                 if cm and not lm:
-                    type_cells.append((cm.group(1), x))
+                    type_cells.append((cm.group(1), x,
+                                       _extract_dedup_suffix(text),
+                                       _extract_laying_method(text)))
                 elif lm and not cm:
                     length_cells.append((int(lm.group(1)), x))
 
@@ -1182,7 +1274,7 @@ def _extract_cables_mtext_table(dxf_path: str) -> dict[str, CableItem]:
             type_cells.sort(key=lambda t: t[1])
             length_cells.sort(key=lambda t: t[1])
 
-            for ct_raw, tx in type_cells:
+            for ct_raw, tx, sfx, lay in type_cells:
                 # Find closest length cell by X
                 best_len = None
                 best_dist = float("inf")
@@ -1192,7 +1284,7 @@ def _extract_cables_mtext_table(dxf_path: str) -> dict[str, CableItem]:
                         best_dist = dist
                         best_len = ln
                 if best_len is not None:
-                    _add_cable(ct_raw, best_len)
+                    _add_cable(ct_raw, best_len, sfx, lay)
 
     return result
 
@@ -1211,15 +1303,15 @@ def _extract_cables_all_blocks(dxf_path: str) -> dict[str, CableItem]:
       - Multi-entity: cable type in one entity, L= in a nearby entity
         within the same block (matched by Y-proximity for table rows)
 
-    Deduplicates by (cable_type, length) pair to avoid double-counting
-    from multiple DXF representations.
+    T-cable-dedup: dedup key includes ΔU + laying method.
     """
     result: dict[str, CableItem] = {}
-    seen_pairs: set[tuple[str, int]] = set()
+    seen_pairs: set[tuple[str, int, str]] = set()
 
-    def _add_cable(ct_raw: str, length: int) -> None:
+    def _add_cable(ct_raw: str, length: int, suffix: str = "",
+                    laying: str = "") -> None:
         ct = ct_raw.replace("х", "×").replace("x", "×")
-        pair = (ct, length)
+        pair = (ct, length, suffix)
         if pair in seen_pairs:
             return
         seen_pairs.add(pair)
@@ -1227,6 +1319,7 @@ def _extract_cables_all_blocks(dxf_path: str) -> dict[str, CableItem]:
             result[ct] = CableItem(cable_type=ct)
         result[ct].count += 1
         result[ct].total_length_m += length
+        _add_laying(result[ct], laying, length)
 
     try:
         doc = ezdxf.readfile(dxf_path)
@@ -1277,7 +1370,9 @@ def _extract_cables_all_blocks(dxf_path: str) -> dict[str, CableItem]:
             cm = _CABLE_TYPE_RE.search(text)
             lm = _CABLE_LENGTH_EXT_RE.search(text)
             if cm and lm:
-                _add_cable(cm.group(1), int(lm.group(1)))
+                _add_cable(cm.group(1), int(lm.group(1)),
+                           _extract_dedup_suffix(text),
+                           _extract_laying_method(text))
 
         # -- Pass 2: Multi-entity extraction (cable + length in nearby entities) --
         has_length = any(_CABLE_LENGTH_EXT_RE.search(t) for t, _, _ in entries)
@@ -1303,13 +1398,15 @@ def _extract_cables_all_blocks(dxf_path: str) -> dict[str, CableItem]:
             row_map[cid].append((text, x))
 
         for cid, cells in row_map.items():
-            type_cells: list[tuple[str, float]] = []
+            type_cells: list[tuple[str, float, str, str]] = []
             length_cells: list[tuple[int, float]] = []
             for text, x in cells:
                 cm = _CABLE_TYPE_RE.search(text)
                 lm = _CABLE_LENGTH_EXT_RE.search(text)
                 if cm and not lm:
-                    type_cells.append((cm.group(1), x))
+                    type_cells.append((cm.group(1), x,
+                                       _extract_dedup_suffix(text),
+                                       _extract_laying_method(text)))
                 elif lm and not cm:
                     length_cells.append((int(lm.group(1)), x))
 
@@ -1319,7 +1416,7 @@ def _extract_cables_all_blocks(dxf_path: str) -> dict[str, CableItem]:
             type_cells.sort(key=lambda t: t[1])
             length_cells.sort(key=lambda t: t[1])
 
-            for ct_raw, tx in type_cells:
+            for ct_raw, tx, sfx, lay in type_cells:
                 best_len = None
                 best_dist = float("inf")
                 for ln, lx in length_cells:
@@ -1328,7 +1425,7 @@ def _extract_cables_all_blocks(dxf_path: str) -> dict[str, CableItem]:
                         best_dist = dist
                         best_len = ln
                 if best_len is not None:
-                    _add_cable(ct_raw, best_len)
+                    _add_cable(ct_raw, best_len, sfx, lay)
 
     return result
 
@@ -1339,7 +1436,7 @@ def _extract_cables_ezdxf_structured(dxf_path: str) -> dict[str, CableItem]:
     """T082: Unified ezdxf structured cable extraction.
 
     Single ezdxf.readfile() call, then extracts cables from ALL structured
-    sources with global dedup by (cable_type, length) tuple:
+    sources with global dedup by (cable_type, length, dedup_suffix) tuple:
 
       1. Modelspace MTEXT entities -- strip formatting, apply cable regex
       2. Modelspace TEXT entities -- apply cable regex directly
@@ -1348,14 +1445,18 @@ def _extract_cables_ezdxf_structured(dxf_path: str) -> dict[str, CableItem]:
       4. Blocks INSERTed in modelspace -- scan MTEXT/TEXT in block defs
          (only blocks actually referenced by INSERT in modelspace)
 
+    T-cable-dedup: dedup key now includes ΔU + laying method so that
+    physically-different cables with the same type and length are kept.
+
     Returns dict keyed by normalized cable_type string.
     """
     result: dict[str, CableItem] = {}
-    seen_pairs: set[tuple[str, int]] = set()
+    seen_pairs: set[tuple[str, int, str]] = set()
 
-    def _add_cable(ct_raw: str, length: int) -> None:
+    def _add_cable(ct_raw: str, length: int, suffix: str = "",
+                    laying: str = "") -> None:
         ct = ct_raw.replace("х", "×").replace("x", "×")
-        pair = (ct, length)
+        pair = (ct, length, suffix)
         if pair in seen_pairs:
             return
         seen_pairs.add(pair)
@@ -1363,6 +1464,7 @@ def _extract_cables_ezdxf_structured(dxf_path: str) -> dict[str, CableItem]:
             result[ct] = CableItem(cable_type=ct)
         result[ct].count += 1
         result[ct].total_length_m += length
+        _add_laying(result[ct], laying, length)
 
     def _scan_text(text: str) -> None:
         """Apply cable regex to cleaned text, handling both single-line
@@ -1371,7 +1473,9 @@ def _extract_cables_ezdxf_structured(dxf_path: str) -> dict[str, CableItem]:
         cm = _CABLE_TYPE_RE.search(text)
         lm = _CABLE_LENGTH_EXT_RE.search(text)
         if cm and lm:
-            _add_cable(cm.group(1), int(lm.group(1)))
+            _add_cable(cm.group(1), int(lm.group(1)),
+                       _extract_dedup_suffix(text),
+                       _extract_laying_method(text))
             return
 
         # Multi-line: cable type and L= on different lines within same entity
@@ -1380,17 +1484,23 @@ def _extract_cables_ezdxf_structured(dxf_path: str) -> dict[str, CableItem]:
         text_lines = text.split("\n")
         found_types: list[str] = []
         found_lengths: list[int] = []
+        found_suffixes: list[str] = []
+        found_layings: list[str] = []
         for ln in text_lines:
             cm2 = _CABLE_TYPE_RE.search(ln)
             if cm2:
                 found_types.append(cm2.group(1))
+                found_suffixes.append(_extract_dedup_suffix(ln))
+                found_layings.append(_extract_laying_method(ln))
             lm2 = _CABLE_LENGTH_EXT_RE.search(ln)
             if lm2:
                 found_lengths.append(int(lm2.group(1)))
         if found_types and found_lengths:
             for i, ct_raw in enumerate(found_types):
                 length = found_lengths[i] if i < len(found_lengths) else found_lengths[-1]
-                _add_cable(ct_raw, length)
+                sfx = found_suffixes[i] if i < len(found_suffixes) else ""
+                lay = found_layings[i] if i < len(found_layings) else ""
+                _add_cable(ct_raw, length, sfx, lay)
 
     try:
         doc = ezdxf.readfile(dxf_path)

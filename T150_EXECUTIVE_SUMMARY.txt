@@ -1,0 +1,130 @@
+================================================================================
+T150: END-TO-END ACCURACY TEST — EXECUTIVE SUMMARY
+================================================================================
+Test: PDF vs DXF Comparison for Drawing 006 (+4.200)
+Date: 2026-04-14
+Status: FAIL (4/9 types within ±1, target ≥7/9)
+
+OVERALL RESULTS
+===============
+Target: ≥7 out of 9 equipment types with counts within ±1 tolerance
+Achieved: 4 out of 9 types (44.4%)
+
+TYPES WITHIN ±1 TOLERANCE (4/9)
+================================
+1. ✅ SLICK.PRS LED 30: PDF=6 vs DXF=5 (delta=+1)
+2. ✅ MERCURY ВЫХОД: PDF=2 vs DXF=2 (delta=0) EXACT
+3. ✅ ATOM ВЫХОД: PDF=3 vs DXF=4 (delta=-1)
+4. ✅ Пиктограмма ВЫХОД: PDF=6 vs DXF=6 (delta=0) EXACT ⭐ T149
+
+TYPES OUTSIDE TOLERANCE (5/9)
+==============================
+1. ❌ SLICK LED 50: PDF=158 vs DXF=30 (delta=+128) CRITICAL
+2. ❌ CD LED 27: PDF=0 vs DXF=2 (delta=-2)
+3. ❌ ARCTIC TH: PDF=3 vs DXF=9 (delta=-6) CRITICAL - Cross-NMS over-suppression
+4. ❌ ARCTIC non-TH: PDF=13 vs DXF=11 (delta=+2)
+5. ❌ SLICK LED 30 Ex: PDF=4 vs DXF=2 (delta=+2)
+
+MAJOR SUCCESS: T149 PICTOGRAM DETECTION
+========================================
+⭐ Pictogram "ВЫХОД" detected: 6/6 EXACT MATCH
+   - Text-based detection working perfectly
+   - Fills gap for non-legend items
+   - Validates T149 implementation
+
+CRITICAL ISSUE: CROSS-SYMBOL NMS OVER-SUPPRESSION
+==================================================
+Problem: ARCTIC TH template lost 8 out of 11 matches (73% loss)
+   - Before cross-NMS: 11 detections
+   - After cross-NMS: 3 detections
+   - DXF ground truth: 9 expected
+   
+Root Cause: CROSS_NMS_CONF_GAP = 0.04 too aggressive
+   - Similar templates (ARCTIC TH vs non-TH) trigger suppression
+   - Non-TH template wins by ≥4% confidence at most locations
+   - Result: Severe undercounting of TH variant
+
+Fix Required: Increase CROSS_NMS_CONF_GAP from 0.04 to 0.07-0.08
+   - More conservative suppression
+   - Add template similarity guard
+   - Expected recovery: 5-6 matches (3 → 8-9)
+
+SECONDARY ISSUE: SLICK LED 50 OVERCOUNT
+========================================
+Problem: PDF detected 158 vs DXF 30 (128 extra, 428% overcount!)
+Root Cause: Likely DXF-PDF symbol legend mismatch
+   - Not a cross-NMS issue (only lost 2 matches)
+   - Template genuinely matches 158 locations
+   - Requires manual verification of symbol correspondence
+
+ACTION REQUIRED: Verify DXF P1 annotation corresponds to PDF legend Item 1
+
+INTEGRATION VALIDATION
+======================
+T147 (Cross-Symbol NMS): ✅ Working, ⚠️ Needs Tuning
+   - Successfully suppressing duplicates (16/208 matches)
+   - Too aggressive on similar templates (ARCTIC TH lost 73%)
+   - Fix: Increase CONF_GAP to 0.07-0.08
+
+T148 (Confidence Gap Guard): ⚠️ Too Strict
+   - Gap of 0.04 working as designed
+   - Threshold too low for nearly-identical templates
+   - Result: Generic template dominates specific variant
+
+T149 (Pictogram Detection): ✅ Perfect
+   - 6/6 exact match on ВЫХОД pictograms
+   - Text-based detection working correctly
+   - Successfully fills gap for non-legend items
+
+CROSS-SYMBOL NMS IMPACT
+=======================
+Total matches suppressed: 16 out of 208 (7.7%)
+
+Per-symbol breakdown:
+  - SLICK LED 50: 160 → 158 (-2, 1.3% loss) Minimal
+  - ARCTIC TH: 11 → 3 (-8, 72.7% loss) ⚠️ CRITICAL
+  - ARCTIC non-TH: 13 → 13 (0% loss) None
+  - SLICK LED 30 Ex: 8 → 4 (-4, 50% loss) Moderate
+  - Switch: 1 → 0 (-1, 100% loss) Minor
+
+RECOMMENDATIONS
+===============
+IMMEDIATE (High Priority):
+1. Increase CROSS_NMS_CONF_GAP from 0.04 to 0.07
+2. Add template similarity guard to cross-NMS
+3. Manually verify DXF-PDF symbol mapping for drawing 006
+
+MEDIUM Priority:
+4. Add cross-NMS debug logging (which pairs suppressed, why)
+5. Review template preprocessing for ARCTIC TH vs non-TH
+
+EXPECTED IMPROVEMENT
+====================
+With tuned CONF_GAP:
+  - ARCTIC TH should recover 5-6 matches (3 → 8-9)
+  - This brings it within ±1 of DXF (9)
+  - Overall accuracy: 5/9 types (55%) → closer to target 7/9 (78%)
+
+CONCLUSION
+==========
+Test Result: FAIL (4/9 types, target ≥7/9)
+
+However, significant validation achieved:
+  ✅ Pictogram detection (T149) works perfectly
+  ✅ Cross-symbol NMS (T147/T148) functional
+  ⚠️ Cross-NMS parameters need tuning
+  ❌ DXF-PDF mapping verification required
+
+With parameter tuning, accuracy should improve to ~55-60%.
+Further improvement requires DXF-PDF ground truth alignment.
+
+TEST ARTIFACTS
+==============
+- T150_FINAL_REPORT.md (comprehensive analysis)
+- T150_COMPARISON_REPORT.md (initial findings)
+- T150_pdf_visual_WITH_PICTOGRAMS.log (full output)
+- T150_EXECUTIVE_SUMMARY.txt (this file)
+
+================================================================================
+Task T150 Complete — Root causes identified, fixes proposed
+================================================================================

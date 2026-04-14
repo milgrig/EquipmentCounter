@@ -1198,6 +1198,106 @@ def _detect_match_color(
 
 
 # ---------------------------------------------------------------------------
+# Pictogram detection (text-based)  — T149
+# ---------------------------------------------------------------------------
+
+# Pictograms are small sticker-like labels on the drawing (e.g. "ВЫХОД" / EXIT).
+# They don't have a separate legend item or a visual template — they are pure
+# text labels.  We detect them by searching for specific text words on the
+# drawing page outside exclusion zones.
+#
+# "ДОХЫВ" is "ВЫХОД" read in reversed column order when the label is placed
+# vertically (rotated 90°).  pdfplumber extracts the chars column-by-column,
+# so the word appears reversed.
+
+PICTOGRAM_KEYWORDS: list[tuple[str, str]] = [
+    # (search_word, canonical_name)
+    ("ВЫХОД", "Пиктограмма Выход"),
+    ("ДОХЫВ", "Пиктограмма Выход"),   # vertical/reversed "ВЫХОД"
+]
+
+
+@dataclass
+class PictogramResult:
+    """Result of pictogram detection on a drawing page."""
+    counts: dict[str, int] = field(default_factory=dict)   # canonical_name → count
+    positions: list[tuple[str, float, float]] = field(default_factory=list)
+    # (canonical_name, x_pt, y_pt)
+    page_index: int = 0
+
+
+def detect_pictograms(
+    pdf_path: str,
+    legend_result: Optional[LegendResult] = None,
+    page: Optional[int] = None,
+) -> PictogramResult:
+    """
+    Detect pictogram labels on a drawing page by searching for known
+    text keywords (e.g. "ВЫХОД") outside exclusion zones.
+
+    Args:
+        pdf_path: Path to the PDF file.
+        legend_result: Pre-parsed legend (for exclusion zone bbox).
+        page: Page index to scan. If None, uses legend page.
+
+    Returns:
+        PictogramResult with counts and positions per canonical name.
+    """
+    if legend_result is None:
+        legend_result = parse_legend(pdf_path)
+
+    legend_page = legend_result.page_index
+    scan_page = page if page is not None else legend_page
+
+    counts: dict[str, int] = defaultdict(int)
+    positions: list[tuple[str, float, float]] = []
+
+    with pdfplumber.open(pdf_path) as pdf:
+        if scan_page >= len(pdf.pages):
+            return PictogramResult(page_index=scan_page)
+
+        pp_page = pdf.pages[scan_page]
+        pp_lines = pp_page.lines or []
+        lb = legend_result.legend_bbox if scan_page == legend_page else None
+        exclusion_zones = _build_exclusion_zones(pp_page, pp_lines, lb)
+
+        # Extract words from the page
+        words = pp_page.extract_words(
+            keep_blank_chars=False, use_text_flow=False,
+        )
+
+        for w in words:
+            w_text = w.get("text", "").strip().strip('"').strip("«»")
+            for keyword, canonical in PICTOGRAM_KEYWORDS:
+                if w_text != keyword:
+                    continue
+
+                # Use center of the word bbox
+                x_pt = (float(w["x0"]) + float(w["x1"])) / 2
+                y_pt = (float(w["top"]) + float(w["bottom"])) / 2
+
+                # Check exclusion zones
+                if _pt_excluded(x_pt, y_pt, exclusion_zones):
+                    continue
+
+                counts[canonical] += 1
+                positions.append((canonical, round(x_pt, 1), round(y_pt, 1)))
+                break  # don't double-count same word
+
+    logger.debug(
+        "detect_pictograms: page=%d  %s",
+        scan_page,
+        "  ".join(f"{k}={v}" for k, v in counts.items()) or "none found",
+    )
+
+    return PictogramResult(
+        counts=dict(counts),
+        positions=positions,
+        page_index=scan_page,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Core matching logic
 # ---------------------------------------------------------------------------
 
@@ -1521,6 +1621,57 @@ def match_symbols(
             adj_threshold, zones_str,
         )
 
+    # --- Cross-symbol NMS (T147, refined T148) --------------------------------
+    # When two DIFFERENT templates match at the same physical location
+    # (e.g. ARCTIC.OPL ECO LED 1200 TH vs non-TH), both get counted.
+    # Deduplicate: keep only the highest-confidence match at each location,
+    # but ONLY suppress when the winner has a clear confidence advantage.
+    #
+    # Confidence gap guard (T148): nearly-identical templates (e.g. ARCTIC
+    # TH vs non-TH) produce near-equal confidences at every location.
+    # Without a gap threshold the more generic template always wins and
+    # steals counts from the specific one.  Requiring a minimum gap
+    # ensures both survive at ambiguous locations — correct, because
+    # per-symbol NMS already prevents each template from double-counting
+    # its own matches.
+    CROSS_NMS_RADIUS_PT = 25.0   # ~25pt ≈ 9mm — catches offset matches
+    CROSS_NMS_CONF_GAP = 0.04   # min confidence advantage to suppress
+
+    if len(all_matches) > 1:
+        # Sort by confidence descending
+        all_matches.sort(key=lambda m: m.confidence, reverse=True)
+
+        deduped: list[VisualMatch] = []
+        for m in all_matches:
+            dominated = False
+            for kept in deduped:
+                if kept.symbol_index == m.symbol_index:
+                    continue  # same symbol — already handled by per-symbol NMS
+                dist = math.sqrt((m.x - kept.x) ** 2 + (m.y - kept.y) ** 2)
+                if dist < CROSS_NMS_RADIUS_PT:
+                    conf_gap = kept.confidence - m.confidence
+                    if conf_gap >= CROSS_NMS_CONF_GAP:
+                        # Clear winner — suppress the weaker match
+                        dominated = True
+                        break
+                    # else: gap too small — both survive (ambiguous pair)
+            if not dominated:
+                deduped.append(m)
+
+        n_cross_suppressed = len(all_matches) - len(deduped)
+        if n_cross_suppressed > 0:
+            logger.debug(
+                "cross_symbol_nms: %d matches suppressed (before=%d after=%d)",
+                n_cross_suppressed, len(all_matches), len(deduped),
+            )
+            all_matches = deduped
+            # Rebuild counts from deduplicated matches
+            counts = {}
+            for desc_idx in descriptions:
+                counts[desc_idx] = 0
+            for m in all_matches:
+                counts[m.symbol_index] = counts.get(m.symbol_index, 0) + 1
+
     return VisualResult(
         matches=all_matches,
         counts=counts,
@@ -1665,6 +1816,14 @@ def main() -> None:
         print(f"  {'':3s} {total:>5d}  TOTAL")
     else:
         print("No symbols matched on the page.")
+
+    # Pictogram detection (T149)
+    picto_result = detect_pictograms(pdf_path, legend, page=scan_page)
+    if picto_result.counts:
+        print()
+        print("Pictograms (text-based):")
+        for name, count in picto_result.counts.items():
+            print(f"  {name}: {count}")
 
     # Detail view
     if show_detail and result.matches:
