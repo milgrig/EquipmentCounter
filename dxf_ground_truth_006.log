@@ -1,0 +1,566 @@
+================================================================================
+  DXF GROUND TRUTH: DXF vs PDF Parser Comparison
+================================================================================
+
+______________________________________________________________________
+[abk_eo] ЭО  (6 matched pairs)
+  DXF: C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\01_АБК\Обновленные файлы\DWG\ЭО\_converted_dxf
+  PDF: C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\01_АБК\Обновленные файлы\PDF_\ЭО
+
+  --- Drawing 001: 001 - Общие данные
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\01_АБК\Обновленные файлы\DWG\ЭО\_converted_dxf\001 - Общие данные.dxf
+    DXF: 0 items  |  PDF: 0 items
+    Name matches: 0  |  Exact (name+count): 0  |  Rate: 0%
+
+  --- Drawing 002: 002-005- Схемы ЩО, ЩАО
+  WARNING: Legend not found, auto-detecting symbols...
+    DXF: 0 items  |  PDF: 0 items
+    Name matches: 0  |  Exact (name+count): 0  |  Rate: 0%
+
+  --- Drawing 006: 006 - План освещения на отм- 0-000
+  [grid] Detected 226 grid axis labels (excluded)
+  [annotations] Found 16 equipment types from plan text
+    P1: 1 × SLICK.PRS LED 30 EM
+    P2: 2 × OWP EVO 30W OPL 840 WH IP54 mat
+    P3: 6 × OWP EVO OPL 840 WH IP54
+    P4: 15 × UNI/R EVO OPL 840 WH
+    P5: 1 × SIMPLE OPTIMA OPL 840 WH
+    P6: 6 × UGR DL PREMIUM
+    P7: 1 × SLICK.PRS LED 30 with driver box
+    P8: 2 × UNI/R EVO OPL 840 WH EMT
+    P9: 9 × UNI/R EVO OPL 840 WH EM
+    P10: 1 × SIMPLE OPTIMA OPL 840 WH EM
+    P11: 2 × OWP EVO OPL 840 WH IP54 EM
+    P12: 3 × SLICK.PRS LED 30
+    P13: 1 × OWP EVO 30W OPL 840 WH IP54 mat EM
+    P14: 1 × UNI/R EVO OPL 840 WH  EMT
+    P15: 1 × SLICK.PRS LED 30 with driver box EM
+    P16: 1 × UNI/R EVO OPL 840 WH  EM
+
+  Unlisted symbols in drawing body (not in legend):
+       8А × 6
+       9А × 4
+      10А × 3
+    DXF: 14 items  |  PDF: 33 items
+    Name matches: 13  |  Exact (name+count): 3  |  Rate: 92.9%
+      ✓ [1   →1   ] ratio=100%  dxf=0  pdf=1  delta=+1
+        DXF: Светильник светодиодный SLICK.PRS LED 30 with driver bo
+        PDF: Светильник светодиодный SLICK.PRS LED 30 with driver bo
+      ✓ [1А  →1А  ] ratio=100%  dxf=2  pdf=3  delta=+1
+        DXF: Светильник светодиодный аварийный SLICK.PRS ECO LED 30 
+        PDF: Светильник светодиодный аварийный SLICK.PRS ECO LED 30 
+      ✓ [2   →2   ] ratio=100%  dxf=0  pdf=1  delta=+1
+        DXF: Светильник светодиодный SLICK.PRS LED 30 with driver bo
+        PDF: Светильник светодиодный SLICK.PRS LED 30 with driver bo
+      ✓ [2А  →2А  ] ratio=100%  dxf=1  pdf=1  =
+        DXF: Светильник светодиодный аварийный SLICK.PRS LED 30 EM w
+        PDF: Светильник светодиодный аварийный SLICK.PRS LED 30 EM w
+      ✓ [3   →3   ] ratio=100%  dxf=0  pdf=1  delta=+1
+        DXF: Светильник светодиодный SIMPLE OPTIMA (1200) 40W OPL 84
+        PDF: Светильник светодиодный SIMPLE OPTIMA (1200) 40W OPL 84
+    Missing in PDF (1):
+      ✗ [ВЫХОД] Пиктограмма "Выход/Exit"  (count=9)
+
+  --- Drawing 007: 007 - План освещения на отм- +4-500
+  [grid] Detected 262 grid axis labels (excluded)
+  [annotations] Found 9 equipment types from plan text
+    P1: 9 × UNI/R EVO OPL 840 WH
+    P2: 6 × UGR DL PREMIUM
+    P3: 8 × OWP EVO 30W OPL 840 WH IP54 mat
+    P4: 5 × SLICK.PRS LED 30 with driver box
+    P5: 6 × UNI/R EVO OPL 840 WH EM
+    P6: 1 × SIMPLE OPTIMA OPL 840 WH
+    P7: 1 × SIMPLE OPTIMA OPL 840 WH EM
+    P8: 4 × OWP EVO 30W OPL 840 WH IP54 mat EM
+    P9: 3 × SLICK.PRS LED 30 with driver box EM
+    DXF: 12 items  |  PDF: 23 items
+    Name matches: 12  |  Exact (name+count): 7  |  Rate: 100.0%
+      ✓ [2   →2   ] ratio=100%  dxf=0  pdf=5  delta=+5
+        DXF: Светильник светодиодный SLICK.PRS LED 30 with driver bo
+        PDF: Светильник светодиодный SLICK.PRS LED 30 with driver bo
+      ✓ [2А  →2А  ] ratio=100%  dxf=3  pdf=3  =
+        DXF: Светильник светодиодный аварийный SLICK.PRS LED 30 with
+        PDF: Светильник светодиодный аварийный SLICK.PRS LED 30 with
+      ✓ [3   →3   ] ratio=100%  dxf=0  pdf=2  delta=+2
+        DXF: Светильник светодиодный SIMPLE OPTIMA (1200) 40W OPL 84
+        PDF: Светильник светодиодный SIMPLE OPTIMA (1200) 40W OPL 84
+      ✓ [3А  →3А  ] ratio=100%  dxf=3  pdf=3  =
+        DXF: Светильник светодиодный аварийный SIMPLE OPTIMA (1200) 
+        PDF: Светильник светодиодный аварийный SIMPLE OPTIMA (1200) 
+      ✓ [4   →4   ] ratio=100%  dxf=1  pdf=10  delta=+9
+        DXF: Светильник светодиодный UGR DL PREMIUM 20W OPL 940 WH
+        PDF: Светильник светодиодный UGR DL PREMIUM 20W OPL 940 WH
+
+  --- Drawing 008: 008 - План привязки светильников на отм-0-000
+  [grid] Detected 208 grid axis labels (excluded)
+
+  Unlisted symbols in drawing body (not in legend):
+      10А × 5
+       9А × 2
+    DXF: 15 items  |  PDF: 26 items
+    Name matches: 14  |  Exact (name+count): 7  |  Rate: 93.3%
+      ✓ [1   →1   ] ratio=100%  dxf=0  pdf=1  delta=+1
+        DXF: Светильник светодиодный SLICK.PRS LED 30 with driver bo
+        PDF: Светильник светодиодный SLICK.PRS LED 30 with driver bo
+      ✓ [1А  →1А  ] ratio=100%  dxf=2  pdf=3  delta=+1
+        DXF: Светильник светодиодный аварийный SLICK.PRS ECO LED 30 
+        PDF: Светильник светодиодный аварийный SLICK.PRS ECO LED 30 
+      ✓ [2   →2   ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Светильник светодиодный SLICK.PRS LED 30 with driver bo
+        PDF: Светильник светодиодный SLICK.PRS LED 30 with driver bo
+      ✓ [2А  →2А  ] ratio=100%  dxf=1  pdf=1  =
+        DXF: Светильник светодиодный аварийный SLICK.PRS LED 30 EM w
+        PDF: Светильник светодиодный аварийный SLICK.PRS LED 30 EM w
+      ✓ [3   →3   ] ratio=100%  dxf=0  pdf=2  delta=+2
+        DXF: Светильник светодиодный SIMPLE OPTIMA (1200) 40W OPL 84
+        PDF: Светильник светодиодный SIMPLE OPTIMA (1200) 40W OPL 84
+    Missing in PDF (1):
+      ✗ [ВЫХОД] Пиктограмма "Выход/Exit"  (count=11)
+
+  --- Drawing 009: 009 - План привязки светильников на отм- +4-500
+  [grid] Detected 261 grid axis labels (excluded)
+    DXF: 11 items  |  PDF: 18 items
+    Name matches: 11  |  Exact (name+count): 3  |  Rate: 100.0%
+      ✓ [2   →2   ] ratio=100%  dxf=0  pdf=2  delta=+2
+        DXF: Светильник светодиодный SLICK.PRS LED 30 with driver bo
+        PDF: Светильник светодиодный SLICK.PRS LED 30 with driver bo
+      ✓ [2А  →2А  ] ratio=100%  dxf=3  pdf=3  =
+        DXF: Светильник светодиодный аварийный SLICK.PRS LED 30 with
+        PDF: Светильник светодиодный аварийный SLICK.PRS LED 30 with
+      ✓ [3   →3   ] ratio=100%  dxf=0  pdf=2  delta=+2
+        DXF: Светильник светодиодный SIMPLE OPTIMA (1200) 40W OPL 84
+        PDF: Светильник светодиодный SIMPLE OPTIMA (1200) 40W OPL 84
+      ✓ [3А  →3А  ] ratio=100%  dxf=2  pdf=3  delta=+1
+        DXF: Светильник светодиодный аварийный SIMPLE OPTIMA (1200) 
+        PDF: Светильник светодиодный аварийный SIMPLE OPTIMA (1200) 
+      ✓ [4   →4   ] ratio=100%  dxf=1  pdf=2  delta=+1
+        DXF: Светильник светодиодный UGR DL PREMIUM 20W OPL 940 WH
+        PDF: Светильник светодиодный UGR DL PREMIUM 20W OPL 940 WH
+
+______________________________________________________________________
+[abk_em] ЭМ  (9 matched pairs)
+  DXF: C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\01_АБК\Обновленные файлы\DWG\ЭМ\_converted_dxf
+  PDF: C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\01_АБК\Обновленные файлы\PDF_\ЭМ
+
+  --- Drawing 013: 013 - План расположения электрооборудования на отм- 0-000
+  [grid] Detected 32 grid axis labels (excluded)
+  [geometry mode] INSERT blocks=4 << circles=80 — using INSERT count
+  [geometry mode] red(щиты)=2  blue(оборуд.)=4
+  [geometry mode] Cable outlets (Подключение): 28
+    DXF: 12 items  |  PDF: 11 items
+    Name matches: 11  |  Exact (name+count): 9  |  Rate: 91.7%
+      ✓ [5   →    ] ratio=100%  dxf=2  pdf=0  delta=-2
+        DXF: Щит силовой
+        PDF: Щит силовой
+      ✓ [8   →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Щит управления вентиляционной установкой
+        PDF: Щит управления вентиляционной установкой
+      ✓ [9   →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Розетка однофазная IP44 ATN440146
+        PDF: Розетка однофазная IP44 ATN440146
+      ✓ [10  →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Розетка однофазная IP20 ATN000145
+        PDF: Розетка однофазная IP20 ATN000145
+      ✓ [11  →    ] ratio=100%  dxf=28  pdf=0  delta=-28
+        DXF: Кабельный вывод
+        PDF: Кабельный вывод
+    Missing in PDF (1):
+      ✗ [⚙] Точечное оборудование на плане (2 видов)  (count=4)
+
+  --- Drawing 014: 014 - План расположения электрооборудования на отм- +4-500
+  [grid] Detected 32 grid axis labels (excluded)
+  [geometry mode] INSERT blocks=4 << circles=59 — using INSERT count
+  [geometry mode] red(щиты)=3  blue(оборуд.)=4
+  [geometry mode] Cable outlets (Подключение): 11
+    DXF: 12 items  |  PDF: 11 items
+    Name matches: 11  |  Exact (name+count): 9  |  Rate: 91.7%
+      ✓ [5   →    ] ratio=100%  dxf=3  pdf=0  delta=-3
+        DXF: Щит силовой
+        PDF: Щит силовой
+      ✓ [8   →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Щит управления вентиляционной установкой
+        PDF: Щит управления вентиляционной установкой
+      ✓ [9   →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Розетка однофазная IP44 ATN440146
+        PDF: Розетка однофазная IP44 ATN440146
+      ✓ [10  →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Розетка однофазная IP20 ATN000145
+        PDF: Розетка однофазная IP20 ATN000145
+      ✓ [11  →    ] ratio=100%  dxf=11  pdf=0  delta=-11
+        DXF: Кабельный вывод
+        PDF: Кабельный вывод
+    Missing in PDF (1):
+      ✗ [⚙] Точечное оборудование на плане (2 видов)  (count=4)
+
+  --- Drawing 015: 015 - План расположения электрооборудования на кровле
+  [grid] Detected 32 grid axis labels (excluded)
+  WARNING: Legend not found, auto-detecting symbols...
+    DXF: 0 items  |  PDF: 3 items
+    Name matches: 0  |  Exact (name+count): 0  |  Rate: 0%
+
+  --- Drawing 016: 016 - План розеточной сети на отм- 0-000
+  [grid] Detected 32 grid axis labels (excluded)
+  [geometry mode] INSERT blocks=5 << circles=276 — using INSERT count
+  [geometry mode] red(щиты)=0  blue(оборуд.)=5
+  [geometry mode] Cable outlets (Подключение): 28
+    DXF: 9 items  |  PDF: 8 items
+    Name matches: 8  |  Exact (name+count): 7  |  Rate: 88.9%
+      ✓ [4   →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Щит силовой
+        PDF: Щит силовой
+      ✓ [5   →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Розетка однофазная скрытой установки IP44 ATN440146
+        PDF: Розетка однофазная скрытой установки IP44 ATN440146
+      ✓ [6   →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Розетка однофазная скрытой установки IP20 ATN000145
+        PDF: Розетка однофазная скрытой установки IP20 ATN000145
+      ✓ [7   →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Розетка стационарная ОП 32А 380В 3P+E+N P44 26033DEK
+        PDF: Розетка стационарная ОП 32А 380В 3P+E+N P44 26033DEK
+      ✓ [8   →    ] ratio=100%  dxf=28  pdf=0  delta=-28
+        DXF: Кабельный вывод
+        PDF: Кабельный вывод
+    Missing in PDF (1):
+      ✗ [⚙] Точечное оборудование на плане (3 видов)  (count=5)
+
+  --- Drawing 017: 017 - План розеточной сети на отм- +4-500
+  [grid] Detected 32 grid axis labels (excluded)
+  [geometry mode] INSERT blocks=4 << circles=423 — using INSERT count
+  [geometry mode] red(щиты)=0  blue(оборуд.)=4
+    DXF: 8 items  |  PDF: 7 items
+    Name matches: 7  |  Exact (name+count): 7  |  Rate: 87.5%
+      ✓ [4   →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Щит силовой
+        PDF: Щит силовой
+      ✓ [5   →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Розетка однофазная IP44 ATN440146
+        PDF: Розетка однофазная IP44 ATN440146
+      ✓ [6   →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Розетка однофазная IP20 ATN000145
+        PDF: Розетка однофазная IP20 ATN000145
+      ✓ [7   →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Розетки рабочих мест IP20 ATN000145
+        PDF: Розетки рабочих мест IP20 ATN000145
+      ✓ [1   →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Кабельная трасса ППГнг(А)-HF
+        PDF: Кабельная трасса ППГнг(А)-HF
+    Missing in PDF (1):
+      ✗ [⚙] Точечное оборудование на плане (3 видов)  (count=4)
+
+  --- Drawing 018: 018 - План кабеленесущих систем на отм- 0-000
+  [grid] Detected 32 grid axis labels (excluded)
+    DXF: 12 items  |  PDF: 2 items
+    Name matches: 2  |  Exact (name+count): 2  |  Rate: 16.7%
+      ✓ [B3  →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Кабельная конструкция силовых кабелей ~400/230В
+        PDF: Кабельная конструкция силовых кабелей ~400/230В
+      ✓ [B4  →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Кабельная конструкция ОКЛ (огнестойкая кабельная линия)
+        PDF: Кабельная конструкция ОКЛ (огнестойкая кабельная линия)
+    Missing in PDF (10):
+      ✗ [B1] 50 ммx50 ммш  (count=0)
+      ✗ [B2] 50 ммx50 ммш  (count=0)
+      ✗ [B5] 50 ммx50 ммш  (count=0)
+
+  --- Drawing 019: 019 - План кабеленесущих систем на отм- +4-500
+  [grid] Detected 32 grid axis labels (excluded)
+    DXF: 7 items  |  PDF: 2 items
+    Name matches: 1  |  Exact (name+count): 0  |  Rate: 14.3%
+      ✓ [B1  →    ] ratio=100%  dxf=1  pdf=0  delta=-1
+        DXF: Кабельная конструкция ОКЛ (огнестойкая кабельная линия)
+        PDF: Кабельная конструкция ОКЛ (огнестойкая кабельная линия)
+    Missing in PDF (6):
+      ✗ [B2] 100 ммx50 ммш  (count=0)
+      ✗ [B3] 300 ммx100 ммш  (count=5)
+      ✗ [B4] 300 ммx100 ммш  (count=0)
+
+  --- Drawing 020: 020 - Узлы крепления кабеленесущих систем
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\01_АБК\Обновленные файлы\DWG\ЭМ\_converted_dxf\020 - Узлы крепления кабеленесущих систем.dxf
+    DXF: 0 items  |  PDF: 3 items
+    Name matches: 0  |  Exact (name+count): 0  |  Rate: 0%
+
+  --- Drawing 021: 021 - Прокладка лотка через перегородки и перекрытия
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\01_АБК\Обновленные файлы\DWG\ЭМ\_converted_dxf\021 - Прокладка лотка через перегородки и перекрытия.dxf
+    DXF: 0 items  |  PDF: 0 items
+    Name matches: 0  |  Exact (name+count): 0  |  Rate: 0%
+
+______________________________________________________________________
+[pos_27] ЭОМ  (10 matched pairs)
+  DXF: C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\27_Склад вспомогательных материалов с участком погрузки крытых вагонов\Обновленные файлы\02_DWG\_converted_dxf
+  PDF: C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\27_Склад вспомогательных материалов с участком погрузки крытых вагонов\Обновленные файлы\03_PDF
+
+  --- Drawing 001: 001 - Общие данные (начало)
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\27_Склад вспомогательных материалов с участком погрузки крытых вагонов\Обновленные файлы\02_DWG\_converted_dxf\001 - Общие данные (начало).dxf
+    DXF: 0 items  |  PDF: 1 items
+    Name matches: 0  |  Exact (name+count): 0  |  Rate: 0%
+
+  --- Drawing 002: 002 - Общие данные (продолжение)
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\27_Склад вспомогательных материалов с участком погрузки крытых вагонов\Обновленные файлы\02_DWG\_converted_dxf\002 - Общие данные (продолжение).dxf
+    DXF: 0 items  |  PDF: 0 items
+    Name matches: 0  |  Exact (name+count): 0  |  Rate: 0%
+
+  --- Drawing 003: 003 - Общие данные (окончание)
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\27_Склад вспомогательных материалов с участком погрузки крытых вагонов\Обновленные файлы\02_DWG\_converted_dxf\003 - Общие данные (окончание).dxf
+    DXF: 0 items  |  PDF: 0 items
+    Name matches: 0  |  Exact (name+count): 0  |  Rate: 0%
+
+  --- Drawing 004: 004-009 - Схемы РД поз.27
+  [grid] Detected 4 grid axis labels (excluded)
+  WARNING: Legend not found, auto-detecting symbols...
+    DXF: 4 items  |  PDF: 3 items
+    Name matches: 0  |  Exact (name+count): 0  |  Rate: 0.0%
+    Missing in PDF (4):
+      ✗ [5] [Auto 5]  (count=1)
+      ✗ [6] [Auto 6]  (count=1)
+      ✗ [8] [Auto 8]  (count=1)
+
+  --- Drawing 010: 010-012 План заземления и молниезащиты
+  [grid] Detected 73 grid axis labels (excluded)
+  WARNING: Legend not found, auto-detecting symbols...
+    DXF: 28 items  |  PDF: 11 items
+    Name matches: 0  |  Exact (name+count): 0  |  Rate: 0.0%
+    Missing in PDF (28):
+      ✗ [1] [Auto 1]  (count=3)
+      ✗ [10] [Auto 10]  (count=2)
+      ✗ [11] [Auto 11]  (count=2)
+
+  --- Drawing 014: 014 - Планы расположения электрооборудования и сетей электроснабжения на кровле
+  [grid] Detected 37 grid axis labels (excluded)
+  [geometry mode] red(щиты)=10  blue(оборуд.)=0
+  [geometry mode] Cable outlets (Подключение): 15
+  Using geometric circle counting mode
+    DXF: 2 items  |  PDF: 1 items
+    Name matches: 1  |  Exact (name+count): 0  |  Rate: 50.0%
+      ✓ [D1  →    ] ratio=97%  dxf=15  pdf=0  delta=-15
+        DXF: Кабельный вывод
+        PDF: Кабельныйвывод
+    Missing in PDF (1):
+      ✗ [Щ] Щит (по цвету)  (count=10)
+
+  --- Drawing 015: 015 - План освещения
+  [grid] Detected 156 grid axis labels (excluded)
+  [annotations] Found 10 equipment types from plan text
+    P1: 24 × ZENITH LED Ex G2/B 90W D270 850 HG
+    P2: 11 × INSEL LB/S LED G3 70W D120 750 WH SB
+    P3: 2 × SLICK.PRS LED 50 with driver box /tempered glass/ 5000K
+    P4: 2 × OWP OPTIMA LED 595 (50) IP54/IP54 4000K mat
+    P5: 3 × OPTIMA.OPL ECO LED 595 (40)
+    P6: 2 × CD LED 27 4000K
+    P7: 1 × OPTIMA.OPL ECO LED 595 EM
+    P8: 1 × SLICK.PRS LED 50 with driver box /tempered glass/ EM 5000K
+    P9: 1 × OPTIMA.OPL ECO LED 595 (40)  EM
+    P10: 1 × OWP OPTIMA LED 595 (50) IP54/IP54 EM 4000K mat
+
+  Unlisted symbols in drawing body (not in legend):
+       8А × 5
+     50ЛК × 2
+       16 × 1
+       21 × 1
+       23 × 1
+       25 × 1
+       24 × 1
+       26 × 1
+       9А × 1
+      10А × 1
+    DXF: 14 items  |  PDF: 26 items
+    Name matches: 13  |  Exact (name+count): 8  |  Rate: 92.9%
+      ✓ [1   →1   ] ratio=100%  dxf=2  pdf=2  =
+        DXF: Светильник светодиодный SLICK.PRS LED 50 with driver bo
+        PDF: Светильник светодиодный SLICK.PRS LED 50 with driver bo
+      ✓ [1А  →1А  ] ratio=100%  dxf=2  pdf=2  =
+        DXF: Светильник светодиодный аварийный SLICK.PRS LED 50 with
+        PDF: Светильник светодиодный аварийный SLICK.PRS LED 50 with
+      ✓ [2   →2   ] ratio=100%  dxf=1  pdf=4  delta=+3
+        DXF: Светильник светодиодный OWP OPTIMA LED 595 (50) IP54/IP
+        PDF: Светильник светодиодный OWP OPTIMA LED 595 (50) IP54/IP
+      ✓ [2А  →2А  ] ratio=100%  dxf=4  pdf=4  =
+        DXF: Светильник светодиодный аварийный OWP OPTIMA LED 595 (5
+        PDF: Светильник светодиодный аварийный OWP OPTIMA LED 595 (5
+      ✓ [3   →3   ] ratio=100%  dxf=0  pdf=6  delta=+6
+        DXF: Светильник светодиодный OPTIMA.OPL ECO LED 595 (40) 400
+        PDF: Светильник светодиодный OPTIMA.OPL ECO LED 595 (40) 400
+    Missing in PDF (1):
+      ✗ [ВЫХОД] Пиктограмма "Выход/Exit"  (count=16)
+
+  --- Drawing 016: 016 - План привязки светильников
+  [grid] Detected 125 grid axis labels (excluded)
+
+  Unlisted symbols in drawing body (not in legend):
+       8А × 17
+       10 × 1
+       15 × 1
+       16 × 1
+       20 × 1
+       21 × 1
+       22 × 1
+       23 × 1
+       25 × 1
+       24 × 1
+       26 × 1
+       9А × 1
+      10А × 1
+    DXF: 14 items  |  PDF: 26 items
+    Name matches: 13  |  Exact (name+count): 8  |  Rate: 92.9%
+      ✓ [1   →1   ] ratio=100%  dxf=1  pdf=5  delta=+4
+        DXF: Светильник светодиодный SLICK.PRS LED 50 with driver bo
+        PDF: Светильник светодиодный SLICK.PRS LED 50 with driver bo
+      ✓ [1А  →1А  ] ratio=100%  dxf=2  pdf=2  =
+        DXF: Светильник светодиодный аварийный SLICK.PRS LED 50 with
+        PDF: Светильник светодиодный аварийный SLICK.PRS LED 50 with
+      ✓ [2   →2   ] ratio=100%  dxf=1  pdf=4  delta=+3
+        DXF: Светильник светодиодный OWP OPTIMA LED 595 (50) IP54/IP
+        PDF: Светильник светодиодный OWP OPTIMA LED 595 (50) IP54/IP
+      ✓ [2А  →2А  ] ratio=100%  dxf=4  pdf=4  =
+        DXF: Светильник светодиодный аварийный OWP OPTIMA LED 595 (5
+        PDF: Светильник светодиодный аварийный OWP OPTIMA LED 595 (5
+      ✓ [3   →3   ] ratio=100%  dxf=4  pdf=11  delta=+7
+        DXF: Светильник светодиодный OPTIMA.OPL ECO LED 595 (40) 400
+        PDF: Светильник светодиодный OPTIMA.OPL ECO LED 595 (40) 400
+    Missing in PDF (1):
+      ✗ [ВЫХОД] Пиктограмма "Выход/Exit"  (count=16)
+
+  --- Drawing 017: 017 - План кабеленесущих систем
+  [grid] Detected 40 grid axis labels (excluded)
+  WARNING: Legend not found, auto-detecting symbols...
+    DXF: 27 items  |  PDF: 1 items
+    Name matches: 0  |  Exact (name+count): 0  |  Rate: 0.0%
+    Missing in PDF (27):
+      ✗ [0] [Auto 0]  (count=3)
+      ✗ [1] [Auto 1]  (count=1)
+      ✗ [10] [Auto 10]  (count=1)
+
+  --- Drawing 018: 018 - Прокладка лотка через перегородки и перекрытия
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\27_Склад вспомогательных материалов с участком погрузки крытых вагонов\Обновленные файлы\02_DWG\_converted_dxf\018 - Прокладка лотка через перегородки и перекрытия.dxf
+    DXF: 0 items  |  PDF: 0 items
+    Name matches: 0  |  Exact (name+count): 0  |  Rate: 0%
+
+______________________________________________________________________
+[pos_30] ЭО  (7 matched pairs)
+  DXF: C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\30. КПП\02_DWG\_converted_dxf
+  PDF: C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\30. КПП\03_PDF
+
+  --- Drawing 001: 001 - Общие данные (начало)
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\30. КПП\02_DWG\_converted_dxf\001 - Общие данные (начало).dxf
+    DXF: 0 items  |  PDF: 0 items
+    Name matches: 0  |  Exact (name+count): 0  |  Rate: 0%
+
+  --- Drawing 002: 002 - Общие данные (продолжение)
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\30. КПП\02_DWG\_converted_dxf\002 - Общие данные (продолжение).dxf
+    DXF: 0 items  |  PDF: 0 items
+    Name matches: 0  |  Exact (name+count): 0  |  Rate: 0%
+
+  --- Drawing 003: 003 - Схема  ВРУ
+  WARNING: Legend not found, auto-detecting symbols...
+    DXF: 0 items  |  PDF: 3 items
+    Name matches: 0  |  Exact (name+count): 0  |  Rate: 0%
+
+  --- Drawing 004: 004, 005 - МЗиЗ
+  WARNING: Legend not found, auto-detecting symbols...
+    DXF: 8 items  |  PDF: 0 items
+    Name matches: 0  |  Exact (name+count): 0  |  Rate: 0.0%
+    Missing in PDF (8):
+      ✗ [1] [Auto 1]  (count=2)
+      ✗ [2] [Auto 2]  (count=2)
+      ✗ [3] [Auto 3]  (count=2)
+
+  --- Drawing 006: 006 - Планы расположения электрооборудования и сетей электроснабжения на отм- 0-000, +2-900
+  [grid] Detected 8 grid axis labels (excluded)
+  [geometry mode] red(щиты)=0  blue(оборуд.)=43
+  [geometry mode] Cable outlets (Подключение): 7
+    DXF: 19 items  |  PDF: 9 items
+    Name matches: 6  |  Exact (name+count): 5  |  Rate: 31.6%
+      ✓ [12  →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Щит силовой
+        PDF: Щит силовой
+      ✓ [14  →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Розетка однофазная скрытой установки IP44 ATN440146
+        PDF: Розетка однофазная скрытой установки IP44 ATN440146
+      ✓ [17  →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Розетка однофазная скрытой установки IP20 ATN000145
+        PDF: Розетка однофазная скрытой установки IP20 ATN000145
+      ✓ [18  →    ] ratio=100%  dxf=7  pdf=0  delta=-7
+        DXF: Кабельный вывод
+        PDF: Кабельный вывод
+      ✓ [6   →    ] ratio=100%  dxf=0  pdf=0  =
+        DXF: Кабельная трасса, ППГнг(А)-HF
+        PDF: Кабельная трасса, ППГнг(А)-HF
+    Missing in PDF (13):
+      ✗ [1] ВРУ-Гр.6  (count=0)
+      ✗ [2] ВРУ-Гр.15  (count=0)
+      ✗ [3] ВРУ-Гр.16  (count=0)
+
+  --- Drawing 007: 007 - Планы освещения на отм- 0-000, +2-900
+  [grid] Detected 31 grid axis labels (excluded)
+  [annotations] Found 3 equipment types from plan text
+    P1: 1 × SAFARI DL LED G2 26W
+    P2: 2 × OPTIMA.OPL ECO LED
+    P3: 1 × OPTIMA.OPL ECO LED EM
+  [geometry mode] red(щиты)=16  blue(оборуд.)=22
+    DXF: 23 items  |  PDF: 10 items
+    Name matches: 10  |  Exact (name+count): 5  |  Rate: 43.5%
+      ✓ [8   →    ] ratio=100%  dxf=16  pdf=0  delta=-16
+        DXF: Щит силовой
+        PDF: Щит силовой
+      ✓ [1   →2   ] ratio=57%  dxf=0  pdf=0  =
+        DXF: 1-SAFARI DL LED G2 26W
+        PDF: Светильник светодиодный SAFARI DL LED G2 26W 940 WH
+      ✓ [2   →1   ] ratio=51%  dxf=0  pdf=4  delta=+4
+        DXF: 4-OPTIMA.OPL ECO LED
+        PDF: Светильник светодиодный OPTIMA.OPL ECO LED 595 (50) 400
+      ✓ [3   →1А  ] ratio=48%  dxf=0  pdf=4  delta=+4
+        DXF: 1-OPTIMA.OPL ECO LED EM
+        PDF: Светильник светодиодный аварийный OPTIMA.OPL ECO LED 59
+      ✓ [10  →3А  ] ratio=69%  dxf=0  pdf=2  delta=+2
+        DXF: Светильник светодиодный OPTIMA.OPL ECO LED 595 (50) 400
+        PDF: Светильник светодиодный аварийный CD LED 27 4000K EM
+    Missing in PDF (13):
+      ✗ [4] ВРУ-Гр.О2  (count=0)
+      ✗ [5] ВРУ-Гр.О2  (count=0)
+      ✗ [6] ПЭСПЗ-Гр.2А  (count=0)
+
+  --- Drawing 008: 008 - План привязки светильников
+  [grid] Detected 31 grid axis labels (excluded)
+  [geometry mode] red(щиты)=3  blue(оборуд.)=4
+    DXF: 19 items  |  PDF: 10 items
+    Name matches: 10  |  Exact (name+count): 4  |  Rate: 52.6%
+      ✓ [5   →    ] ratio=100%  dxf=3  pdf=0  delta=-3
+        DXF: Щит силовой
+        PDF: Щит силовой
+      ✓ [6   →1   ] ratio=100%  dxf=0  pdf=5  delta=+5
+        DXF: Светильник светодиодный OPTIMA.OPL ECO LED 595 (50) 400
+        PDF: Светильник светодиодный OPTIMA.OPL ECO LED 595 (50) 400
+      ✓ [8   →1А  ] ratio=100%  dxf=0  pdf=4  delta=+4
+        DXF: Светильник светодиодный аварийный OPTIMA.OPL ECO LED 59
+        PDF: Светильник светодиодный аварийный OPTIMA.OPL ECO LED 59
+      ✓ [10  →2   ] ratio=100%  dxf=0  pdf=1  delta=+1
+        DXF: Светильник светодиодный SAFARI DL LED G2 26W 940 WH
+        PDF: Светильник светодиодный SAFARI DL LED G2 26W 940 WH
+      ✓ [13  →3А  ] ratio=100%  dxf=0  pdf=2  delta=+2
+        DXF: Светильник светодиодный аварийный CD LED 27 4000K EM
+        PDF: Светильник светодиодный аварийный CD LED 27 4000K EM
+    Missing in PDF (9):
+      ✗ [1] ВРУ-Гр.О2  (count=0)
+      ✗ [2] ВРУ-Гр.О2  (count=0)
+      ✗ [3] ВРУ-Гр.О2  (count=0)
+
+================================================================================
+  OVERALL SUMMARY
+================================================================================
+  Total matched DXF↔PDF pairs: 32
+  Total DXF items (ground truth): 270
+  Total PDF items (generated):    248
+
+  Name match rate:  143/270  = 53.0%
+  Exact match rate: 84/270  = 31.1%
+  Missing in PDF:   127
+  Extra in PDF:     105
+
+  Case           Pairs   DXF   PDF  NmMt  ExMt  NmRt%  ExRt%
+  -------------- ----- ----- ----- ----- ----- ------ ------
+  abk_eo             6    52   100    50    20  96.2%  38.5%
+  abk_em             9    60    47    40    34  66.7%  56.7%
+  pos_27            10    89    69    27    16  30.3%  18.0%
+  pos_30             7    69    32    26    14  37.7%  20.3%
+
+  Report saved: C:\Cursor\TayfaProject\EquipmentCounter\dxf_ground_truth_report.json
+================================================================================

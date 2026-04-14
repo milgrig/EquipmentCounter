@@ -1,0 +1,269 @@
+skip_non_equip[13] Проводка прокладываемая в трубе скрыто
+skip_non_equip[14] Проводка прокладываемая в трубе открыто
+match_symbols[1] Щит рабочего освещения: raw=20 pre_excl=12 drawing=8 nms=1 excl=0 fp=0 color_rej=0 valid=1 thr=0.75
+match_symbols[2] Светильник SLICK.PRS LED 50 with driver : raw=6192 pre_excl=32 drawing=6160 nms=160 excl=0 fp=0 color_rej=0 valid=160 thr=0.75
+match_symbols[3] Светильник CD LED 27 4000K: raw=1 pre_excl=1 drawing=0 nms=0 excl=0 fp=0 color_rej=0 valid=0 thr=0.75
+match_symbols[4] Светильник ARCTIC.OPL ECO LED 1200 TH 50: raw=253 pre_excl=76 drawing=177 nms=13 excl=0 fp=0 color_rej=2 valid=11 thr=0.75
+match_symbols[5] Светильник SLICK.PRS LED 30 with driver : raw=52 pre_excl=38 drawing=14 nms=6 excl=0 fp=0 color_rej=0 valid=6 thr=0.75
+match_symbols[6] Светильник ARCTIC.OPL ECO LED 1200 5000K: raw=656 pre_excl=61 drawing=595 nms=15 excl=0 fp=0 color_rej=2 valid=13 thr=0.75
+match_symbols[7] Светильник SLICK.PRS LED 30 with driver : raw=512 pre_excl=36 drawing=476 nms=11 excl=0 fp=1 color_rej=2 valid=8 thr=0.75
+match_symbols[8] Световые указатели "ВЫХОД" MERCURY LED E: raw=22 pre_excl=12 drawing=10 nms=4 excl=0 fp=0 color_rej=1 valid=3 thr=0.75
+match_symbols[9] Световые указатели "ВЫХОД" ATOM 6500-3 L: raw=16 pre_excl=6 drawing=10 nms=4 excl=0 fp=0 color_rej=1 valid=3 thr=0.75
+match_symbols[15] Одноклавишный выключатель Systeme Electr: raw=40 pre_excl=40 drawing=0 nms=0 excl=0 fp=0 color_rej=0 valid=0 thr=0.75
+match_symbols[16] Выключатель одноклавишный ЭТЮД IP44 О/У : raw=167 pre_excl=163 drawing=4 nms=1 excl=0 fp=0 color_rej=0 valid=1 thr=0.75
+match_symbols[17] Пост управления рабочим освещением: raw=4 pre_excl=2 drawing=2 nms=2 excl=0 fp=0 color_rej=0 valid=2 thr=0.75
+Visual symbol matching: Data/ДБТ разделы для ИИ/03_ГПК_/3-я захватка/02_PDF/006-Планы освещения-отм. +4.200.pdf
+
+Legend: 18 items on page 1
+  (graphic): Щит аварийного освещения
+  (graphic): Щит рабочего освещения
+  '1': Светильник SLICK.PRS LED 50 with driver box /tempered glass/
+  '2': Светильник CD LED 27 4000K
+  '3': Светильник ARCTIC.OPL ECO LED 1200 TH 5000K
+  '4': Светильник SLICK.PRS LED 30 with driver box /tempered glass/
+  '5': Светильник ARCTIC.OPL ECO LED 1200 5000K
+  '6': Светильник SLICK.PRS LED 30 with driver box /tempered glass/
+  '7АЭ': Световые указатели "ВЫХОД" MERCURY LED Ex 20W DLW
+  '8АЭ': Световые указатели "ВЫХОД" ATOM 6500-3 LED SP AT FP
+  (graphic): Кабельная трасса аварийного освещения
+  (graphic): Кабельная трасса рабочего освещения
+  (graphic): Проводка прокладываемая на лотке
+  (graphic): Проводка прокладываемая в трубе скрыто
+  (graphic): Проводка прокладываемая в трубе открыто
+  (graphic): Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 
+  (graphic): Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧ
+  (graphic): Пост управления рабочим освещением
+
+Matching with threshold=0.75, DPI=200
+Scales: [1.0]
+Rotations: [0, 90]
+
+Symbols extracted from legend: 12
+Scanning page: 1
+
+#     Count    Color  Description
+----------------------------------------------------------------------
+  1       1     blue  Щит рабочего освещения
+  2     160     blue  Светильник SLICK.PRS LED 50 with driver box /tempe
+  3       0        —  Светильник CD LED 27 4000K
+  4      11     blue  Светильник ARCTIC.OPL ECO LED 1200 TH 5000K
+  5       6     blue  Светильник SLICK.PRS LED 30 with driver box /tempe
+  6      13     blue  Светильник ARCTIC.OPL ECO LED 1200 5000K
+  7       8     blue  Светильник SLICK.PRS LED 30 with driver box /tempe
+  8       3      red  Световые указатели "ВЫХОД" MERCURY LED Ex 20W DLW
+  9       3      red  Световые указатели "ВЫХОД" ATOM 6500-3 LED SP AT F
+  15      0        —  Одноклавишный выключатель Systeme Electric ОП Этюд
+  16      1     blue  Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишны
+  17      2     blue  Пост управления рабочим освещением
+----------------------------------------------------------------------
+        208  TOTAL
+
+=== Match Details ===
+    1. #1 (0.92) at (1304, 956) s=1.0 r=0 [blue]  Щит рабочего освещения
+    2. #2 (0.97) at (1115, 1360) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+    3. #2 (0.97) at (1750, 1360) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+    4. #2 (0.97) at (1593, 772) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+    5. #2 (0.97) at (1115, 1561) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+    6. #2 (0.96) at (1593, 670) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+    7. #2 (0.96) at (1115, 1457) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+    8. #2 (0.96) at (1593, 871) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+    9. #2 (0.95) at (1593, 457) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   10. #2 (0.95) at (1593, 565) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   11. #2 (0.94) at (1434, 1165) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   12. #2 (0.94) at (1434, 1266) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   13. #2 (0.94) at (1435, 1360) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   14. #2 (0.94) at (1109, 871) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   15. #2 (0.94) at (1109, 670) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   16. #2 (0.94) at (1435, 1561) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   17. #2 (0.94) at (1109, 772) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   18. #2 (0.93) at (1435, 1457) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   19. #2 (0.93) at (950, 772) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   20. #2 (0.93) at (1109, 457) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   21. #2 (0.93) at (1276, 1561) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   22. #2 (0.92) at (950, 670) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   23. #2 (0.92) at (1276, 1457) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   24. #2 (0.92) at (950, 871) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   25. #2 (0.92) at (950, 457) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   26. #2 (0.92) at (1276, 1360) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   27. #2 (0.91) at (1109, 565) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   28. #2 (0.91) at (975, 1266) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   29. #2 (0.91) at (975, 1165) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   30. #2 (0.91) at (978, 1358) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   31. #2 (0.91) at (950, 565) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   32. #2 (0.91) at (1599, 1266) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   33. #2 (0.91) at (754, 1094) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   34. #2 (0.90) at (1599, 1165) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   35. #2 (0.90) at (1366, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   36. #2 (0.90) at (1198, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   37. #2 (0.89) at (1224, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   38. #2 (0.89) at (883, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   39. #2 (0.89) at (1028, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   40. #2 (0.89) at (1053, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   41. #2 (0.89) at (742, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   42. #2 (0.88) at (1380, 1688) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   43. #2 (0.88) at (1380, 1858) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   44. #2 (0.88) at (1380, 1713) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   45. #2 (0.88) at (1258, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   46. #2 (0.88) at (1380, 1884) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   47. #2 (0.88) at (1002, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   48. #2 (0.88) at (1380, 1730) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   49. #2 (0.88) at (1380, 1747) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   50. #2 (0.88) at (1380, 1810) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   51. #2 (0.87) at (1332, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   52. #2 (0.87) at (741, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   53. #2 (0.87) at (977, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   54. #2 (0.87) at (1380, 1838) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   55. #2 (0.87) at (1380, 1901) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   56. #2 (0.87) at (1380, 1765) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   57. #2 (0.86) at (767, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   58. #2 (0.86) at (794, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   59. #2 (0.86) at (958, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   60. #2 (0.86) at (1120, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   61. #2 (0.86) at (1070, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   62. #2 (0.86) at (1096, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   63. #2 (0.86) at (1140, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   64. #2 (0.86) at (1166, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   65. #2 (0.86) at (1275, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   66. #2 (0.86) at (1292, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   67. #2 (0.86) at (1310, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   68. #2 (0.86) at (818, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   69. #2 (0.86) at (910, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   70. #2 (0.86) at (835, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   71. #2 (0.86) at (927, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   72. #2 (0.86) at (858, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   73. #2 (0.86) at (1432, 670) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   74. #2 (0.86) at (1432, 772) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   75. #2 (0.86) at (1241, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   76. #2 (0.86) at (1816, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   77. #2 (0.86) at (1349, 1627) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   78. #2 (0.85) at (1432, 871) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   79. #2 (0.85) at (1432, 457) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+   80. #2 (0.85) at (1524, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   81. #2 (0.85) at (1498, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   82. #2 (0.85) at (1002, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   83. #2 (0.85) at (1394, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   84. #2 (0.85) at (884, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   85. #2 (0.85) at (1027, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   86. #2 (0.85) at (1232, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   87. #2 (0.85) at (1258, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   88. #2 (0.85) at (1054, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   89. #2 (0.85) at (1564, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   90. #2 (0.85) at (1648, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   91. #2 (0.85) at (1197, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   92. #2 (0.85) at (1332, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   93. #2 (0.85) at (977, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   94. #2 (0.85) at (1374, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   95. #2 (0.84) at (1683, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   96. #2 (0.84) at (1348, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   97. #2 (0.84) at (1120, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   98. #2 (0.84) at (912, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+   99. #2 (0.84) at (955, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  100. #2 (0.84) at (1070, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  101. #2 (0.84) at (1089, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  102. #2 (0.84) at (1137, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  103. #2 (0.84) at (1154, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  104. #2 (0.84) at (1177, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  105. #2 (0.84) at (1276, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  106. #2 (0.84) at (1313, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  107. #2 (0.84) at (1414, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  108. #2 (0.84) at (1431, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  109. #2 (0.84) at (1589, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  110. #2 (0.84) at (1606, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  111. #2 (0.84) at (1623, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  112. #2 (0.84) at (1738, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  113. #2 (0.84) at (932, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  114. #2 (0.84) at (1449, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  115. #2 (0.84) at (1465, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  116. #2 (0.84) at (1759, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  117. #2 (0.84) at (1776, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  118. #2 (0.84) at (1793, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  119. #2 (0.84) at (1293, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  120. #2 (0.84) at (770, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  121. #2 (0.84) at (820, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  122. #2 (0.84) at (790, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  123. #2 (0.84) at (840, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  124. #2 (0.84) at (1432, 565) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  125. #2 (0.84) at (1214, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  126. #2 (0.84) at (1541, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  127. #2 (0.84) at (857, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  128. #2 (0.83) at (1276, 1266) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  129. #2 (0.83) at (1665, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  130. #2 (0.83) at (1276, 1165) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  131. #2 (0.83) at (1700, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  132. #2 (0.82) at (1599, 1561) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  133. #2 (0.82) at (1740, 871) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  134. #2 (0.82) at (976, 1561) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  135. #2 (0.82) at (976, 1457) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  136. #2 (0.82) at (1740, 772) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  137. #2 (0.82) at (1740, 670) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  138. #2 (0.82) at (1273, 772) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  139. #2 (0.82) at (1716, 414) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  140. #2 (0.82) at (1749, 1165) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  141. #2 (0.82) at (1749, 1265) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  142. #2 (0.82) at (1273, 457) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  143. #2 (0.81) at (1599, 1457) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  144. #2 (0.81) at (1599, 1360) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  145. #2 (0.81) at (1273, 670) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  146. #2 (0.80) at (1273, 565) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  147. #2 (0.80) at (1041, 1056) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  148. #2 (0.80) at (1273, 871) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  149. #2 (0.80) at (1773, 1462) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  150. #2 (0.79) at (1089, 930) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  151. #2 (0.79) at (1114, 1165) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  152. #2 (0.79) at (1380, 1793) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  153. #2 (0.79) at (768, 1055) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  154. #2 (0.79) at (1114, 1266) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  155. #2 (0.77) at (1380, 1917) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  156. #2 (0.76) at (754, 947) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  157. #2 (0.76) at (1227, 984) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  158. #2 (0.76) at (737, 1094) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 50 wi
+  159. #2 (0.75) at (727, 608) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  160. #2 (0.75) at (727, 1458) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  161. #2 (0.75) at (727, 582) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 50 wi
+  162. #4 (0.91) at (1775, 528) s=1.0 r=90 [blue]  Светильник ARCTIC.OPL ECO LED 
+  163. #4 (0.91) at (1775, 466) s=1.0 r=90 [blue]  Светильник ARCTIC.OPL ECO LED 
+  164. #4 (0.91) at (1777, 1519) s=1.0 r=90 [blue]  Светильник ARCTIC.OPL ECO LED 
+  165. #4 (0.89) at (1777, 1590) s=1.0 r=90 [blue]  Светильник ARCTIC.OPL ECO LED 
+  166. #4 (0.88) at (929, 1052) s=1.0 r=90 [blue]  Светильник ARCTIC.OPL ECO LED 
+  167. #4 (0.88) at (899, 1052) s=1.0 r=90 [blue]  Светильник ARCTIC.OPL ECO LED 
+  168. #4 (0.81) at (1085, 1020) s=1.0 r=0 [blue]  Светильник ARCTIC.OPL ECO LED 
+  169. #4 (0.76) at (1594, 1183) s=1.0 r=90 [blue]  Светильник ARCTIC.OPL ECO LED 
+  170. #4 (0.76) at (1734, 653) s=1.0 r=90 [blue]  Светильник ARCTIC.OPL ECO LED 
+  171. #4 (0.75) at (788, 984) s=1.0 r=90 [blue]  Светильник ARCTIC.OPL ECO LED 
+  172. #4 (0.75) at (961, 1055) s=1.0 r=90 [blue]  Светильник ARCTIC.OPL ECO LED 
+  173. #5 (0.95) at (1583, 1050) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 30 wi
+  174. #5 (0.95) at (1403, 981) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 30 wi
+  175. #5 (0.94) at (1225, 980) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 30 wi
+  176. #5 (0.94) at (1583, 980) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 30 wi
+  177. #5 (0.81) at (1225, 1052) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 30 wi
+  178. #5 (0.80) at (1404, 1052) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 30 wi
+  179. #6 (0.95) at (1775, 528) s=1.0 r=90 [blue]  Светильник ARCTIC.OPL ECO LED 
+  180. #6 (0.95) at (1777, 1519) s=1.0 r=90 [blue]  Светильник ARCTIC.OPL ECO LED 
+  181. #6 (0.95) at (1775, 466) s=1.0 r=90 [blue]  Светильник ARCTIC.OPL ECO LED 
+  182. #6 (0.95) at (1777, 1590) s=1.0 r=90 [blue]  Светильник ARCTIC.OPL ECO LED 
+  183. #6 (0.87) at (833, 1039) s=1.0 r=0 [blue]  Светильник ARCTIC.OPL ECO LED 
+  184. #6 (0.87) at (835, 1071) s=1.0 r=0 [blue]  Светильник ARCTIC.OPL ECO LED 
+  185. #6 (0.87) at (871, 1039) s=1.0 r=0 [blue]  Светильник ARCTIC.OPL ECO LED 
+  186. #6 (0.87) at (797, 1071) s=1.0 r=0 [blue]  Светильник ARCTIC.OPL ECO LED 
+  187. #6 (0.87) at (962, 1055) s=1.0 r=90 [blue]  Светильник ARCTIC.OPL ECO LED 
+  188. #6 (0.86) at (788, 984) s=1.0 r=90 [blue]  Светильник ARCTIC.OPL ECO LED 
+  189. #6 (0.86) at (873, 1071) s=1.0 r=0 [blue]  Светильник ARCTIC.OPL ECO LED 
+  190. #6 (0.86) at (795, 1039) s=1.0 r=0 [blue]  Светильник ARCTIC.OPL ECO LED 
+  191. #6 (0.79) at (956, 983) s=1.0 r=90 [blue]  Светильник ARCTIC.OPL ECO LED 
+  192. #7 (0.81) at (856, 1028) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 30 wi
+  193. #7 (0.80) at (944, 1028) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 30 wi
+  194. #7 (0.80) at (902, 1061) s=1.0 r=90 [blue]  Светильник SLICK.PRS LED 30 wi
+  195. #7 (0.80) at (962, 1028) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 30 wi
+  196. #7 (0.80) at (892, 1028) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 30 wi
+  197. #7 (0.80) at (911, 1028) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 30 wi
+  198. #7 (0.79) at (874, 1028) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 30 wi
+  199. #7 (0.77) at (982, 1028) s=1.0 r=0 [blue]  Светильник SLICK.PRS LED 30 wi
+  200. #8 (0.92) at (1062, 976) s=1.0 r=90 [red]  Световые указатели "ВЫХОД" MER
+  201. #8 (0.86) at (1125, 1015) s=1.0 r=90 [red]  Световые указатели "ВЫХОД" MER
+  202. #8 (0.85) at (1089, 945) s=1.0 r=0 [red]  Световые указатели "ВЫХОД" MER
+  203. #9 (0.90) at (1124, 1015) s=1.0 r=90 [red]  Световые указатели "ВЫХОД" ATO
+  204. #9 (0.89) at (1062, 976) s=1.0 r=90 [red]  Световые указатели "ВЫХОД" ATO
+  205. #9 (0.85) at (1089, 946) s=1.0 r=0 [red]  Световые указатели "ВЫХОД" ATO
+  206. #16 (0.76) at (1297, 960) s=1.0 r=0 [blue]  Выключатель одноклавишный ЭТЮД
+  207. #17 (0.82) at (1115, 955) s=1.0 r=90 [blue]  Пост управления рабочим освеще
+  208. #17 (0.80) at (1115, 1084) s=1.0 r=90 [blue]  Пост управления рабочим освеще
