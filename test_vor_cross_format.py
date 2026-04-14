@@ -44,7 +44,7 @@ DBT_DIR = DATA_DIR / "ДБТ разделы для ИИ"
 from pdf_legend_parser import parse_legend  # noqa: E402
 from pdf_count_text import count_symbols  # noqa: E402
 from pdf_count_cables import extract_cables  # noqa: E402
-from pdf_count_visual import match_symbols  # noqa: E402
+from pdf_count_visual import match_symbols, detect_pictograms  # noqa: E402
 from vor_work_mapping import map_items as vor_map_items  # noqa: E402
 from equipment_counter import process_dxf  # noqa: E402
 
@@ -405,6 +405,18 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
             "symbol": sym, "name": name,
             "count": count, "count_ae": 0, "total": count,
         })
+
+    # Pictogram detection (T149)
+    try:
+        picto_result = detect_pictograms(pdf_path, legend_result)
+        for pname, pcount in picto_result.counts.items():
+            if pcount > 0:
+                items.append({
+                    "symbol": "", "name": pname,
+                    "count": pcount, "count_ae": 0, "total": pcount,
+                })
+    except Exception as exc:
+        log.warning("Pictogram detection failed for %s: %s", pdf_path, exc)
 
     try:
         cable_result = extract_cables(pdf_path, legend_result)

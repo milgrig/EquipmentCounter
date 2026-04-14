@@ -362,6 +362,8 @@ def build_report(
                     "cable_type": c.cable_type,
                     "count": c.count,
                     "total_length_m": c.total_length_m,
+                    **({"length_by_laying": c.length_by_laying}
+                       if c.length_by_laying else {}),
                 }
                 for c in cables
             ]

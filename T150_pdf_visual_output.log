@@ -1,0 +1,60 @@
+skip_non_equip[13] Проводка прокладываемая в трубе скрыто
+skip_non_equip[14] Проводка прокладываемая в трубе открыто
+match_symbols[1] Щит рабочего освещения: raw=20 pre_excl=12 drawing=8 nms=1 excl=0 fp=0 color_rej=0 valid=1 thr=0.75
+match_symbols[2] Светильник SLICK.PRS LED 50 with driver : raw=6192 pre_excl=32 drawing=6160 nms=160 excl=0 fp=0 color_rej=0 valid=160 thr=0.75
+match_symbols[3] Светильник CD LED 27 4000K: raw=1 pre_excl=1 drawing=0 nms=0 excl=0 fp=0 color_rej=0 valid=0 thr=0.75
+match_symbols[4] Светильник ARCTIC.OPL ECO LED 1200 TH 50: raw=253 pre_excl=76 drawing=177 nms=13 excl=0 fp=0 color_rej=2 valid=11 thr=0.75
+match_symbols[5] Светильник SLICK.PRS LED 30 with driver : raw=52 pre_excl=38 drawing=14 nms=6 excl=0 fp=0 color_rej=0 valid=6 thr=0.75
+match_symbols[6] Светильник ARCTIC.OPL ECO LED 1200 5000K: raw=656 pre_excl=61 drawing=595 nms=15 excl=0 fp=0 color_rej=2 valid=13 thr=0.75
+match_symbols[7] Светильник SLICK.PRS LED 30 with driver : raw=512 pre_excl=36 drawing=476 nms=11 excl=0 fp=1 color_rej=2 valid=8 thr=0.75
+match_symbols[8] Световые указатели "ВЫХОД" MERCURY LED E: raw=22 pre_excl=12 drawing=10 nms=4 excl=0 fp=0 color_rej=1 valid=3 thr=0.75
+match_symbols[9] Световые указатели "ВЫХОД" ATOM 6500-3 L: raw=16 pre_excl=6 drawing=10 nms=4 excl=0 fp=0 color_rej=1 valid=3 thr=0.75
+match_symbols[15] Одноклавишный выключатель Systeme Electr: raw=40 pre_excl=40 drawing=0 nms=0 excl=0 fp=0 color_rej=0 valid=0 thr=0.75
+match_symbols[16] Выключатель одноклавишный ЭТЮД IP44 О/У : raw=167 pre_excl=163 drawing=4 nms=1 excl=0 fp=0 color_rej=0 valid=1 thr=0.75
+match_symbols[17] Пост управления рабочим освещением: raw=4 pre_excl=2 drawing=2 nms=2 excl=0 fp=0 color_rej=0 valid=2 thr=0.75
+cross_symbol_nms: 16 matches suppressed (before=208 after=192)
+Visual symbol matching: Data/ДБТ разделы для ИИ/03_ГПК_/3-я захватка/02_PDF/006-Планы освещения-отм. +4.200.pdf
+
+Legend: 18 items on page 1
+  (graphic): Щит аварийного освещения
+  (graphic): Щит рабочего освещения
+  '1': Светильник SLICK.PRS LED 50 with driver box /tempered glass/
+  '2': Светильник CD LED 27 4000K
+  '3': Светильник ARCTIC.OPL ECO LED 1200 TH 5000K
+  '4': Светильник SLICK.PRS LED 30 with driver box /tempered glass/
+  '5': Светильник ARCTIC.OPL ECO LED 1200 5000K
+  '6': Светильник SLICK.PRS LED 30 with driver box /tempered glass/
+  '7АЭ': Световые указатели "ВЫХОД" MERCURY LED Ex 20W DLW
+  '8АЭ': Световые указатели "ВЫХОД" ATOM 6500-3 LED SP AT FP
+  (graphic): Кабельная трасса аварийного освещения
+  (graphic): Кабельная трасса рабочего освещения
+  (graphic): Проводка прокладываемая на лотке
+  (graphic): Проводка прокладываемая в трубе скрыто
+  (graphic): Проводка прокладываемая в трубе открыто
+  (graphic): Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 
+  (graphic): Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧ
+  (graphic): Пост управления рабочим освещением
+
+Matching with threshold=0.75, DPI=200
+Scales: [1.0]
+Rotations: [0, 90]
+
+Symbols extracted from legend: 12
+Scanning page: 1
+
+#     Count    Color  Description
+----------------------------------------------------------------------
+  1       1     blue  Щит рабочего освещения
+  2     158     blue  Светильник SLICK.PRS LED 50 with driver box /tempe
+  3       0        —  Светильник CD LED 27 4000K
+  4       3     blue  Светильник ARCTIC.OPL ECO LED 1200 TH 5000K
+  5       6     blue  Светильник SLICK.PRS LED 30 with driver box /tempe
+  6      13     blue  Светильник ARCTIC.OPL ECO LED 1200 5000K
+  7       4     blue  Светильник SLICK.PRS LED 30 with driver box /tempe
+  8       2      red  Световые указатели "ВЫХОД" MERCURY LED Ex 20W DLW
+  9       3      red  Световые указатели "ВЫХОД" ATOM 6500-3 LED SP AT F
+  15      0        —  Одноклавишный выключатель Systeme Electric ОП Этюд
+  16      0        —  Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишны
+  17      2     blue  Пост управления рабочим освещением
+----------------------------------------------------------------------
+        192  TOTAL

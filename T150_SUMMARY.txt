@@ -1,0 +1,76 @@
+================================================================================
+T150 END-TO-END ACCURACY TEST: SUMMARY
+================================================================================
+
+Test: PDF vs DXF comparison for drawing 006 (+4.200)
+Date: 2026-04-14
+Status: FAIL (3/9 types within ±1, target was ≥7/9)
+
+KEY METRICS
+-----------
+DXF Ground Truth: 71 total items across 9 equipment types
+PDF Detected: 192 total items (after cross-symbol NMS)
+Cross-Symbol NMS: 16 matches suppressed (208 → 192)
+
+ACCURACY BREAKDOWN
+------------------
+Within ±1 tolerance: 3/9 types (33.3%) ❌ FAIL (target: ≥7/9)
+  ✓ SLICK.PRS LED 30: PDF=6 vs DXF=5 (delta=+1)
+  ✓ MERCURY ВЫХОД: PDF=2 vs DXF=2 (delta=0) EXACT
+  ✓ ATOM ВЫХОД: PDF=3 vs DXF=4 (delta=-1)
+
+Outside tolerance: 6/9 types
+  ❌ SLICK.PRS LED 50: PDF=158 vs DXF=30 (delta=+128) CRITICAL
+  ❌ CD LED 27: PDF=0 vs DXF=2 (delta=-2)
+  ❌ ARCTIC TH: PDF=3 vs DXF=9 (delta=-6) CRITICAL
+  ❌ ARCTIC non-TH: PDF=13 vs DXF=11 (delta=+2)
+  ❌ SLICK LED 30 Ex: PDF=4 vs DXF=2 (delta=+2)
+
+ROOT CAUSES IDENTIFIED
+----------------------
+1. ARCTIC TH Over-Suppression (Critical)
+   - Cross-symbol NMS removed 8 out of 11 ARCTIC TH matches
+   - Non-TH template consistently wins at ambiguous locations
+   - CONF_GAP=0.04 is too aggressive for similar templates
+   
+2. SLICK LED 50 Mapping Issue (Critical)
+   - PDF detected 158 vs DXF 30 (massive overcount)
+   - Possible DXF-PDF symbol correspondence mismatch
+   - Requires manual verification of legend mapping
+
+3. CD LED 27 Missing
+   - Zero detections (template extracted but no matches)
+   - Likely not present on this PDF plan elevation
+
+CROSS-SYMBOL NMS PERFORMANCE
+-----------------------------
+Configuration:
+  CROSS_NMS_RADIUS_PT = 25.0 (9mm proximity)
+  CROSS_NMS_CONF_GAP = 0.04 (4% confidence advantage required)
+
+Impact breakdown:
+  Item 2 (SLICK 50): 160 → 158 (-2)
+  Item 4 (ARCTIC TH): 11 → 3 (-8) ⚠️ CRITICAL LOSS
+  Item 6 (ARCTIC non-TH): 13 → 13 (0)
+  Item 7 (SLICK 30 Ex): 8 → 4 (-4)
+  Item 16 (Switch): 1 → 0 (-1)
+
+RECOMMENDATIONS
+---------------
+1. Increase CROSS_NMS_CONF_GAP from 0.04 to 0.07 (immediate)
+2. Add template similarity guard to cross-NMS (high priority)
+3. Manually verify DXF-PDF symbol mapping for drawing 006 (high priority)
+4. Add debug logging for cross-NMS suppressions (medium priority)
+
+CONCLUSION
+----------
+Cross-symbol NMS (T147/T148) is working but needs tuning:
+  ✓ Successfully suppressing duplicates (16/208 matches)
+  ❌ Too aggressive on similar templates (ARCTIC TH lost 73% of matches)
+  ❌ DXF-PDF mapping verification needed for accurate ground truth
+
+Test artifacts:
+  - T150_COMPARISON_REPORT.md (full analysis)
+  - T150_pdf_visual_output.log (verbose matching log)
+  - T150_SUMMARY.txt (this file)
+

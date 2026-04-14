@@ -1,0 +1,208 @@
+C:\Cursor\TayfaProject\EquipmentCounter\temp_spec_table.py:14: SyntaxWarning: invalid escape sequence '\P'
+  t = t.replace('\P', '\n').replace('\p', '\n')
+C:\Cursor\TayfaProject\EquipmentCounter\temp_spec_table.py:14: SyntaxWarning: invalid escape sequence '\p'
+  t = t.replace('\P', '\n').replace('\p', '\n')
+Tables in *Model_Space block: 9
+
+========================================================================================================================
+TABLE 0: 5 rows x 3 cols
+Position: (71589.3, 500588.6)
+========================================================================================================================
+Row   0: [0]=\fISOCPEUR|b0|i1|c204|p34;\C256;Обозначение | [1]=\fISOCPEUR|b0|i1|c204|p34;\C256;Наименование | [2]=\fISOCPEUR|b0|i1|c204|p34;\C256;Примечания
+Row   1: [0]= | [1]=\L\C256;Прилагаемые документы | [2]=
+Row   2: [0]=\C256;1Д-24-29-ЭОМ\A1;\C0;.СО | [1]=\C256;Спецификация оборудования, изделий и материалов   (на 3-х листах) | [2]=
+Row   3: [0]=\C256;1Д-24-29-ЭОМ\A1;\C0;.ВОР | [1]=\C256;Ведомость объемов работ (на 5-ти листах) | [2]=
+Row   4: [0]= | [1]= | [2]=
+
+========================================================================================================================
+TABLE 1: 8 rows x 3 cols
+Position: (71566.9, 509400.2)
+========================================================================================================================
+Row   0: [0]=Лист | [1]=\fISOCPEUR|b0|i1|c204|p34;\C256;Наименование | [2]=\fISOCPEUR|b0|i1|c204|p34;\C256;Примечания
+Row   1: [0]=1 | [1]=Общие данные (начало) | [2]=
+Row   2: [0]=2 | [1]=Общие данные (окончание) | [2]=
+Row   3: [0]=3 | [1]=\C256;Схема электрическая принципиальная ВРУ | [2]=
+Row   4: [0]=4 | [1]=\C256;План молниезащиты, заземления и СУП | [2]=
+Row   5: [0]=5 | [1]=\C256;План расстановки оборудования и кабельных трасс | [2]=
+Row   6: [0]=6 | [1]=План освещения | [2]=
+Row   7: [0]=7 | [1]=План привязки светильников | [2]=
+
+========================================================================================================================
+TABLE 2: 75 rows x 9 cols
+Position: (26475.3, 416495.5)
+========================================================================================================================
+Row   0: [0]=\fISOCPEUR|b0|i1|c0;Поз. | [1]=\fISOCPEUR|b0|i1|c0;Наименование и техническая характеристика | [2]=\fISOCPEUR|b0|i1|c0;Тип, марка, обозначение документа, опросного листа | [3]=\fISOCPEUR|b0|i1|c0;Код продукции | [4]=\fISOCPEUR|b0|i1|c0;Поставщик | [5]=\fISOCPEUR|b0|i1|c0;Ед. измерения | [6]=\fISOCPEUR|b0|i1|c0;Количество | [7]=\fISOCPEUR|b0|i1|c0;Масса 1 ед., кг | [8]=\fISOCPEUR|b0|i1|c0;Примечания
+Row   1: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b1|i1|c0;\LЩитовое оборудование | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row   2: [0]=\fISOCPEUR|b0|i1|c0;1 | [1]=\fISOCPEUR|b0|i1|c0;Вводно-распределительное устройство | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0;Systeme Electric | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;1 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row   3: [0]=\fISOCPEUR|b0|i1|c0;2 | [1]=\fISOCPEUR|b0|i1|c0;Панель питания электрооборудования систем противопожарной защиты | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0;Systeme Electric | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;1 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row   4: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0; | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row   5: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b1|i1|c0;\LСветотехническое оборудование | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row   6: [0]=\fISOCPEUR|b0|i1|c0;1 | [1]=\fISOCPEUR|b0|i1|c0;Светодиодный светильник 5000K 50ВТ 6000Лм | [2]=\fISOCPEUR|b0|i1|c0;TRAY/RB (800) 50W OPL 750 GY | [3]=\fISOCPEUR|b0|i1|c0;1946000310 | [4]=\fISOCPEUR|b0|i1|c0; «МГК «Световые Технологии» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;22 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row   7: [0]=\fISOCPEUR|b0|i1|c0;2 | [1]=\fISOCPEUR|b0|i1|c0;Светодиодный светильник 5000K 50ВТ 7800Лм | [2]=\fISOCPEUR|b0|i1|c0;TRAY/RB (800) 50W PRS 750 GY EM | [3]=\fISOCPEUR|b0|i1|c0;1946000230 | [4]=\fISOCPEUR|b0|i1|c0; «МГК «Световые Технологии» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;8 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row   8: [0]=\fISOCPEUR|b0|i1|c0;3 | [1]=\fISOCPEUR|b0|i1|c0;Emergency CONVERSION KIT POWER LED 70W IP65 | [2]=\f__DINFontRegular_2c143e|b0|i0|c0; | [3]=\fISOCPEUR|b0|i1|c0;4501008200 | [4]=\fISOCPEUR|b0|i1|c0; «МГК «Световые Технологии» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;8 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row   9: [0]=\fISOCPEUR|b0|i1|c0;4 | [1]=\fISOCPEUR|b0|i1|c0;Светодиодный светильник 4000K 26ВТ 3400Лм | [2]=\fISOCPEUR|b0|i1|c0;OPTIMA.OPL ECO LED 595 4000K | [3]=\fISOCPEUR|b0|i1|c0;1166000010 | [4]=\fISOCPEUR|b0|i1|c0; «МГК «Световые Технологии» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;2 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  10: [0]=\fISOCPEUR|b0|i1|c0;5 | [1]=\fISOCPEUR|b0|i1|c0;Светодиодный светильник 4000K 26ВТ 3400Лм | [2]=\fISOCPEUR|b0|i1|c0;OPTIMA.OPL ECO LED 595 EM 4000K | [3]=\fISOCPEUR|b0|i1|c0;1166000040 | [4]=\fISOCPEUR|b0|i1|c0; «МГК «Световые Технологии» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;2 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  11: [0]=\fISOCPEUR|b0|i1|c0;6 | [1]=\fISOCPEUR|b0|i1|c0;Светодиодный светильник 4Вт IP20 | [2]=\fISOCPEUR|b0|i1|c0;MARS 2223-4 LED | [3]=\fISOCPEUR|b0|i1|c0;4501006420 | [4]=\fISOCPEUR|b0|i1|c0;ООО "МГК "Световые Технологии | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;1 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  12: [0]=\fISOCPEUR|b0|i1|c0;7 | [1]=\fISOCPEUR|b0|i1|c0;ПЭУ 010 Выход (210х105) LUNA/MARS пиктограмма | [2]=\fISOCPEUR|b0|i1|c0;LUNA/MARS | [3]=\fISOCPEUR|b0|i1|c0;2501002330 | [4]=\fISOCPEUR|b0|i1|c0;ООО "МГК "Световые Технологии | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;1 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  13: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0; | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  14: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b1|i1|c0;\LЭлектроустановочные изделия | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  15: [0]=\fISOCPEUR|b0|i1|c0;1 | [1]=\fISOCPEUR|b0|i1|c0;Коробка пластиковая FS с кабельными вводами и клеммниками, IP55, 100х100х50 мм, 4р, 450V, 6A, 4 мм2 | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;FSB11404 | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;10 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  16: [0]=\fISOCPEUR|b0|i1|c0;2 | [1]=\fISOCPEUR|b0|i1|c0;Коробка ответвит. с кабельными вводами, IP44, 80х80х40мм | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;53700 | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;25 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  17: [0]=\fISOCPEUR|b0|i1|c0;3 | [1]=\fISOCPEUR|b0|i1|c0;SDN2 Коробка распределительная для к/к, 151х151х75 | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;01870 | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;10 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  18: [0]=\fISOCPEUR|b0|i1|c0;4 | [1]=\fISOCPEUR|b0|i1|c0;ЭТЮД IP44 О/У 1-клавишный ВЫКЛЮЧАТЕЛЬ 10 АХ, БЕЛЫЙ | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;BA10-041B | [4]=\fISOCPEUR|b0|i1|c0;Systeme Electric | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;8 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  19: [0]=\fISOCPEUR|b0|i1|c0;5 | [1]=\fISOCPEUR|b0|i1|c0;ЭТЮД О/У РОЗЕТКА с заземлением со шторками, 16А, 250В, БЕЛЫЙ | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;PA16-004B | [4]=\fISOCPEUR|b0|i1|c0;Systeme Electric | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;3 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  20: [0]=\fISOCPEUR|b0|i1|c0;6 | [1]=\fISOCPEUR|b0|i1|c0;BLANCA О/У РОЗЕТКА 3-я с заземлением со шторками, ИЗОЛ.ПЛ., 16А, 250В, БЕЛЫЙ | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;BLNRA011311 | [4]=\fISOCPEUR|b0|i1|c0;Systeme Electric | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;4 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  21: [0]=\fISOCPEUR|b0|i1|c0;7 | [1]=\fISOCPEUR|b0|i1|c0;Луженая гильза ГМЛ 6-4КВТ 41301 | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;41301 | [4]=\fISOCPEUR|b0|i1|c0;КВТ | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;15 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  22: [0]=\fISOCPEUR|b0|i1|c0;8 | [1]=\fISOCPEUR|b0|i1|c0;Термоусадочная трубка ТТК(4:1)-8/2 КВТ 59674 | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;ТТК(4:1)-8/2 | [4]=\fISOCPEUR|b0|i1|c0;КВТ | [5]=\fISOCPEUR|b0|i1|c0;м | [6]=\fISOCPEUR|b0|i1|c0;6 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  23: [0]=\fISOCPEUR|b0|i1|c0;9 | [1]=\fISOCPEUR|b0|i1|c0;Двухкомпонентная огнестойкая пена | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;2 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  24: [0]=\fISOCPEUR|b0|i1|c0;10 | [1]=\fISOCPEUR|b0|i1|c0;Пистолет для двухкомпонентной пены | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;1 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  25: [0]=\fISOCPEUR|b0|i1|c0;11 | [1]=\fISOCPEUR|b0|i1|c0;Гильза закладная труба сталь ВГП Ду 20 (Дн 26,8х2,5) ГОСТ 3262-75 | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;6 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  26: [0]=\fISOCPEUR|b0|i1|c0;12 | [1]=\fISOCPEUR|b0|i1|c0;Гильза закладная труба сталь ВГП Ду 32 (Дн 26,8х2,5) ГОСТ 3262-75 | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;1 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  27: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0; | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  28: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b1|i1|c0;\LКабельная продукция | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  29: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0;Кабель силовой с медными жилами с изоляцией и | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  30: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0;оболочкий из ПВХ пластикатов не содержащих галогенов, | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  31: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0;не распространяющий горение, количеством жил и сечением: | [2]=\fISOCPEUR|b0|i1|c0;ГОСТ 31996-2012 | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  32: [0]=\fISOCPEUR|b0|i1|c0;1 | [1]=\fISOCPEUR|b0|i1|c0;5х4мм-0,66кВ | [2]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-HF | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0;ОАО "Электрокабель" | [5]=\fISOCPEUR|b0|i1|c0;м | [6]=\fISOCPEUR|b0|i1|c0;14 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  33: [0]=\fISOCPEUR|b0|i1|c0;2 | [1]=\fISOCPEUR|b0|i1|c0;3х2,5мм-0,66кВ | [2]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-HF | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0;ОАО "Электрокабель" | [5]=\fISOCPEUR|b0|i1|c0;м | [6]=\fISOCPEUR|b0|i1|c0;493 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  34: [0]=\fISOCPEUR|b0|i1|c0;3 | [1]=\fISOCPEUR|b0|i1|c0;3х1,5мм-0,66кВ | [2]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-HF | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0;ОАО "Электрокабель" | [5]=\fISOCPEUR|b0|i1|c0;м | [6]=\fISOCPEUR|b0|i1|c0;30 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  35: [0]=\fISOCPEUR|b0|i1|c0;4 | [1]=\fISOCPEUR|b0|i1|c0;Лента сигнальная ЛСЭ-300 "Осторожно кабель" (300мм-200мкм) 100м | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;UST20-100-300-200-K04 | [4]=\fISOCPEUR|b0|i1|c0;IEK | [5]=\fISOCPEUR|b0|i1|c0;м | [6]=\fISOCPEUR|b0|i1|c0;15 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  36: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0;Кабель силовой с медными жилами с изоляцией и | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  37: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0;оболочкой из ПВХ пластикатов не содержащих галогенов, | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  38: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0;не распространяющий горение, количеством жил и сечением: | [2]=\fISOCPEUR|b0|i1|c0;ГОСТ 31996-2013 | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  39: [0]=\fISOCPEUR|b0|i1|c0;1 | [1]=\fISOCPEUR|b0|i1|c0;5х2,5мм-0,66кВ | [2]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-FRHF | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0;ОАО "Электрокабель" | [5]=\fISOCPEUR|b0|i1|c0;м | [6]=\fISOCPEUR|b0|i1|c0;10 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  40: [0]=\fISOCPEUR|b0|i1|c0;2 | [1]=\fISOCPEUR|b0|i1|c0;3х2,5мм-0,66кВ | [2]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-FRHF | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0;ОАО "Электрокабель" | [5]=\fISOCPEUR|b0|i1|c0;м | [6]=\fISOCPEUR|b0|i1|c0;305 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  41: [0]=\fISOCPEUR|b0|i1|c0;3 | [1]=\fISOCPEUR|b0|i1|c0;3х1,5мм-0,66кВ | [2]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-FRHF | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0;ОАО "Электрокабель" | [5]=\fISOCPEUR|b0|i1|c0;м | [6]=\fISOCPEUR|b0|i1|c0;42 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  42: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0; | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  43: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b1|i1|c0;\LКабеленесущие системы | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  44: [0]=\fISOCPEUR|b0|i1|c0;1 | [1]=\fISOCPEUR|b0|i1|c0;TA-GN 100x60 Короб с крышкой с направляющими для установки разделителей | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;01786 | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;м | [6]=\fISOCPEUR|b0|i1|c0;10 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  45: [0]=\fISOCPEUR|b0|i1|c0;2 | [1]=\fISOCPEUR|b0|i1|c0;SEP-N 60/50 Разделитель универсальный | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;01415 | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;м | [6]=\fISOCPEUR|b0|i1|c0;10 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  46: [0]=\fISOCPEUR|b0|i1|c0;3 | [1]=\fISOCPEUR|b0|i1|c0;TA-EN 40x40 Короб с крышкой | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;01772 | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;м | [6]=\fISOCPEUR|b0|i1|c0;16 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  47: [0]=\fISOCPEUR|b0|i1|c0;4 | [1]=\fISOCPEUR|b0|i1|c0;Мини-канал 25x17 мм с аксессуарами | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;00304 | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;м | [6]=\fISOCPEUR|b0|i1|c0;26 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  48: [0]=\fISOCPEUR|b0|i1|c0;5 | [1]=\fISOCPEUR|b0|i1|c0;NTAN 100x60 Тройник/отвод | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;01761 | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;4 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  49: [0]=\fISOCPEUR|b0|i1|c0;6 | [1]=\fISOCPEUR|b0|i1|c0;NPAN 100x60 Угол плоский | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;01745 | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;4 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  50: [0]=\fISOCPEUR|b0|i1|c0;7 | [1]=\fISOCPEUR|b0|i1|c0;NPAN 40x40 Угол плоский | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;01738 | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;6 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  51: [0]=\fISOCPEUR|b0|i1|c0;8 | [1]=\fISOCPEUR|b0|i1|c0;LAN 100x60 Заглушка | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;00874 | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;4 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  52: [0]=\fISOCPEUR|b0|i1|c0;9 | [1]=\fISOCPEUR|b0|i1|c0;RQM 100 Рамка для ввода в стену/коробку/потолок | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;01776 | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;2 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  53: [0]=\fISOCPEUR|b0|i1|c0;10 | [1]=\fISOCPEUR|b0|i1|c0;SGAN 60 Накладка на стык профиля | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;00833 | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;10 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  54: [0]=\fISOCPEUR|b0|i1|c0;11 | [1]=\fISOCPEUR|b0|i1|c0;NIA 100x60 Угол внутренний неизменяемый (90°) | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;01829 | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;2 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  55: [0]=\fISOCPEUR|b0|i1|c0;12 | [1]=\fISOCPEUR|b0|i1|c0;NEAV 100x60 Угол внешний изменяемый (70-120°) | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;01713 | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;2 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  56: [0]=\fISOCPEUR|b0|i1|c0;13 | [1]=\fISOCPEUR|b0|i1|c0;Хомут кабельный (стяжка) | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;91920 | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;100 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  57: [0]=\fISOCPEUR|b0|i1|c0;14 | [1]=\fISOCPEUR|b0|i1|c0;Саморез с пресс-шайбой 4.2х16 | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;400 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  58: [0]=\fISOCPEUR|b0|i1|c0;15 | [1]=\fISOCPEUR|b0|i1|c0;Саморез с пресс-шайбой 4.2х32 | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;100 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  59: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0; | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  60: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b1|i1|c0;\LМатериалы для заземления | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  61: [0]=\fISOCPEUR|b0|i1|c0;1 | [1]=\fISOCPEUR|b0|i1|c0;Стержень заземления L-1500 с цапфой D20, гор. цинк | [2]=\fISOCPEUR|b0|i1|c0;МЗ-200-ГЦ | [3]=\fISOCPEUR|b0|i1|c0;392200 | [4]=\fISOCPEUR|b0|i1|c0;Ostec | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;30 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  62: [0]=\fISOCPEUR|b0|i1|c0;2 | [1]=\fISOCPEUR|b0|i1|c0;Наконечник стержня заземления D20, гор. цинк | [2]=\fISOCPEUR|b0|i1|c0;МЗ-205-ГЦ | [3]=\fISOCPEUR|b0|i1|c0;392205 | [4]=\fISOCPEUR|b0|i1|c0;Ostec | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;15 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  63: [0]=\fISOCPEUR|b0|i1|c0;3 | [1]=\fISOCPEUR|b0|i1|c0;Забивная головка SDS-MAX D20, оцинк. | [2]=\fISOCPEUR|b0|i1|c0;МЗ-224-ЭЦ | [3]=\fISOCPEUR|b0|i1|c0;92224 | [4]=\fISOCPEUR|b0|i1|c0;Ostec | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;2 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  64: [0]=\fISOCPEUR|b0|i1|c0;4 | [1]=\fISOCPEUR|b0|i1|c0;Соединитель диагональный стержня заземления D-20, термодиффузия | [2]=\fISOCPEUR|b0|i1|c0;МС-121-Т | [3]=\fISOCPEUR|b0|i1|c0;591121 | [4]=\fISOCPEUR|b0|i1|c0;Ostec | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;15 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  65: [0]=\fISOCPEUR|b0|i1|c0;5 | [1]=\fISOCPEUR|b0|i1|c0;Соединитель плоского проводника до 40 мм две пластины, термодиффузия | [2]=\fISOCPEUR|b0|i1|c0;МС-152-Т | [3]=\fISOCPEUR|b0|i1|c0;591152 | [4]=\fISOCPEUR|b0|i1|c0;Ostec | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;15 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  66: [0]=\fISOCPEUR|b0|i1|c0;6 | [1]=\fISOCPEUR|b0|i1|c0;Плоский проводник 40х4 мм, гор. цинк (бухта 38 м) | [2]=\fISOCPEUR|b0|i1|c0;МПП-40х4-ГЦ | [3]=\fISOCPEUR|b0|i1|c0;392404 | [4]=\fISOCPEUR|b0|i1|c0;Ostec | [5]=\fISOCPEUR|b0|i1|c0;м | [6]=\fISOCPEUR|b0|i1|c0;330 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  67: [0]=\fISOCPEUR|b0|i1|c0;7 | [1]=\fISOCPEUR|b0|i1|c0;Антикоррозийная лента шириной 50 мм, длиной 10 м | [2]=\fISOCPEUR|b0|i1|c0;МА-951 | [3]=\fISOCPEUR|b0|i1|c0;592951 | [4]=\fISOCPEUR|b0|i1|c0;Ostec | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;6 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  68: [0]=\fISOCPEUR|b0|i1|c0;8 | [1]=\fISOCPEUR|b0|i1|c0;Спрей цинковый СВАРТОН ЦИНК 96 7SZN001 | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;16532304 | [4]=\fISOCPEUR|b0|i1|c0;Ostec | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;3 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  69: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0; | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  70: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b1|i1|c0;\LПВХ изделия и трубы | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0; | [5]=\fISOCPEUR|b0|i1|c0; | [6]=\fISOCPEUR|b0|i1|c0; | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  71: [0]=\fISOCPEUR|b0|i1|c0;1 | [1]=\fISOCPEUR|b0|i1|c0;Труба ПА 6 гибкая гофр. д.40мм, ПВ-0, без протяжки, 100м, цвет тёмно-серый | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;80040 | [4]=\fISOCPEUR|b0|i1|c0;DKC | [5]=\fISOCPEUR|b0|i1|c0;м | [6]=\fISOCPEUR|b0|i1|c0;5 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  72: [0]=\fISOCPEUR|b0|i1|c0;2 | [1]=\fISOCPEUR|b0|i1|c0;Труба ПА 6 гибкая гофр. д.20мм, ПВ-0, без протяжки, 100м, цвет тёмно-серый | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;80020 | [4]=\fISOCPEUR|b0|i1|c0;DKC | [5]=\fISOCPEUR|b0|i1|c0;м | [6]=\fISOCPEUR|b0|i1|c0;560 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  73: [0]=\fISOCPEUR|b0|i1|c0;3 | [1]=\fISOCPEUR|b0|i1|c0;Стяжка стальная СКС-2 (304) 12х1400 74991 КВТ | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0;74991 | [4]=\fISOCPEUR|b0|i1|c0;Fortisflex | [5]=\fISOCPEUR|b0|i1|c0;шт | [6]=\fISOCPEUR|b0|i1|c0;738 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+Row  74: [0]=\fISOCPEUR|b0|i1|c0;4 | [1]=\fISOCPEUR|b0|i1|c0;Двустенная труба ПНД гибкая для кабельной канализации д.40мм с протяжкой | [2]=\fISOCPEUR|b0|i1|c0; | [3]=\fISOCPEUR|b0|i1|c0; | [4]=\fISOCPEUR|b0|i1|c0;«DKC» | [5]=\fISOCPEUR|b0|i1|c0;м | [6]=\fISOCPEUR|b0|i1|c0;30 | [7]=\fISOCPEUR|b0|i1|c0; | [8]=\fISOCPEUR|b0|i1|c0;
+
+========================================================================================================================
+TABLE 3: 4 rows x 2 cols
+Position: (457507.6, 519861.4)
+========================================================================================================================
+Row   0: [0]=Обозначение на чертеже | [1]=Наименование
+Row   1: [0]= | [1]=\C256; Токоотвод- металлическая колонна
+Row   2: [0]= | [1]=\C256; Заземляющее устройство. Сталь полосовая 40х4 мм
+Row   3: [0]= | [1]=\C256; Вертикальный заземлитель
+
+========================================================================================================================
+TABLE 4: 11 rows x 16 cols
+Position: (202508.2, 504159.9)
+========================================================================================================================
+Row   0: [0]=\fISOCPEUR|b0|i1|c0;QF-01 | [1]=\fISOCPEUR|b0|i1|c0;QF-02 | [2]=\fISOCPEUR|b0|i1|c0;QF-03 | [3]=\fISOCPEUR|b0|i1|c0;QF-04 | [4]=\fISOCPEUR|b0|i1|c0;QF-05 | [5]=\fISOCPEUR|b0|i1|c0;QF-06 | [6]=\fISOCPEUR|b0|i1|c0;QF-07 | [7]=\fISOCPEUR|b0|i1|c0;QF-08 | [8]=\fISOCPEUR|b0|i1|c0;QF-09 | [9]=\fISOCPEUR|b0|i1|c0;QF-10 | [10]=\fISOCPEUR|b0|i1|c0;QF-11 | [11]=\fISOCPEUR|b0|i1|c0;QF-12 | [12]=\fISOCPEUR|b0|i1|c0;QF-13 | [13]=\fISOCPEUR|b0|i1|c0;QF-14 | [14]=\fISOCPEUR|b0|i1|c0;QF-15 | [15]=\fISOCPEUR|b0|i1|c0;QF-16
+Row   1: [0]=\fISOCPEUR|b0|i1|c0;16А | [1]=\fISOCPEUR|b0|i1|c0;16А | [2]=\fISOCPEUR|b0|i1|c0;16А | [3]=\fISOCPEUR|b0|i1|c0;16А | [4]=\fISOCPEUR|b0|i1|c0;16А | [5]=\fISOCPEUR|b0|i1|c0;20А | [6]=\fISOCPEUR|b0|i1|c0;10А | [7]=\fISOCPEUR|b0|i1|c0;10А | [8]=\fISOCPEUR|b0|i1|c0;16А | [9]=\fISOCPEUR|b0|i1|c0;16А | [10]=\fISOCPEUR|b0|i1|c0;10А | [11]=\fISOCPEUR|b0|i1|c0;10А | [12]=\fISOCPEUR|b0|i1|c0;10А | [13]=\fISOCPEUR|b0|i1|c0;10А | [14]=\fISOCPEUR|b0|i1|c0;16А | [15]=\fISOCPEUR|b0|i1|c0;16А
+Row   2: [0]=\fCalibri|b0|i0|c0; | [1]=\fCalibri|b0|i0|c0; | [2]=\fCalibri|b0|i0|c0; | [3]=\fCalibri|b0|i0|c0; | [4]=\fCalibri|b0|i0|c0; | [5]=\fCalibri|b0|i0|c0; | [6]=\fCalibri|b0|i0|c0; | [7]=\fCalibri|b0|i0|c0; | [8]=\fCalibri|b0|i0|c0; | [9]=\fCalibri|b0|i0|c0; | [10]=\fCalibri|b0|i0|c0; | [11]=\fCalibri|b0|i0|c0; | [12]=\fCalibri|b0|i0|c0; | [13]=\fCalibri|b0|i0|c0; | [14]=\fCalibri|b0|i0|c0; | [15]=\fCalibri|b0|i0|c0;
+Row   3: [0]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-HF 3х2,5 в кабель-канале ΔU=0,06% L=25м | [1]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-HF 3х2,5 в кабель-канале ΔU=0,21% L=17м | [2]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-HF 3х2,5 в кабель-канале ΔU=0,1% L=20м | [3]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-HF 3х2,5 в кабель-канале ΔU=0,18% L=13м | [4]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-HF 3х2,5 в кабель-канале ΔU=0,25% L=14м | [5]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-HF 5х4 в кабель-канале, в гофре ΔU=0,26% L=14м | [6]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-HF 3х2,5 в кабель-канале ΔU=0,1% L=10м | [7]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-HF 3х2,5 в кабель-канале ΔU=0% L=9м | [8]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-HF 3х2,5 в кабель-канале ΔU=0,34% L=10м | [9]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-HF 3х2,5 в кабель-канале ΔU=0,34% L=7м | [10]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-HF 3х1,5 в кабель-канале ΔU=0,15% L=30м | [11]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-HF 3х2,5 в гофре ΔU=1,12% L=162м | [12]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-HF 3х2,5 в гофре ΔU=1,91% L=206м | [13]=\fISOCPEUR|b0|i1|c0; | [14]=\fISOCPEUR|b0|i1|c0; | [15]=\fISOCPEUR|b0|i1|c0;
+Row   4: [0]=\fCalibri|b0|i0|c0; | [1]=\fCalibri|b0|i0|c0; | [2]=\fCalibri|b0|i0|c0; | [3]=\fCalibri|b0|i0|c0; | [4]=\fCalibri|b0|i0|c0; | [5]=\fCalibri|b0|i0|c0; | [6]=\fCalibri|b0|i0|c0; | [7]=\fCalibri|b0|i0|c0; | [8]=\fCalibri|b0|i0|c0; | [9]=\fCalibri|b0|i0|c0; | [10]=\fCalibri|b0|i0|c0; | [11]=\fCalibri|b0|i0|c0; | [12]=\fCalibri|b0|i0|c0; | [13]=\fCalibri|b0|i0|c0; | [14]=\fCalibri|b0|i0|c0; | [15]=\fCalibri|b0|i0|c0;
+Row   5: [0]=\fISOCPEUR|b0|i1|c0;Гр.1 | [1]=\fISOCPEUR|b0|i1|c0;Гр.2 | [2]=\fISOCPEUR|b0|i1|c0;Гр.3 | [3]=\fISOCPEUR|b0|i1|c0;Гр.4 | [4]=\fISOCPEUR|b0|i1|c0;Гр.5 | [5]=\fISOCPEUR|b0|i1|c0;Гр.6 | [6]=\fISOCPEUR|b0|i1|c0;Гр.7 | [7]=\fISOCPEUR|b0|i1|c0;Гр.8 | [8]=\fISOCPEUR|b0|i1|c0;ШП-29 | [9]=\fISOCPEUR|b0|i1|c0;ШПБ-29 | [10]=\fISOCPEUR|b0|i1|c0;Гр.О1 | [11]=\fISOCPEUR|b0|i1|c0;Гр.О2 | [12]=\fISOCPEUR|b0|i1|c0;Гр.О3 | [13]=\fISOCPEUR|b0|i1|c0; | [14]=\fISOCPEUR|b0|i1|c0; | [15]=\fISOCPEUR|b0|i1|c0;
+Row   6: [0]=\fISOCPEUR|b0|i1|c0;0,6 | [1]=\fISOCPEUR|b0|i1|c0;2 | [2]=\fISOCPEUR|b0|i1|c0;1 | [3]=\fISOCPEUR|b0|i1|c0;1,5 | [4]=\fISOCPEUR|b0|i1|c0;1,5 | [5]=\fISOCPEUR|b0|i1|c0;7,50 | [6]=\fISOCPEUR|b0|i1|c0;0,10 | [7]=\fISOCPEUR|b0|i1|c0;0,20 | [8]=\fISOCPEUR|b0|i1|c0;1 | [9]=\fISOCPEUR|b0|i1|c0;1 | [10]=\fISOCPEUR|b0|i1|c0;0,37 | [11]=\fISOCPEUR|b0|i1|c0;0,30 | [12]=\fISOCPEUR|b0|i1|c0;0,80 | [13]=\fISOCPEUR|b0|i1|c0; | [14]=\fISOCPEUR|b0|i1|c0; | [15]=\fISOCPEUR|b0|i1|c0;
+Row   7: [0]=\fISOCPEUR|b0|i1|c0;0,36 | [1]=\fISOCPEUR|b0|i1|c0;1,2 | [2]=\fISOCPEUR|b0|i1|c0;0,6 | [3]=\fISOCPEUR|b0|i1|c0;1,05 | [4]=\fISOCPEUR|b0|i1|c0;1,05 | [5]=\fISOCPEUR|b0|i1|c0;7,50 | [6]=\fISOCPEUR|b0|i1|c0;0,10 | [7]=\fISOCPEUR|b0|i1|c0;0,20 | [8]=\fISOCPEUR|b0|i1|c0;1 | [9]=\fISOCPEUR|b0|i1|c0;1 | [10]=\fISOCPEUR|b0|i1|c0;0,37 | [11]=\fISOCPEUR|b0|i1|c0;0,30 | [12]=\fISOCPEUR|b0|i1|c0;0,80 | [13]=\fISOCPEUR|b0|i1|c0; | [14]=\fISOCPEUR|b0|i1|c0; | [15]=\fISOCPEUR|b0|i1|c0;
+Row   8: [0]=\fISOCPEUR|b0|i1|c0;2,0 | [1]=\fISOCPEUR|b0|i1|c0;6,5 | [2]=\fISOCPEUR|b0|i1|c0;3,3 | [3]=\fISOCPEUR|b0|i1|c0;5,7 | [4]=\fISOCPEUR|b0|i1|c0;5,7 | [5]=\fISOCPEUR|b0|i1|c0;11,0 | [6]=\fISOCPEUR|b0|i1|c0;0,2 | [7]=\fISOCPEUR|b0|i1|c0;0,3 | [8]=\fISOCPEUR|b0|i1|c0;5,4 | [9]=\fISOCPEUR|b0|i1|c0;5,4 | [10]=\fISOCPEUR|b0|i1|c0;1,6 | [11]=\fISOCPEUR|b0|i1|c0;1,3 | [12]=\fISOCPEUR|b0|i1|c0;3,5 | [13]=\fISOCPEUR|b0|i1|c0; | [14]=\fISOCPEUR|b0|i1|c0; | [15]=\fISOCPEUR|b0|i1|c0;
+Row   9: [0]=\fISOCPEUR|b0|i1|c0;0,8 | [1]=\fISOCPEUR|b0|i1|c0;0,8 | [2]=\fISOCPEUR|b0|i1|c0;0,8 | [3]=\fISOCPEUR|b0|i1|c0;0,8 | [4]=\fISOCPEUR|b0|i1|c0;0,8 | [5]=\fISOCPEUR|b0|i1|c0;0,98 | [6]=\fISOCPEUR|b0|i1|c0;0,95 | [7]=\fISOCPEUR|b0|i1|c0;0,95 | [8]=\fISOCPEUR|b0|i1|c0;0,98 | [9]=\fISOCPEUR|b0|i1|c0;0,98 | [10]=\fISOCPEUR|b0|i1|c0;0,98 | [11]=\fISOCPEUR|b0|i1|c0;0,98 | [12]=\fISOCPEUR|b0|i1|c0;0,98 | [13]=\fISOCPEUR|b0|i1|c0; | [14]=\fISOCPEUR|b0|i1|c0; | [15]=\fISOCPEUR|b0|i1|c0;
+Row  10: [0]=\fISOCPEUR|b0|i1|c0;Розетки пом.2 | [1]=\fISOCPEUR|b0|i1|c0;Розетки пом.2 | [2]=\fISOCPEUR|b0|i1|c0;Розетки пом.1,3 | [3]=\fISOCPEUR|b0|i1|c0;Конвектор электрический | [4]=\fISOCPEUR|b0|i1|c0;Конвектор электрический | [5]=\fISOCPEUR|b0|i1|c0;Пресс для картона | [6]=\fISOCPEUR|b0|i1|c0;СКУД | [7]=\fISOCPEUR|b0|i1|c0;Охранная сигнализация | [8]=\fISOCPEUR|b0|i1|c0;ШП-29 | [9]=\fISOCPEUR|b0|i1|c0;ШПБ-29 | [10]=\fISOCPEUR|b0|i1|c0;Рабочее освещение (блок-контейнер) | [11]=\fISOCPEUR|b0|i1|c0;Рабочее освещение в осях 1-6 (площадка с навесом) | [12]=\fISOCPEUR|b0|i1|c0;Рабочее освещение в осях 7-21 (площадка с навесом) | [13]=\fISOCPEUR|b0|i1|c0;Резерв | [14]=\fISOCPEUR|b0|i1|c0;Резерв | [15]=\fISOCPEUR|b0|i1|c0;Резерв
+
+========================================================================================================================
+TABLE 5: 11 rows x 7 cols
+Position: (183925.9, 504156.3)
+========================================================================================================================
+Row   0: [0]=\fCalibri|b0|i0|c0; | [1]=\fISOCPEUR|b0|i1|c0;QF-101 | [2]=\fISOCPEUR|b0|i1|c0;QF-102 | [3]=\fISOCPEUR|b0|i1|c0;QF-103 | [4]=\fISOCPEUR|b0|i1|c0;QF-104 | [5]=\fISOCPEUR|b0|i1|c0;QF-105 | [6]=\fISOCPEUR|b0|i1|c0;QF-106
+Row   1: [0]=\fCalibri|b0|i0|c0; | [1]=\fISOCPEUR|b0|i1|c0;10А | [2]=\fISOCPEUR|b0|i1|c0;10А | [3]=\fISOCPEUR|b0|i1|c0;10А | [4]=\fISOCPEUR|b0|i1|c0;10А | [5]=\fISOCPEUR|b0|i1|c0;10А | [6]=\fISOCPEUR|b0|i1|c0;16А
+Row   2: [0]=\fCalibri|b0|i0|c0; | [1]=\fCalibri|b0|i0|c0; | [2]=\fCalibri|b0|i0|c0; | [3]=\fCalibri|b0|i0|c0; | [4]=\fCalibri|b0|i0|c0; | [5]=\fCalibri|b0|i0|c0; | [6]=\fCalibri|b0|i0|c0;
+Row   3: [0]=\fCalibri|b0|i0|c0; | [1]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-FRHF 3х1,5 в кабель-канале ΔU=0,02% L=33м | [2]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-FRHF 3х2,5 в гофре ΔU=0,4% L=149м | [3]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-FRHF 3х2,5 в гофре ΔU=0,66% L=147м | [4]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-FRHF 3х2,5 в кабель-канале ΔU=0% L=9м | [5]=\fISOCPEUR|b0|i1|c0;ППГнг(А)-FRHF 3х2,5 в кабель-канале ΔU=0,05% L=9м | [6]=\fISOCPEUR|b0|i1|c0;
+Row   4: [0]=\fCalibri|b0|i0|c0; | [1]=\fCalibri|b0|i0|c0; | [2]=\fCalibri|b0|i0|c0; | [3]=\fCalibri|b0|i0|c0; | [4]=\fCalibri|b0|i0|c0; | [5]=\fCalibri|b0|i0|c0; | [6]=\fCalibri|b0|i0|c0;
+Row   5: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0;Гр.1А | [2]=\fISOCPEUR|b0|i1|c0;Гр.2А | [3]=\fISOCPEUR|b0|i1|c0;Гр.3А | [4]=\fISOCPEUR|b0|i1|c0;Гр.4А | [5]=\fISOCPEUR|b0|i1|c0;Гр.5А | [6]=\fISOCPEUR|b0|i1|c0;
+Row   6: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0;0,05 | [2]=\fISOCPEUR|b0|i1|c0;0,10 | [3]=\fISOCPEUR|b0|i1|c0;0,30 | [4]=\fISOCPEUR|b0|i1|c0;0,04 | [5]=\fISOCPEUR|b0|i1|c0;0,20 | [6]=\fISOCPEUR|b0|i1|c0;
+Row   7: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0;0,05 | [2]=\fISOCPEUR|b0|i1|c0;0,10 | [3]=\fISOCPEUR|b0|i1|c0;0,30 | [4]=\fISOCPEUR|b0|i1|c0;0,04 | [5]=\fISOCPEUR|b0|i1|c0;0,20 | [6]=\fISOCPEUR|b0|i1|c0;
+Row   8: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0;0,2 | [2]=\fISOCPEUR|b0|i1|c0;0,4 | [3]=\fISOCPEUR|b0|i1|c0;1,3 | [4]=\fISOCPEUR|b0|i1|c0;0,2 | [5]=\fISOCPEUR|b0|i1|c0;0,9 | [6]=\fISOCPEUR|b0|i1|c0;
+Row   9: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0;0,98 | [2]=\fISOCPEUR|b0|i1|c0;0,98 | [3]=\fISOCPEUR|b0|i1|c0;0,98 | [4]=\fISOCPEUR|b0|i1|c0;0,98 | [5]=\fISOCPEUR|b0|i1|c0;0,98 | [6]=\fISOCPEUR|b0|i1|c0;
+Row  10: [0]=\fISOCPEUR|b0|i1|c0; | [1]=\fISOCPEUR|b0|i1|c0;Аварийное освещение (блок-контейнер) | [2]=\fISOCPEUR|b0|i1|c0;Аварийное освещение  в осях 1-6 (площадка с навесом) | [3]=\fISOCPEUR|b0|i1|c0;Аварийное освещение  в осях 7-21 (площадка с навесом) | [4]=\fISOCPEUR|b0|i1|c0;Эвакуационное освещение | [5]=\fISOCPEUR|b0|i1|c0;АПС, СОУЭ | [6]=\fISOCPEUR|b0|i1|c0;Резерв
+
+========================================================================================================================
+TABLE 6: 6 rows x 3 cols
+Position: (193808.3, 508865.9)
+========================================================================================================================
+Row   0: [0]=Ру= | [1]= | [2]=кВт
+Row   1: [0]=\T0.95;Кс= | [1]= | [2]=
+Row   2: [0]=Рр= | [1]= | [2]=кВт
+Row   3: [0]=\T0.95;Iр= | [1]= | [2]=А
+Row   4: [0]=cos ɸ= | [1]= | [2]=
+Row   5: [0]=Sp= | [1]= | [2]=кВА
+
+========================================================================================================================
+TABLE 7: 6 rows x 3 cols
+Position: (236257.7, 508664.0)
+========================================================================================================================
+Row   0: [0]=Ру= | [1]= | [2]=кВт
+Row   1: [0]=\T0.95;Кс= | [1]= | [2]=
+Row   2: [0]=Рр= | [1]= | [2]=кВт
+Row   3: [0]=\T0.95;Iр= | [1]= | [2]=А
+Row   4: [0]=cos ɸ= | [1]= | [2]=
+Row   5: [0]=Sp= | [1]= | [2]=кВА
+
+========================================================================================================================
+TABLE 8: 27 rows x 9 cols
+Position: (345262.5, -56256.3)
+========================================================================================================================
+Row   0: [0]=Маркировка кабеля | [1]=Трасса | [2]= | [3]=Кабель | [4]= | [5]= | [6]= | [7]= | [8]=
+Row   1: [0]= | [1]=Начало | [2]=Конец | [3]=по проекту | [4]= | [5]= | [6]=проложен | [7]= | [8]=
+Row   2: [0]= | [1]= | [2]= | [3]=Марка | [4]=Количество кабелей и сечение жил, напряжение | [5]=Длина, м | [6]=Марка | [7]=Количество кабелей и сечение жил, напряжение | [8]=Длина, м
+Row   3: [0]=Гр.01 | [1]= | [2]= | [3]=ППГнг(А)-HF | [4]=3х1,5-1 | [5]=9 | [6]= | [7]= | [8]=
+Row   4: [0]=Гр.01 | [1]= | [2]= | [3]=ППГнг(А)-HF | [4]=3х1,5-1 | [5]=13 | [6]= | [7]= | [8]=
+Row   5: [0]=Гр.01 | [1]= | [2]= | [3]=ППГнг(А)-HF | [4]=3х1,5-1 | [5]=8 | [6]= | [7]= | [8]=
+Row   6: [0]=Гр.1А | [1]= | [2]= | [3]=ППГнг(А)-FRHF | [4]=3х1,5-1 | [5]=7 | [6]= | [7]= | [8]=
+Row   7: [0]=Гр.1А | [1]= | [2]= | [3]=ППГнг(А)-FRHF | [4]=3х1,5-1 | [5]=12 | [6]= | [7]= | [8]=
+Row   8: [0]=Гр.1А | [1]= | [2]= | [3]=ППГнг(А)-FRHF | [4]=3х1,5-1 | [5]=6 | [6]= | [7]= | [8]=
+Row   9: [0]=Гр.1А | [1]= | [2]= | [3]=ППГнг(А)-FRHF | [4]=3х1,5-1 | [5]=8 | [6]= | [7]= | [8]=
+Row  10: [0]=Гр.02 | [1]= | [2]= | [3]=ППГнг(А)-HF | [4]=3х2.5-1 | [5]=21 | [6]= | [7]= | [8]=
+Row  11: [0]=Гр.02 | [1]= | [2]= | [3]=ППГнг(А)-HF | [4]=3х2.5-1 | [5]=11 | [6]= | [7]= | [8]=
+Row  12: [0]=Гр.02 | [1]= | [2]= | [3]=ППГнг(А)-HF | [4]=3х2.5-1 | [5]=130 | [6]= | [7]= | [8]=
+Row  13: [0]=Гр.2А | [1]= | [2]= | [3]=ППГнг(А)-FRHF | [4]=3х2,5-1 | [5]=11 | [6]= | [7]= | [8]=
+Row  14: [0]=Гр.2А | [1]= | [2]= | [3]=ППГнг(А)-FRHF | [4]=3х2,5-1 | [5]=14 | [6]= | [7]= | [8]=
+Row  15: [0]=Гр.2А | [1]= | [2]= | [3]=ППГнг(А)-FRHF | [4]=3х2,5-1 | [5]=124 | [6]= | [7]= | [8]=
+Row  16: [0]=Гр.03 | [1]= | [2]= | [3]=ППГнг(А)-HF | [4]=3х1,5-1 | [5]=29 | [6]= | [7]= | [8]=
+Row  17: [0]=Гр.03 | [1]= | [2]= | [3]=ППГнг(А)-HF | [4]=3х1,5-1 | [5]=34 | [6]= | [7]= | [8]=
+Row  18: [0]=Гр.03 | [1]= | [2]= | [3]=ППГнг(А)-HF | [4]=3х2.5-1 | [5]=59 | [6]= | [7]= | [8]=
+Row  19: [0]=Гр.03 | [1]= | [2]= | [3]=ППГнг(А)-HF | [4]=3х2.5-1 | [5]=63 | [6]= | [7]= | [8]=
+Row  20: [0]=Гр.03 | [1]= | [2]= | [3]=ППГнг(А)-HF | [4]=3х2.5-1 | [5]=11 | [6]= | [7]= | [8]=
+Row  21: [0]=Гр.3А | [1]= | [2]= | [3]=ППГнг(А)-FRHF | [4]=3х2,5-1 | [5]=19 | [6]= | [7]= | [8]=
+Row  22: [0]=Гр.3А | [1]= | [2]= | [3]=ППГнг(А)-FRHF | [4]=3х2,5-1 | [5]=9 | [6]= | [7]= | [8]=
+Row  23: [0]=Гр.3А | [1]= | [2]= | [3]=ППГнг(А)-FRHF | [4]=3х2,5-1 | [5]=40 | [6]= | [7]= | [8]=
+Row  24: [0]=Гр.3А | [1]= | [2]= | [3]=ППГнг(А)-FRHF | [4]=3х2,5-1 | [5]=11 | [6]= | [7]= | [8]=
+Row  25: [0]=Гр.3А | [1]= | [2]= | [3]=ППГнг(А)-FRHF | [4]=3х2,5-1 | [5]=68 | [6]= | [7]= | [8]=
+Row  26: [0]=Гр.4А | [1]= | [2]= | [3]=ППГнг(А)-FRHF | [4]=3х1,5-1 | [5]=9 | [6]= | [7]= | [8]=
+
+========================================================================================================================
+SEARCHING FOR ENTITIES WITH ELEVATION TEXT IN ENTIRE ENTITYDB
+========================================================================================================================
+Total entities with elevation text: 0

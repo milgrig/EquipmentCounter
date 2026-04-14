@@ -37,7 +37,7 @@ from pdf_legend_parser import parse_legend, LegendResult
 from pdf_count_text import count_symbols
 from pdf_count_cables import extract_cables
 from pdf_count_geometry import measure_cables
-from pdf_count_visual import match_symbols, _extract_symbol_images, build_equipment_cluster_bboxes
+from pdf_count_visual import match_symbols, detect_pictograms, _extract_symbol_images, build_equipment_cluster_bboxes
 from vor_work_mapping import map_items as vor_map_items
 from legend_validator import validate_legend_symbols
 
@@ -740,14 +740,36 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
                 continue
 
             # Determine count: smart priority between visual and text.
-            # Visual is preferred, but if it's suspiciously high compared
-            # to text (>3×), the visual result likely contains false positives
-            # so we trust text instead.
+            #
+            # Compound text markers (containing Cyrillic, e.g. '7АЭ', '8АЭ')
+            # are highly reliable — they cannot be confused with axis labels,
+            # room numbers, or other non-equipment text.  When a compound
+            # text count exceeds visual, trust text.  (T148)
+            #
+            # For standalone digit symbols: visual is preferred, but if
+            # suspiciously high vs text (>3×), fall back to text when
+            # txt >= 5 (T147 guard against unreliable small text counts).
+            #
+            # When txt > vis and both > 0: visual may be undercounting
+            # due to similar-template cross-symbol NMS suppression;
+            # take max(vis, txt) as a better estimate.  (T148)
             vis_count = visual_counts.get(idx, 0)
             txt_count = text_counts.get(sym, 0) if sym else 0
+            is_compound = bool(sym and re_mod.search(r'[А-Яа-яЁё]', sym))
             count = 0
-            if vis_count > 0 and txt_count > 0 and vis_count > txt_count * 3:
+            if is_compound and txt_count > 0:
+                # Compound text markers (e.g. '7АЭ', '8АЭ') are highly
+                # reliable — they cannot be confused with axis labels or
+                # room numbers.  Always prefer text for compound symbols.
+                count = txt_count
+            elif (vis_count > 0 and txt_count >= 5
+                    and vis_count > txt_count * 3):
                 count = txt_count  # visual likely has false positives
+            elif vis_count > 0 and txt_count > vis_count:
+                # Text found more than visual — visual may be under-
+                # counting due to cross-symbol NMS suppression between
+                # similar templates.  Trust text as the better estimate.
+                count = txt_count
             elif vis_count > 0:
                 count = vis_count
             elif txt_count > 0:
@@ -763,6 +785,22 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
                 "count_ae": 0,
                 "total": count,
             })
+
+    # Step 4b: detect pictograms — text labels like "ВЫХОД" on the drawing
+    # that have no legend entry and no visual template (T149).
+    try:
+        picto_result = detect_pictograms(pdf_path, legend_result)
+        for name, count in picto_result.counts.items():
+            if count > 0:
+                items.append({
+                    "symbol": "",
+                    "name": name,
+                    "count": count,
+                    "count_ae": 0,
+                    "total": count,
+                })
+    except Exception as exc:
+        log.warning("Pictogram detection failed for %s: %s", pdf_path, exc)
 
     # Step 5: extract cables and add to items (ALL section types)
     try:
