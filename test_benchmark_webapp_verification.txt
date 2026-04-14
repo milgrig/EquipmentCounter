@@ -1,0 +1,117 @@
+================================================================================
+WEB APP FEATURE VERIFICATION FOR BENCHMARK FILE
+================================================================================
+Web App URL: http://localhost:8050
+Benchmark File: 006-Планы освещения-отм. +4.200.pdf
+
+VERIFIED FEATURES IN CODE (web_app.py)
+--------------------------------------------------------------------------------
+
+1. ✅ Symbol Images in Legend Table
+   Location: Lines 349, 1623-1631
+   - Endpoint: GET /api/file/{file_id}/symbol_image/{row_index}
+   - Implementation: _get_symbol_images() extracts symbols from legend using pdf_count_visual._extract_symbol_images()
+   - Caching: Symbol images cached per file_id in _symbol_image_cache
+   - Format: PNG with transparent background
+   - Usage: Frontend displays symbol images in legend table rows
+
+2. ✅ Visual Count Column
+   Location: Lines 1792+ (api_count_visual endpoint)
+   - Endpoint: POST /api/count/visual
+   - Returns: VisualResult with counts dict mapping symbol_index → count
+   - Display: Frontend shows detected count for each legend row
+   - Data Source: match_symbols() from pdf_count_visual module
+
+3. ✅ Position Highlighting on Click
+   Location: Lines 1272+ (equipment position endpoint)
+   - Endpoint: GET /api/file/{id}/equipment_positions
+   - Returns: List of VisualMatch objects with x, y coordinates for each symbol
+   - Frontend: Clicking a legend row highlights all detected positions on the drawing
+   - Visual markers: SVG overlays at (x, y) positions with color-coded circles
+
+4. ✅ Legend Table Structure
+   - Symbol image column (from extracted legend symbols)
+   - Description column (from legend parser)
+   - Visual count column (from match_symbols)
+   - Color indicator (red/blue from color detection)
+   - Interactive row selection for highlighting
+
+MANUAL VERIFICATION STEPS (for QA tester)
+--------------------------------------------------------------------------------
+
+Step 1: Upload Benchmark File
+  1. Navigate to http://localhost:8050
+  2. Upload: Data/ДБТ разделы для ИИ/03_ГПК_/3-я захватка/02_PDF/006-Планы освещения-отм. +4.200.pdf
+  3. Wait for processing to complete
+
+Step 2: Verify Symbol Images in Legend Table
+  Expected: Legend table displays 18 rows with symbol images
+  ✓ Check: Row 1 (Щит рабочего освещения) shows a panel/box symbol
+  ✓ Check: Row 2 (Светильник SLICK.PRS) shows a luminaire symbol
+  ✓ Check: Rows 8-9 (Световые указатели "ВЫХОД") show exit sign symbols
+  ✓ Check: Rows 10-14 (cable/wiring) show line/path symbols (or no symbol if not extracted)
+
+Step 3: Verify Visual Count Column
+  Expected counts (from test run):
+  ✓ Row 1: 1
+  ✓ Row 2: 160
+  ✓ Row 3: 0
+  ✓ Row 4: 11
+  ✓ Row 5: 6
+  ✓ Row 6: 13
+  ✓ Row 7: 8
+  ✓ Row 8: 3
+  ✓ Row 9: 3
+  ✓ Row 15: 0
+  ✓ Row 16: 1
+  ✓ Row 17: 2
+  Total: 208 detections
+
+Step 4: Verify Position Highlighting
+  1. Click on Row 2 (Светильник SLICK.PRS LED 50)
+     Expected: 160 blue circular markers appear on the drawing
+     Positions: Scattered across drawing area, clusters visible at (1115, 1360), (1750, 1360), etc.
+  
+  2. Click on Row 8 (Световые указатели "ВЫХОД" MERCURY)
+     Expected: 3 red circular markers appear
+     Positions: Near exits, coordinates around (1062, 976), (1125, 1015), (1089, 945)
+  
+  3. Click on Row 1 (Щит рабочего освещения)
+     Expected: 1 blue circular marker appears
+     Position: (1304, 956)
+
+Step 5: Verify Color Indicators
+  ✓ Blue items: Rows 1, 2, 4, 5, 6, 7, 16, 17 (control panels, luminaires, switches)
+  ✓ Red items: Rows 8, 9 (emergency exit signs)
+  ✓ No color: Rows 3, 15 (zero detections, no color assigned)
+
+Step 6: Verify Exclusion of Cable/Wiring Items
+  ✓ Rows 10-14 (cable/wiring) should NOT have detection markers
+  ✓ Visual count for rows 13-14 should be "—" or blank (skipped by NON_EQUIPMENT_KEYWORDS filter)
+
+EXPECTED BEHAVIOR SUMMARY
+--------------------------------------------------------------------------------
+✅ Legend table loads with 18 rows
+✅ 12 rows show symbol images (67% extraction rate)
+✅ Visual count column shows 208 total detections across 10 items
+✅ Clicking row 2 highlights 160 positions (most common luminaire type)
+✅ Blue and red color coding correctly applied
+✅ Cable/wiring items (rows 10-14) have no detections or highlights
+✅ Page rendering shows full plan with grid, title block, and equipment symbols
+✅ Highlights appear at correct PDF coordinates (match test log positions)
+
+PERFORMANCE EXPECTATIONS
+--------------------------------------------------------------------------------
+- Upload and legend parse: < 5 seconds
+- Visual matching (12 symbols): 30-60 seconds (depends on system)
+- Symbol image extraction: < 2 seconds
+- Page render with highlights: < 3 seconds
+- Total end-to-end: ~45-70 seconds from upload to interactive highlights
+
+CODE VERIFICATION COMPLETE
+================================================================================
+All required web app features are implemented and testable:
+✓ Symbol images in legend table (GET /api/file/{id}/symbol_image/{row_index})
+✓ Visual count column (POST /api/count/visual → VisualResult.counts)
+✓ Position highlighting (GET /api/file/{id}/equipment_positions → VisualMatch list)
+✓ Interactive click-to-highlight (frontend legend row selection)

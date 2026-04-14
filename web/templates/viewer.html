@@ -68,69 +68,276 @@
         <!-- Resizer handle -->
         <div class="resizer" id="resizer" title="Изменить размер панелей"></div>
 
-        <!-- RIGHT: Legend panel (40%) -->
+        <!-- RIGHT: Tabbed panel (40%) -->
         <div class="panel legend-panel" id="legend-panel">
-            <!-- Legend header -->
-            <div class="legend-header">
-                <h2>Условные обозначения</h2>
-                <div class="legend-toolbar">
-                    <button id="btn-export" class="btn btn-sm" title="Экспорт JSON">&#128190; JSON</button>
-                    <button id="btn-debug-toggle" class="btn btn-sm btn-ghost" title="Отладка слов">&#128270; Debug</button>
+            <!-- Tab bar -->
+            <div class="tab-bar" id="tab-bar">
+                <button class="tab-btn active" data-tab="tab-legend">Легенда</button>
+                <button class="tab-btn" data-tab="tab-count">Подсчёт</button>
+                <button class="tab-btn" data-tab="tab-cables">Кабели</button>
+            </div>
+
+            <!-- =============== TAB: LEGEND =============== -->
+            <div class="tab-content active" id="tab-legend">
+                <!-- Legend header -->
+                <div class="legend-header">
+                    <h2>Условные обозначения</h2>
+                    <div class="legend-toolbar">
+                        <button id="btn-export" class="btn btn-sm" title="Экспорт JSON">&#128190; JSON</button>
+                        <button id="btn-colors-toggle" class="btn btn-sm btn-ghost" title="Цветовые фильтры">&#127912; Цвета</button>
+                        <button id="btn-debug-toggle" class="btn btn-sm btn-ghost" title="Отладка слов">&#128270; Debug</button>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Legend loading -->
-            <div class="legend-loading" id="legend-loading">
-                <div class="spinner"></div>
-                <span>Анализ легенды...</span>
-            </div>
-
-            <!-- Legend status -->
-            <div class="legend-status hidden" id="legend-status">
-                <div class="status-badges">
-                    <span class="status-badge" id="badge-found"></span>
-                    <span class="status-badge" id="badge-type"></span>
-                    <span class="status-badge" id="badge-count"></span>
+                <!-- Legend loading -->
+                <div class="legend-loading" id="legend-loading">
+                    <div class="spinner"></div>
+                    <span>Анализ легенды...</span>
                 </div>
-            </div>
 
-            <!-- Legend items table -->
-            <div class="legend-table-wrap hidden" id="legend-table-wrap">
-                <table class="legend-items-table">
-                    <thead>
-                        <tr>
-                            <th class="th-num">#</th>
-                            <th class="th-sym">Обозначение</th>
-                            <th class="th-desc">Наименование</th>
-                            <th class="th-cat">Категория</th>
-                        </tr>
-                    </thead>
-                    <tbody id="legend-tbody"></tbody>
-                </table>
-            </div>
-
-            <!-- Debug words panel (hidden by default) -->
-            <div class="debug-panel hidden" id="debug-panel">
-                <div class="debug-header">
-                    <h3>&#128270; Отладка: слова pdfplumber</h3>
-                    <span class="debug-info" id="debug-info"></span>
+                <!-- Legend status -->
+                <div class="legend-status hidden" id="legend-status">
+                    <div class="status-badges">
+                        <span class="status-badge" id="badge-found"></span>
+                        <span class="status-badge" id="badge-type"></span>
+                        <span class="status-badge" id="badge-count"></span>
+                    </div>
                 </div>
-                <div class="debug-table-wrap">
-                    <table class="debug-table">
+
+                <!-- Legend items table -->
+                <div class="legend-table-wrap hidden" id="legend-table-wrap">
+                    <table class="legend-items-table">
                         <thead>
                             <tr>
-                                <th>#</th>
-                                <th>Текст</th>
-                                <th>x0</th>
-                                <th>top</th>
-                                <th>x1</th>
-                                <th>bottom</th>
+                                <th class="th-num">#</th>
+                                <th class="th-sym">Обозначение</th>
+                                <th class="th-desc">Наименование</th>
+                                <th class="th-cat">Категория</th>
                             </tr>
                         </thead>
-                        <tbody id="debug-tbody"></tbody>
+                        <tbody id="legend-tbody"></tbody>
                     </table>
                 </div>
+
+                <!-- Color filter panel -->
+                <div class="color-filter-panel hidden" id="color-filter-panel">
+                    <div class="color-filter-header">
+                        <h3>Цветовые фильтры</h3>
+                        <div class="color-filter-quick">
+                            <button class="btn btn-sm" id="cf-all" title="Показать все цвета">Все</button>
+                            <button class="btn btn-sm" id="cf-electric" title="Красный + Синий">Электрика</button>
+                            <button class="btn btn-sm" id="cf-alarm" title="Только красный">Аварийное</button>
+                            <button class="btn btn-sm" id="cf-work" title="Только синий">Рабочее</button>
+                        </div>
+                    </div>
+                    <div class="color-filter-loading hidden" id="cf-loading">
+                        <div class="spinner"></div>
+                        <span>Анализ цветов...</span>
+                    </div>
+                    <div class="color-filter-list" id="cf-list"></div>
+                </div>
+
+                <!-- Debug words panel (hidden by default) -->
+                <div class="debug-panel hidden" id="debug-panel">
+                    <div class="debug-header">
+                        <h3>&#128270; Отладка: слова pdfplumber</h3>
+                        <span class="debug-info" id="debug-info"></span>
+                    </div>
+                    <div class="debug-table-wrap">
+                        <table class="debug-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Текст</th>
+                                    <th>x0</th>
+                                    <th>top</th>
+                                    <th>x1</th>
+                                    <th>bottom</th>
+                                </tr>
+                            </thead>
+                            <tbody id="debug-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
+
+            <!-- =============== TAB: COUNT =============== -->
+            <div class="tab-content" id="tab-count">
+                <!-- Count header -->
+                <div class="count-header">
+                    <h2>Подсчёт оборудования</h2>
+                    <div class="count-toolbar">
+                        <button id="btn-run-count" class="btn btn-sm btn-primary" title="Запустить все методы">&#9654; Запустить</button>
+                    </div>
+                </div>
+
+                <!-- Count loading -->
+                <div class="count-loading hidden" id="count-loading">
+                    <div class="spinner"></div>
+                    <span id="count-loading-text">Анализ...</span>
+                </div>
+
+                <!-- Stats bar -->
+                <div class="count-stats hidden" id="count-stats">
+                    <div class="status-badges" id="count-stats-badges"></div>
+                </div>
+
+                <!-- Overlay controls -->
+                <div class="overlay-controls hidden" id="overlay-controls">
+                    <label class="toggle-label" title="Метки текстового метода">
+                        <input type="checkbox" id="chk-overlay-text" />
+                        <span class="overlay-dot" style="background:#4a90d9"></span>
+                        <span>Текст (A)</span>
+                    </label>
+                    <label class="toggle-label" title="Метки визуального метода">
+                        <input type="checkbox" id="chk-overlay-visual" />
+                        <span class="overlay-dot" style="background:#28a745"></span>
+                        <span>Визуал (D)</span>
+                    </label>
+                    <label class="toggle-label" title="Кабельные маршруты">
+                        <input type="checkbox" id="chk-overlay-cables" />
+                        <span class="overlay-dot" style="background:#dc3545"></span>
+                        <span>Кабели (B)</span>
+                    </label>
+                </div>
+
+                <!-- Equipment count table -->
+                <div class="count-section hidden" id="equip-section">
+                    <h3 class="section-title">Оборудование</h3>
+                    <div class="count-table-wrap">
+                        <table class="count-table">
+                            <thead>
+                                <tr>
+                                    <th class="th-num">#</th>
+                                    <th class="th-sym">Обозн.</th>
+                                    <th>Наименование</th>
+                                    <th class="th-cnt">Текст</th>
+                                    <th class="th-cnt">Визуал</th>
+                                    <th class="th-cnt">Итого</th>
+                                </tr>
+                            </thead>
+                            <tbody id="equip-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Cable table -->
+                <div class="count-section hidden" id="cable-section">
+                    <h3 class="section-title">Кабели</h3>
+                    <div class="count-table-wrap">
+                        <table class="count-table">
+                            <thead>
+                                <tr>
+                                    <th>Щит</th>
+                                    <th>Группа</th>
+                                    <th>Сечение</th>
+                                    <th>Длина (аннот.)</th>
+                                    <th>Длина (геом.)</th>
+                                    <th>Тип</th>
+                                    <th>Цвет</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cable-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- =============== TAB: CABLES =============== -->
+            <div class="tab-content" id="tab-cables">
+                <!-- Cable header -->
+                <div class="cable-header">
+                    <h2>Кабельные трассы</h2>
+                    <div class="cable-toolbar">
+                        <button id="btn-run-cables" class="btn btn-sm btn-primary" title="Анализ кабелей">&#9654; Анализ</button>
+                    </div>
+                </div>
+
+                <!-- Cable loading -->
+                <div class="cable-loading hidden" id="cable-loading">
+                    <div class="spinner"></div>
+                    <span>Анализ кабельных трасс...</span>
+                </div>
+
+                <!-- Cable stats -->
+                <div class="cable-stats hidden" id="cable-stats">
+                    <div class="status-badges" id="cable-stats-badges"></div>
+                </div>
+
+                <!-- Cable filter mode selector -->
+                <div class="cable-filter-bar hidden" id="cable-filter-bar">
+                    <div class="cable-mode-btns">
+                        <button class="btn btn-sm cable-mode-btn active" data-mode="type" title="By color type">По типу</button>
+                        <button class="btn btn-sm cable-mode-btn" data-mode="group" title="By group label">По группе</button>
+                        <button class="btn btn-sm cable-mode-btn" data-mode="route" title="By connected route">По трассе</button>
+                    </div>
+                </div>
+
+                <!-- Cable filter: by type -->
+                <div class="cable-filter-panel" id="cable-filter-type">
+                    <label class="cable-filter-item">
+                        <input type="checkbox" class="cable-type-chk" data-color="red" checked />
+                        <span class="cable-type-dot" style="background:#dc3545"></span>
+                        <span>Аварийное</span>
+                        <span class="cable-type-count" id="cable-red-count">0</span>
+                    </label>
+                    <label class="cable-filter-item">
+                        <input type="checkbox" class="cable-type-chk" data-color="blue" checked />
+                        <span class="cable-type-dot" style="background:#4a90d9"></span>
+                        <span>Рабочее</span>
+                        <span class="cable-type-count" id="cable-blue-count">0</span>
+                    </label>
+                </div>
+
+                <!-- Cable filter: by group -->
+                <div class="cable-filter-panel hidden" id="cable-filter-group">
+                    <div class="cable-group-list" id="cable-group-list"></div>
+                </div>
+
+                <!-- Cable filter: by route -->
+                <div class="cable-filter-panel hidden" id="cable-filter-route">
+                    <div class="cable-route-list" id="cable-route-list"></div>
+                </div>
+
+                <!-- Cable annotations table -->
+                <div class="cable-annot-section hidden" id="cable-annot-section">
+                    <h3 class="section-title">Аннотации</h3>
+                    <div class="cable-annot-wrap">
+                        <table class="count-table">
+                            <thead>
+                                <tr>
+                                    <th>Группа</th>
+                                    <th>Сечение</th>
+                                    <th>Тип</th>
+                                    <th>Цвет</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cable-annot-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cable tooltip (follows mouse) -->
+    <div class="cable-tooltip hidden" id="cable-tooltip"></div>
+
+    <!-- Find navigation bar (hidden by default, shows when legend row is clicked) -->
+    <div class="find-nav hidden" id="find-nav">
+        <div class="find-nav-left">
+            <span class="find-nav-symbol" id="find-nav-symbol"></span>
+            <span class="find-nav-desc" id="find-nav-desc"></span>
+        </div>
+        <div class="find-nav-center">
+            <button class="btn btn-sm" id="find-nav-prev" title="Previous">&larr;</button>
+            <span class="find-nav-counter" id="find-nav-counter">0 / 0</span>
+            <button class="btn btn-sm" id="find-nav-next" title="Next">&rarr;</button>
+        </div>
+        <div class="find-nav-right">
+            <span class="find-nav-status" id="find-nav-status"></span>
+            <button class="btn btn-sm btn-filter-reset hidden" id="find-nav-filter-reset" title="Сбросить фильтр цвета">&#x1f3a8; Показать все</button>
+            <button class="btn btn-sm btn-ghost" id="find-nav-close" title="Close (Esc)">&times;</button>
         </div>
     </div>
 

@@ -51,6 +51,7 @@
                                     <span class="folder-icon">&#128193;</span>
                                     <span class="folder-name">{{ f.folder if f.folder else '(корневая папка)' }}</span>
                                     <span class="folder-count"></span>
+                                    <button class="btn btn-sm btn-vor" onclick="event.stopPropagation(); startVor('{{ folder_id(f.folder) }}', '{{ f.folder }}')" title="Генерация ВОР">&#9997; ВОР</button>
                                 </td>
                             </tr>
                         {% endif %}
@@ -69,6 +70,40 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <!-- VOR Processing Modal -->
+        <div class="vor-modal hidden" id="vor-modal">
+            <div class="vor-modal-content">
+                <div class="vor-modal-header">
+                    <h2>&#128203; Генерация ВОР</h2>
+                    <span class="vor-folder-name" id="vor-folder-name"></span>
+                    <button class="btn btn-sm" onclick="document.getElementById('vor-modal').classList.add('hidden')">&#10005;</button>
+                </div>
+                <div class="vor-progress" id="vor-progress">
+                    <div class="progress-bar"><div class="progress-fill" id="vor-fill"></div></div>
+                    <span id="vor-ptext">Подготовка...</span>
+                </div>
+                <div class="vor-log" id="vor-log"></div>
+                <div class="vor-results hidden" id="vor-results">
+                    <table class="vor-table">
+                        <thead>
+                            <tr>
+                                <th>№</th>
+                                <th>Наименование вида работ</th>
+                                <th>Ед. изм.</th>
+                                <th>Объем</th>
+                                <th>Формула</th>
+                                <th>Ссылка на чертежи</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vor-tbody"></tbody>
+                    </table>
+                    <div class="vor-actions">
+                        <button class="btn btn-primary" id="btn-vor-xlsx">&#128190; Скачать Excel</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -135,6 +170,75 @@
 
         fileCounter.textContent = q ? `${visible} / ${totalFiles} файлов` : `${totalFiles} файлов`;
     });
+
+    // ── VOR Processing ──
+    function startVor(folderId, folderName) {
+        var modal = document.getElementById('vor-modal');
+        var fill = document.getElementById('vor-fill');
+        var ptext = document.getElementById('vor-ptext');
+        var log = document.getElementById('vor-log');
+        var results = document.getElementById('vor-results');
+        var tbody = document.getElementById('vor-tbody');
+
+        document.getElementById('vor-folder-name').textContent = folderName;
+        modal.classList.remove('hidden');
+        results.classList.add('hidden');
+        log.innerHTML = '';
+        fill.style.width = '0%';
+        ptext.textContent = 'Подготовка...';
+
+        var src = new EventSource('/api/folder/' + folderId + '/process');
+
+        src.addEventListener('start', function(e) {
+            var d = JSON.parse(e.data);
+            ptext.textContent = '0 / ' + d.total + ' файлов...';
+        });
+
+        src.addEventListener('progress', function(e) {
+            var d = JSON.parse(e.data);
+            var pct = Math.round((d.current / d.total) * 100);
+            fill.style.width = pct + '%';
+            ptext.textContent = d.current + ' / ' + d.total + ': ' + d.filename;
+        });
+
+        src.addEventListener('file_done', function(e) {
+            var d = JSON.parse(e.data);
+            var icon = d.status === 'ok' ? '&#10003;' : '&#10007;';
+            var cls = d.status === 'ok' ? 'log-ok' : 'log-err';
+            log.innerHTML += '<div class="log-entry ' + cls + '">' + icon + ' ' + escHtml(d.filename) + ' (' + d.items + ' эл.)</div>';
+            log.scrollTop = log.scrollHeight;
+        });
+
+        src.addEventListener('done', function(e) {
+            src.close();
+            var d = JSON.parse(e.data);
+            fill.style.width = '100%';
+            ptext.textContent = 'Готово: ' + d.files_processed + ' / ' + d.total_files + ' файлов';
+
+            tbody.innerHTML = '';
+            (d.aggregated || []).forEach(function(item) {
+                var tr = document.createElement('tr');
+                tr.innerHTML = '<td>' + item.row + '</td><td>' + escHtml(item.name) + '</td><td>' + item.unit + '</td><td>' + item.total + '</td><td class="mono">' + escHtml(item.formula) + '</td><td>' + escHtml(item.drawing_refs) + '</td>';
+                tbody.appendChild(tr);
+            });
+            results.classList.remove('hidden');
+
+            document.getElementById('btn-vor-xlsx').onclick = function() {
+                window.location.href = '/api/folder/' + folderId + '/export_xlsx';
+            };
+        });
+
+        src.onerror = function() {
+            src.close();
+            ptext.textContent = 'Ошибка соединения';
+        };
+    }
+
+    function escHtml(t) {
+        var d = document.createElement('div');
+        d.textContent = t;
+        return d.innerHTML;
+    }
     </script>
 </body>
 </html>

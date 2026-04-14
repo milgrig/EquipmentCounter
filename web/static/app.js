@@ -39,6 +39,29 @@
     let pageHeight = 0;
     let renderDPI = 150;
 
+    // Color filter state (T123): tracks whether we're showing a color-filtered page
+    let legendColorFilterActive = false;  // true when color filter is applied from legend click
+    let legendColorFilterHex = null;      // hex string of filtered color, e.g. "FF0000"
+    let legendColorFilterName = "";       // display name, e.g. "red"
+
+    // Map legend item color names to hex values for render_filtered API
+    const COLOR_NAME_TO_HEX = {
+        "red":   ["FF0000"],
+        "blue":  ["0000FF"],
+        "green": ["00FF00"],
+        "black": ["000000"],
+        "grey":  [],  // grey includes many shades; show all greys
+    };
+
+    // Map color names to CSS display colors for UI
+    const COLOR_NAME_TO_CSS = {
+        "red":   "#dc3545",
+        "blue":  "#4a90d9",
+        "green": "#28a745",
+        "black": "#333",
+        "grey":  "#999",
+    };
+
     // ── DOM refs ─────────────────────────────────────────────────
     const pdfImage = document.getElementById("pdf-image");
     const pdfViewport = document.getElementById("pdf-viewport");
@@ -239,23 +262,39 @@
                 ? `cat-${item.category.replace(/\s/g, "-")}`
                 : "";
 
-            const symHtml = item.symbol
-                ? `<span>${escapeHtml(item.symbol)}</span>`
+            const textFallback = item.symbol
+                ? escapeHtml(item.symbol)
                 : `<span class="sym-none">&#9679;</span>`;
+            const imgUrl = item.image_url || `/api/file/${FILE_ID}/symbol_image/${i}`;
+            const symHtml = `<img class="sym-img" src="${imgUrl}" alt="" `
+                + `onerror="this.style.display='none';this.nextElementSibling.style.display='inline'" />`
+                + `<span class="sym-text-fallback" style="display:none">${textFallback}</span>`;
 
             const catHtml = item.category
                 ? `<span class="category-tag ${catClass}">${escapeHtml(item.category)}</span>`
                 : "";
 
+            // Color dot indicator (T123): shows the equipment color from the PDF
+            const colorDotHtml = item.color && COLOR_NAME_TO_CSS[item.color]
+                ? `<span class="legend-color-dot" style="background:${COLOR_NAME_TO_CSS[item.color]}" title="${item.color}"></span>`
+                : "";
+
             tr.innerHTML = `
                 <td style="text-align:center;color:var(--text-muted)">${i + 1}</td>
                 <td class="sym-cell">${symHtml}</td>
-                <td class="desc-cell">${escapeHtml(item.description)}</td>
+                <td class="desc-cell">${colorDotHtml}${escapeHtml(item.description)}</td>
                 <td class="cat-cell">${catHtml}</td>
             `;
 
-            // Click → scroll PDF to item position & highlight
-            tr.addEventListener("click", () => scrollToItem(i, item));
+            // Click → find all instances on PDF & highlight
+            tr.addEventListener("click", (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    // Ctrl+click: add/remove from multi-selection
+                    toggleFindSelection(i, item);
+                } else {
+                    findEquipment(i, item);
+                }
+            });
 
             legendTbody.appendChild(tr);
         });
@@ -454,6 +493,152 @@
         debugPanel.classList.remove("hidden");
     });
 
+    // ── Color filters ─────────────────────────────────────────────
+    const colorPanel = document.getElementById("color-filter-panel");
+    const cfList = document.getElementById("cf-list");
+    const cfLoading = document.getElementById("cf-loading");
+    let colorData = null;
+    let colorsLoaded = false;
+    let activeColorFilter = null; // null = no filter (all visible)
+
+    document.getElementById("btn-colors-toggle").addEventListener("click", async () => {
+        if (!colorPanel.classList.contains("hidden")) {
+            colorPanel.classList.add("hidden");
+            return;
+        }
+
+        if (!colorsLoaded) {
+            colorPanel.classList.remove("hidden");
+            cfLoading.classList.remove("hidden");
+            try {
+                const resp = await fetch(`/api/file/${FILE_ID}/colors?page=${currentPage}`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                colorData = await resp.json();
+                renderColorList(colorData.colors);
+                colorsLoaded = true;
+            } catch (err) {
+                console.error("Color load error:", err);
+                cfList.innerHTML = '<div style="padding:1rem;color:var(--text-muted)">Ошибка загрузки цветов</div>';
+            } finally {
+                cfLoading.classList.add("hidden");
+            }
+        }
+
+        colorPanel.classList.remove("hidden");
+    });
+
+    function renderColorList(colors) {
+        cfList.innerHTML = "";
+        colors.forEach((c) => {
+            const item = document.createElement("label");
+            item.className = "cf-item";
+            item.dataset.hex = c.hex;
+
+            const checked = activeColorFilter === null || (activeColorFilter && activeColorFilter.has(c.hex));
+            item.innerHTML = `
+                <input type="checkbox" class="cf-check" data-hex="${c.hex}" ${checked ? "checked" : ""} />
+                <span class="cf-swatch" style="background:#${c.hex}"></span>
+                <span class="cf-label">${c.label || "#" + c.hex}</span>
+                <span class="cf-count">${c.total}</span>
+            `;
+            cfList.appendChild(item);
+        });
+
+        // Bind change events
+        cfList.querySelectorAll(".cf-check").forEach((cb) => {
+            cb.addEventListener("change", () => applyColorFilter());
+        });
+    }
+
+    function applyColorFilter() {
+        const checkboxes = cfList.querySelectorAll(".cf-check");
+        const total = checkboxes.length;
+        const checked = Array.from(checkboxes).filter((cb) => cb.checked);
+
+        if (checked.length === total || checked.length === 0) {
+            // All or none checked → show normal render
+            activeColorFilter = null;
+            loadPage(currentPage);
+            return;
+        }
+
+        // Build show list
+        const showHexes = checked.map((cb) => cb.dataset.hex);
+        activeColorFilter = new Set(showHexes);
+        loadFilteredPage(showHexes);
+    }
+
+    async function loadFilteredPage(showHexes) {
+        pdfLoading.classList.remove("hidden");
+        const showParam = showHexes.join(",");
+        const url = `/api/file/${FILE_ID}/render_filtered?page=${currentPage}&dpi=${renderDPI}&show=${showParam}`;
+
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const blob = await resp.blob();
+
+            if (pdfImage.src && pdfImage.src.startsWith("blob:")) {
+                URL.revokeObjectURL(pdfImage.src);
+            }
+
+            pdfImage.src = URL.createObjectURL(blob);
+            pdfImage.onload = () => drawOverlay();
+        } catch (err) {
+            console.error("Filtered render error:", err);
+        } finally {
+            pdfLoading.classList.add("hidden");
+        }
+    }
+
+    // Quick filter buttons
+    document.getElementById("cf-all").addEventListener("click", () => {
+        cfList.querySelectorAll(".cf-check").forEach((cb) => { cb.checked = true; });
+        applyColorFilter();
+    });
+
+    document.getElementById("cf-electric").addEventListener("click", () => {
+        if (!colorData) return;
+        cfList.querySelectorAll(".cf-check").forEach((cb) => {
+            const hex = cb.dataset.hex;
+            // Red (FF0000) or Blue (0000FF) — with tolerance
+            cb.checked = _isRedHex(hex) || _isBlueHex(hex);
+        });
+        applyColorFilter();
+    });
+
+    document.getElementById("cf-alarm").addEventListener("click", () => {
+        if (!colorData) return;
+        cfList.querySelectorAll(".cf-check").forEach((cb) => {
+            cb.checked = _isRedHex(cb.dataset.hex);
+        });
+        applyColorFilter();
+    });
+
+    document.getElementById("cf-work").addEventListener("click", () => {
+        if (!colorData) return;
+        cfList.querySelectorAll(".cf-check").forEach((cb) => {
+            cb.checked = _isBlueHex(cb.dataset.hex);
+        });
+        applyColorFilter();
+    });
+
+    function _isRedHex(hex) {
+        // Match reds: R channel high, G and B low
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        return r > 180 && g < 80 && b < 80;
+    }
+
+    function _isBlueHex(hex) {
+        // Match blues: B channel high, R and G low
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+        return b > 180 && r < 80 && g < 80;
+    }
+
     // ── Resizer (drag to resize panels) ──────────────────────────
     const resizer = document.getElementById("resizer");
     const pdfPanel = document.getElementById("pdf-panel");
@@ -493,5 +678,1334 @@
         div.textContent = text;
         return div.innerHTML;
     }
+
+    // ================================================================
+    // TAB SWITCHING
+    // ================================================================
+
+    document.querySelectorAll(".tab-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+            document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
+            btn.classList.add("active");
+            const target = document.getElementById(btn.dataset.tab);
+            if (target) target.classList.add("active");
+        });
+    });
+
+    // ================================================================
+    // COUNTING DASHBOARD
+    // ================================================================
+
+    let countData = null; // cached results from /count/all
+    let countOverlayState = { text: false, visual: false, cables: false };
+
+    const countLoading = document.getElementById("count-loading");
+    const countLoadingText = document.getElementById("count-loading-text");
+    const countStats = document.getElementById("count-stats");
+    const countStatsBadges = document.getElementById("count-stats-badges");
+    const overlayControls = document.getElementById("overlay-controls");
+    const equipSection = document.getElementById("equip-section");
+    const cableSection = document.getElementById("cable-section");
+    const equipTbody = document.getElementById("equip-tbody");
+    const cableTbody = document.getElementById("cable-tbody");
+
+    // ── Run all counting methods ────────────────────────────────
+    document.getElementById("btn-run-count").addEventListener("click", runCounting);
+
+    async function runCounting() {
+        if (!legendData) {
+            alert("Legend not loaded yet.");
+            return;
+        }
+
+        countLoading.classList.remove("hidden");
+        countLoadingText.textContent = "Running all methods...";
+        countStats.classList.add("hidden");
+        equipSection.classList.add("hidden");
+        cableSection.classList.add("hidden");
+        overlayControls.classList.add("hidden");
+
+        try {
+            const resp = await fetch(`/api/file/${FILE_ID}/count/all`);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            countData = await resp.json();
+
+            renderCountStats(countData);
+            renderEquipTable(countData);
+            renderCableTable(countData);
+
+            overlayControls.classList.remove("hidden");
+
+        } catch (err) {
+            console.error("Count error:", err);
+            countStatsBadges.innerHTML = `<span class="status-badge badge-red">Error: ${escapeHtml(err.message)}</span>`;
+            countStats.classList.remove("hidden");
+        } finally {
+            countLoading.classList.add("hidden");
+        }
+    }
+
+    // ── Render count stats badges ───────────────────────────────
+    function renderCountStats(data) {
+        const badges = [];
+        const elapsed = data.elapsed_s || 0;
+        badges.push(`<span class="status-badge badge-blue">Total: ${elapsed}s</span>`);
+
+        const methods = ["text", "cables", "geometry", "visual"];
+        for (const m of methods) {
+            if (data.results && data.results[m]) {
+                const t = data.results[m].elapsed_s || 0;
+                badges.push(`<span class="status-badge badge-green">${m}: ${t}s</span>`);
+            }
+            if (data.errors && data.errors[m]) {
+                badges.push(`<span class="status-badge badge-yellow">${m}: err</span>`);
+            }
+        }
+
+        countStatsBadges.innerHTML = badges.join("");
+        countStats.classList.remove("hidden");
+    }
+
+    // ── Render equipment comparison table ────────────────────────
+    function renderEquipTable(data) {
+        equipTbody.innerHTML = "";
+        if (!legendData || !legendData.items) return;
+
+        const textCounts = (data.results && data.results.text)
+            ? data.results.text.counts || {}
+            : {};
+        const visCounts = (data.results && data.results.visual)
+            ? data.results.visual.counts || {}
+            : {};
+        const visDescs = (data.results && data.results.visual)
+            ? data.results.visual.descriptions || {}
+            : {};
+
+        let hasData = false;
+
+        legendData.items.forEach((item, i) => {
+            const sym = item.symbol || "";
+            const textVal = sym ? (textCounts[sym] || 0) : 0;
+
+            // Visual counts are keyed by symbol_index
+            const visVal = visCounts[String(i)] || 0;
+
+            // Only show rows that have any count or a symbol
+            if (textVal === 0 && visVal === 0 && !sym) return;
+            hasData = true;
+
+            // Visual is primary: use visual count when available, text as fallback
+            const total = visVal > 0 ? visVal : textVal;
+            const mismatch = textVal > 0 && visVal > 0 && textVal !== visVal;
+
+            const tr = document.createElement("tr");
+            tr.dataset.index = i;
+            tr.dataset.symbol = sym;
+
+            const imgUrl = `/api/file/${FILE_ID}/symbol_image/${i}`;
+            const textFallback = sym
+                ? `<span style="font-weight:700;font-family:var(--mono)">${escapeHtml(sym)}</span>`
+                : `<span style="color:var(--text-faint)">&#9679;</span>`;
+            const symHtml = `<img class="sym-img" src="${imgUrl}" alt="" `
+                + `onerror="this.style.display='none';this.nextElementSibling.style.display='inline'" />`
+                + `<span style="display:none">${textFallback}</span>`;
+
+            const textClass = textVal > 0 ? "cnt-cell" : "cnt-cell cnt-zero";
+            const visClass = visVal > 0 ? "cnt-cell" : "cnt-cell cnt-zero";
+            const mismatchClass = mismatch ? " cnt-mismatch" : "";
+
+            tr.innerHTML = `
+                <td style="text-align:center;color:var(--text-muted)">${i + 1}</td>
+                <td style="text-align:center">${symHtml}</td>
+                <td class="desc-cell">${escapeHtml(item.description).substring(0, 60)}</td>
+                <td class="${textClass}${mismatchClass}">${textVal}</td>
+                <td class="${visClass}${mismatchClass}">${visVal}</td>
+                <td class="cnt-cell" style="font-weight:700">${total}</td>
+            `;
+
+            // Click to highlight positions on PDF
+            tr.addEventListener("click", () => {
+                highlightCountPositions(sym, i, data);
+            });
+
+            equipTbody.appendChild(tr);
+        });
+
+        if (hasData) equipSection.classList.remove("hidden");
+    }
+
+    // ── Render cable comparison table ────────────────────────────
+    function renderCableTable(data) {
+        cableTbody.innerHTML = "";
+
+        const cableData = (data.results && data.results.cables)
+            ? data.results.cables
+            : null;
+        const geoData = (data.results && data.results.geometry)
+            ? data.results.geometry
+            : null;
+
+        if (!cableData || cableData.total_runs === 0) return;
+
+        // Build cable schedule rows
+        const schedule = cableData.schedule || [];
+
+        let totalAnnotLen = 0;
+        let totalGeoRed = 0;
+        let totalGeoBlue = 0;
+
+        // Get geometric lengths by color
+        if (geoData && geoData.routes) {
+            for (const r of geoData.routes) {
+                if (r.color === "red") totalGeoRed = r.total_length_m;
+                if (r.color === "blue") totalGeoBlue = r.total_length_m;
+            }
+        }
+
+        schedule.forEach((entry) => {
+            const tr = document.createElement("tr");
+
+            const colors = entry.colors || [];
+            let colorDots = "";
+            for (const c of colors) {
+                colorDots += `<span class="cable-color-dot cable-color-${c}"></span>`;
+            }
+
+            const lengthAnnot = entry.total_length_m
+                ? `${entry.total_length_m}m`
+                : "\u2014";
+            if (entry.total_length_m) totalAnnotLen += entry.total_length_m;
+
+            const cs = (entry.cross_sections || []).join(", ");
+            const types = (entry.cable_types || []).join(", ") || "\u2014";
+
+            tr.innerHTML = `
+                <td>${escapeHtml(entry.panel || "\u2014")}</td>
+                <td>${escapeHtml(entry.group || "\u2014")}</td>
+                <td style="font-family:var(--mono);font-size:0.78rem">${escapeHtml(cs)}</td>
+                <td style="text-align:center">${lengthAnnot}</td>
+                <td style="text-align:center;color:var(--text-muted)">\u2014</td>
+                <td style="font-size:0.75rem">${escapeHtml(types)}</td>
+                <td>${colorDots}</td>
+            `;
+            cableTbody.appendChild(tr);
+        });
+
+        // Summary row
+        const summaryTr = document.createElement("tr");
+        summaryTr.className = "cable-summary-row";
+
+        let geoSummary = "\u2014";
+        if (totalGeoRed > 0 || totalGeoBlue > 0) {
+            const parts = [];
+            if (totalGeoRed > 0) parts.push(`<span class="cable-color-dot cable-color-red"></span>${totalGeoRed.toFixed(1)}m`);
+            if (totalGeoBlue > 0) parts.push(`<span class="cable-color-dot cable-color-blue"></span>${totalGeoBlue.toFixed(1)}m`);
+            geoSummary = parts.join(" ");
+        }
+
+        summaryTr.innerHTML = `
+            <td colspan="3" style="text-align:right;font-weight:600">ИТОГО</td>
+            <td style="text-align:center;font-weight:600">${totalAnnotLen > 0 ? totalAnnotLen.toFixed(1) + "m" : "\u2014"}</td>
+            <td style="text-align:center">${geoSummary}</td>
+            <td colspan="2"></td>
+        `;
+        cableTbody.appendChild(summaryTr);
+
+        cableSection.classList.remove("hidden");
+    }
+
+    // ── Highlight positions on PDF ──────────────────────────────
+    function highlightCountPositions(symbol, index, data) {
+        if (!pdfImage.naturalWidth) return;
+        const pxPerPt = renderDPI / 72.0;
+        const ctx = highlightCanvas.getContext("2d");
+
+        // Redraw base overlay first
+        drawOverlay();
+
+        const positions = [];
+
+        // Text positions
+        if (data.results && data.results.text && data.results.text.positions) {
+            const symPositions = data.results.text.positions[symbol] || [];
+            for (const p of symPositions) {
+                positions.push({ x: p.x * pxPerPt, y: p.y * pxPerPt, type: "text" });
+            }
+        }
+
+        // Visual positions
+        if (data.results && data.results.visual && data.results.visual.matches) {
+            for (const m of data.results.visual.matches) {
+                if (m.symbol_index === index) {
+                    positions.push({ x: m.x * pxPerPt, y: m.y * pxPerPt, type: "visual" });
+                }
+            }
+        }
+
+        // Draw markers
+        for (const p of positions) {
+            const r = 8;
+            if (p.type === "text") {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
+                ctx.fillStyle = "rgba(74, 144, 217, 0.5)";
+                ctx.fill();
+                ctx.strokeStyle = "rgba(74, 144, 217, 0.9)";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            } else {
+                ctx.strokeStyle = "rgba(40, 167, 69, 0.9)";
+                ctx.lineWidth = 2;
+                ctx.fillStyle = "rgba(40, 167, 69, 0.3)";
+                ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+                ctx.strokeRect(p.x - r, p.y - r, r * 2, r * 2);
+            }
+        }
+
+        // Scroll to first position
+        if (positions.length > 0) {
+            const first = positions[0];
+            pdfViewport.scrollTo({
+                left: first.x * zoomLevel - pdfViewport.clientWidth / 2,
+                top: first.y * zoomLevel - pdfViewport.clientHeight / 2,
+                behavior: "smooth",
+            });
+        }
+    }
+
+    // ── Overlay toggle handlers ─────────────────────────────────
+    const chkText = document.getElementById("chk-overlay-text");
+    const chkVisual = document.getElementById("chk-overlay-visual");
+    const chkCables = document.getElementById("chk-overlay-cables");
+
+    if (chkText) chkText.addEventListener("change", () => {
+        countOverlayState.text = chkText.checked;
+        drawCountOverlay();
+    });
+    if (chkVisual) chkVisual.addEventListener("change", () => {
+        countOverlayState.visual = chkVisual.checked;
+        drawCountOverlay();
+    });
+    if (chkCables) chkCables.addEventListener("change", () => {
+        countOverlayState.cables = chkCables.checked;
+        drawCountOverlay();
+    });
+
+    function drawCountOverlay() {
+        if (!countData || !pdfImage.naturalWidth) return;
+
+        // Redraw base
+        drawOverlay();
+
+        const pxPerPt = renderDPI / 72.0;
+        const ctx = highlightCanvas.getContext("2d");
+
+        // Method A: Text markers (blue circles)
+        if (countOverlayState.text && countData.results && countData.results.text) {
+            const positions = countData.results.text.positions || {};
+            ctx.fillStyle = "rgba(74, 144, 217, 0.4)";
+            ctx.strokeStyle = "rgba(74, 144, 217, 0.8)";
+            ctx.lineWidth = 1.5;
+            for (const sym in positions) {
+                for (const p of positions[sym]) {
+                    ctx.beginPath();
+                    ctx.arc(p.x * pxPerPt, p.y * pxPerPt, 6, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // Method D: Visual matches (green rectangles)
+        if (countOverlayState.visual && countData.results && countData.results.visual) {
+            const matches = countData.results.visual.matches || [];
+            ctx.strokeStyle = "rgba(40, 167, 69, 0.8)";
+            ctx.fillStyle = "rgba(40, 167, 69, 0.2)";
+            ctx.lineWidth = 1.5;
+            for (const m of matches) {
+                const r = 7;
+                ctx.fillRect(m.x * pxPerPt - r, m.y * pxPerPt - r, r * 2, r * 2);
+                ctx.strokeRect(m.x * pxPerPt - r, m.y * pxPerPt - r, r * 2, r * 2);
+            }
+        }
+
+        // Method B: Cable positions (red/blue dots)
+        if (countOverlayState.cables && countData.results && countData.results.cables) {
+            const runs = countData.results.cables.runs || [];
+            ctx.lineWidth = 1;
+            for (const r of runs) {
+                const px = r.position.x * pxPerPt;
+                const py = r.position.y * pxPerPt;
+                if (r.color === "red") {
+                    ctx.fillStyle = "rgba(220, 53, 69, 0.5)";
+                    ctx.strokeStyle = "rgba(220, 53, 69, 0.9)";
+                } else if (r.color === "blue") {
+                    ctx.fillStyle = "rgba(74, 144, 217, 0.5)";
+                    ctx.strokeStyle = "rgba(74, 144, 217, 0.9)";
+                } else {
+                    ctx.fillStyle = "rgba(128, 128, 128, 0.4)";
+                    ctx.strokeStyle = "rgba(128, 128, 128, 0.8)";
+                }
+                ctx.beginPath();
+                ctx.arc(px, py, 4, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            }
+        }
+    }
+
+    // ================================================================
+    // INTERACTIVE EQUIPMENT FIND & HIGHLIGHT (T106)
+    // ================================================================
+
+    // State for find mode
+    let findState = {
+        active: false,
+        selections: [],       // [{rowIndex, item, data}] — multi-select support
+        currentIndex: 0,      // index into allPositions for navigation
+        allPositions: [],     // flat list of all found positions across selections
+        pulseTimer: null,     // animation timer
+        pulsePhase: 0,
+    };
+
+    // DOM refs for find nav bar
+    const findNav = document.getElementById("find-nav");
+    const findNavSymbol = document.getElementById("find-nav-symbol");
+    const findNavDesc = document.getElementById("find-nav-desc");
+    const findNavCounter = document.getElementById("find-nav-counter");
+    const findNavStatus = document.getElementById("find-nav-status");
+
+    // Navigation buttons
+    document.getElementById("find-nav-prev").addEventListener("click", () => findNavigate(-1));
+    document.getElementById("find-nav-next").addEventListener("click", () => findNavigate(1));
+    document.getElementById("find-nav-close").addEventListener("click", clearFind);
+
+    // T123: Reset color filter button
+    document.getElementById("find-nav-filter-reset").addEventListener("click", () => {
+        resetLegendColorFilter();
+    });
+
+    // Esc to close find
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && findState.active) {
+            clearFind();
+            e.preventDefault();
+        }
+        if (findState.active) {
+            if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+                findNavigate(-1);
+                e.preventDefault();
+            }
+            if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+                findNavigate(1);
+                e.preventDefault();
+            }
+        }
+    });
+
+    /**
+     * Main entry: find all instances of a legend item and highlight them.
+     * Single-click replaces selection; Ctrl+click adds (handled by toggleFindSelection).
+     */
+    async function findEquipment(rowIndex, item) {
+        // If clicking the same row again while find is active — clear
+        if (findState.active && findState.selections.length === 1
+            && findState.selections[0].rowIndex === rowIndex) {
+            clearFind();
+            return;
+        }
+
+        // Reset to single selection
+        findState.selections = [];
+        findState.currentIndex = 0;
+        findState.active = true;
+
+        // Highlight table row
+        legendTbody.querySelectorAll("tr").forEach((r) => r.classList.remove("active-row", "find-selected"));
+        const targetRow = legendTbody.querySelector(`tr[data-index="${rowIndex}"]`);
+        if (targetRow) {
+            targetRow.classList.add("active-row", "find-selected");
+        }
+
+        // T123: Apply color filter if item has a color
+        applyLegendColorFilter(item);
+
+        await addFindSelection(rowIndex, item);
+    }
+
+    /**
+     * Ctrl+click: toggle a row in multi-selection mode.
+     */
+    async function toggleFindSelection(rowIndex, item) {
+        // Check if already selected
+        const existingIdx = findState.selections.findIndex((s) => s.rowIndex === rowIndex);
+        if (existingIdx >= 0) {
+            // Remove from selection
+            findState.selections.splice(existingIdx, 1);
+            const row = legendTbody.querySelector(`tr[data-index="${rowIndex}"]`);
+            if (row) row.classList.remove("active-row", "find-selected");
+
+            if (findState.selections.length === 0) {
+                clearFind();
+                return;
+            }
+
+            // Rebuild allPositions
+            rebuildAllPositions();
+            findState.currentIndex = 0;
+            updateFindNavBar();
+            drawFindOverlay();
+            return;
+        }
+
+        // Add to selection
+        if (!findState.active) {
+            findState.active = true;
+            findState.selections = [];
+        }
+
+        const row = legendTbody.querySelector(`tr[data-index="${rowIndex}"]`);
+        if (row) row.classList.add("active-row", "find-selected");
+
+        await addFindSelection(rowIndex, item);
+    }
+
+    /**
+     * Add a single row to the current find selection, fetch positions from API.
+     */
+    async function addFindSelection(rowIndex, item) {
+        // Show loading state
+        findNav.classList.remove("hidden");
+        const sym = item.symbol || "\u25CF";
+        findNavSymbol.textContent = sym;
+        findNavDesc.textContent = item.description || "";
+        findNavStatus.innerHTML = '<span class="spinner" style="width:16px;height:16px;border-width:2px"></span>';
+        findNavCounter.textContent = "...";
+
+        try {
+            const resp = await fetch(`/api/file/${FILE_ID}/find/${rowIndex}`);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+
+            findState.selections.push({ rowIndex, item, data });
+            rebuildAllPositions();
+            findState.currentIndex = 0;
+            updateFindNavBar();
+            drawFindOverlay();
+
+            // Navigate to first position
+            if (findState.allPositions.length > 0) {
+                scrollToFindPosition(0);
+            }
+        } catch (err) {
+            console.error("Find error:", err);
+            findNavStatus.textContent = "Error";
+            findNavStatus.className = "find-nav-status find-nav-error";
+        }
+    }
+
+    /**
+     * Rebuild flat allPositions array from all selections.
+     */
+    function rebuildAllPositions() {
+        findState.allPositions = [];
+        for (const sel of findState.selections) {
+            if (sel.data && sel.data.positions) {
+                for (const p of sel.data.positions) {
+                    findState.allPositions.push({
+                        ...p,
+                        rowIndex: sel.rowIndex,
+                        symbol: sel.data.symbol || "",
+                        description: sel.data.description || "",
+                        category: sel.data.category || "",
+                    });
+                }
+            }
+        }
+    }
+
+    /**
+     * Update the navigation bar text & status.
+     */
+    function updateFindNavBar() {
+        const total = findState.allPositions.length;
+
+        // Update symbol/description for multi-select
+        if (findState.selections.length === 1) {
+            const sel = findState.selections[0];
+            findNavSymbol.textContent = sel.data.symbol || "\u25CF";
+            findNavDesc.textContent = sel.data.description || "";
+        } else {
+            const syms = findState.selections.map((s) => s.data.symbol || "\u25CF").join(", ");
+            findNavSymbol.textContent = syms;
+            findNavDesc.textContent = findState.selections.length + " elements";
+        }
+
+        if (total === 0) {
+            findNavCounter.textContent = "0 / 0";
+            // Determine message
+            const hasSymbol = findState.selections.some((s) => s.data.symbol);
+            const needsVisual = findState.selections.some((s) => s.data.needs_visual);
+            if (needsVisual) {
+                findNavStatus.textContent = "Requires visual search (Method D)";
+                findNavStatus.className = "find-nav-status find-nav-warning";
+            } else if (!hasSymbol) {
+                findNavStatus.textContent = "No text marker (graphical symbol)";
+                findNavStatus.className = "find-nav-status find-nav-warning";
+            } else {
+                findNavStatus.textContent = "Not found on drawing";
+                findNavStatus.className = "find-nav-status find-nav-warning";
+            }
+        } else {
+            findNavCounter.textContent = `${findState.currentIndex + 1} / ${total}`;
+            const count = total;
+            findNavStatus.textContent = `found: ${count}`;
+            findNavStatus.className = "find-nav-status find-nav-ok";
+        }
+    }
+
+    /**
+     * Navigate to prev/next found position.
+     */
+    function findNavigate(delta) {
+        if (findState.allPositions.length === 0) return;
+        findState.currentIndex =
+            (findState.currentIndex + delta + findState.allPositions.length)
+            % findState.allPositions.length;
+
+        updateFindNavBar();
+        scrollToFindPosition(findState.currentIndex);
+        drawFindOverlay(); // redraw to highlight current
+    }
+
+    /**
+     * Scroll PDF viewport to a specific found position.
+     */
+    function scrollToFindPosition(idx) {
+        if (!pdfImage.naturalWidth) return;
+        const pos = findState.allPositions[idx];
+        if (!pos) return;
+
+        const pxPerPt = renderDPI / 72.0;
+        const cx = pos.x * pxPerPt * zoomLevel;
+        const cy = pos.y * pxPerPt * zoomLevel;
+
+        pdfViewport.scrollTo({
+            left: cx - pdfViewport.clientWidth / 2,
+            top: cy - pdfViewport.clientHeight / 2,
+            behavior: "smooth",
+        });
+    }
+
+    /**
+     * Draw the find overlay: dim layer + glowing markers.
+     */
+    function drawFindOverlay() {
+        if (!pdfImage.naturalWidth) return;
+
+        const w = pdfImage.naturalWidth;
+        const h = pdfImage.naturalHeight;
+        highlightCanvas.width = w;
+        highlightCanvas.height = h;
+        highlightCanvas.style.width = w + "px";
+        highlightCanvas.style.height = h + "px";
+
+        const ctx = highlightCanvas.getContext("2d");
+        ctx.clearRect(0, 0, w, h);
+
+        if (!findState.active || findState.allPositions.length === 0) return;
+
+        const pxPerPt = renderDPI / 72.0;
+        const manyPositions = findState.allPositions.length > 50;
+
+        // 1. Dim layer (30% dark overlay)
+        ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+        ctx.fillRect(0, 0, w, h);
+
+        // 2. Draw markers for each found position
+        const catColors = {
+            "default":    { fill: "rgba(74, 144, 217, 0.25)", stroke: "rgba(74, 144, 217, 0.80)" },
+            "text":       { fill: "rgba(74, 144, 217, 0.25)", stroke: "rgba(74, 144, 217, 0.80)" },
+            "visual":     { fill: "rgba(40, 167, 69, 0.25)",  stroke: "rgba(40, 167, 69, 0.80)" },
+        };
+
+        findState.allPositions.forEach((pos, i) => {
+            const px = pos.x * pxPerPt;
+            const py = pos.y * pxPerPt;
+            const radius = 18;
+
+            const colors = catColors[pos.method] || catColors["default"];
+            const isCurrent = (i === findState.currentIndex);
+
+            // Clear a circle in the dim layer to reveal the PDF underneath
+            ctx.save();
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.beginPath();
+            ctx.arc(px, py, radius + 12, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.restore();
+
+            // Draw marker circle
+            ctx.beginPath();
+            ctx.arc(px, py, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = colors.fill;
+            ctx.fill();
+            ctx.strokeStyle = isCurrent ? "#fff" : colors.stroke;
+            ctx.lineWidth = isCurrent ? 3 : 2;
+            ctx.stroke();
+
+            // Draw glow for current marker
+            if (isCurrent && !manyPositions) {
+                ctx.save();
+                ctx.shadowColor = colors.stroke;
+                ctx.shadowBlur = 20;
+                ctx.beginPath();
+                ctx.arc(px, py, radius + 2, 0, 2 * Math.PI);
+                ctx.strokeStyle = colors.stroke;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Draw label with symbol
+            const label = pos.symbol || (i + 1).toString();
+            ctx.font = "bold 11px " + getComputedStyle(document.body).getPropertyValue("--mono");
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillStyle = isCurrent ? "#fff" : colors.stroke.replace("0.80", "1.0");
+            ctx.fillText(label, px, py);
+        });
+
+        // Start pulse animation if not too many positions and not already running
+        if (!manyPositions && !findState.pulseTimer) {
+            startPulseAnimation();
+        }
+        if (manyPositions && findState.pulseTimer) {
+            stopPulseAnimation();
+        }
+    }
+
+    /**
+     * Pulsating glow animation for current marker.
+     */
+    function startPulseAnimation() {
+        findState.pulsePhase = 0;
+        findState.pulseTimer = setInterval(() => {
+            if (!findState.active || !pdfImage.naturalWidth) {
+                stopPulseAnimation();
+                return;
+            }
+
+            findState.pulsePhase = (findState.pulsePhase + 1) % 60; // ~2s at 30fps
+            const t = findState.pulsePhase / 60;
+            const scale = 1.0 + 0.15 * Math.sin(t * 2 * Math.PI);
+
+            // Redraw just the current marker with pulse
+            drawFindOverlayFrame(scale);
+        }, 33); // ~30fps
+    }
+
+    function stopPulseAnimation() {
+        if (findState.pulseTimer) {
+            clearInterval(findState.pulseTimer);
+            findState.pulseTimer = null;
+        }
+    }
+
+    /**
+     * Draw a single animation frame with pulse scale for current marker.
+     */
+    function drawFindOverlayFrame(pulseScale) {
+        if (!pdfImage.naturalWidth || findState.allPositions.length === 0) return;
+
+        const w = pdfImage.naturalWidth;
+        const h = pdfImage.naturalHeight;
+        const ctx = highlightCanvas.getContext("2d");
+        ctx.clearRect(0, 0, w, h);
+
+        const pxPerPt = renderDPI / 72.0;
+
+        // Dim layer
+        ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
+        ctx.fillRect(0, 0, w, h);
+
+        const catColors = {
+            "default":    { fill: "rgba(74, 144, 217, 0.25)", stroke: "rgba(74, 144, 217, 0.80)" },
+            "text":       { fill: "rgba(74, 144, 217, 0.25)", stroke: "rgba(74, 144, 217, 0.80)" },
+            "visual":     { fill: "rgba(40, 167, 69, 0.25)",  stroke: "rgba(40, 167, 69, 0.80)" },
+        };
+
+        findState.allPositions.forEach((pos, i) => {
+            const px = pos.x * pxPerPt;
+            const py = pos.y * pxPerPt;
+            const isCurrent = (i === findState.currentIndex);
+            const radius = isCurrent ? 18 * pulseScale : 18;
+            const clearRadius = isCurrent ? (18 + 12) * pulseScale : 18 + 12;
+
+            const colors = catColors[pos.method] || catColors["default"];
+
+            // Clear dim layer around marker
+            ctx.save();
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.beginPath();
+            ctx.arc(px, py, clearRadius, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.restore();
+
+            // Draw marker
+            ctx.beginPath();
+            ctx.arc(px, py, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = colors.fill;
+            ctx.fill();
+            ctx.strokeStyle = isCurrent ? "#fff" : colors.stroke;
+            ctx.lineWidth = isCurrent ? 3 : 2;
+            ctx.stroke();
+
+            // Glow for current
+            if (isCurrent) {
+                ctx.save();
+                ctx.shadowColor = colors.stroke;
+                ctx.shadowBlur = 15 + 10 * Math.sin((findState.pulsePhase / 60) * 2 * Math.PI);
+                ctx.beginPath();
+                ctx.arc(px, py, radius + 2, 0, 2 * Math.PI);
+                ctx.strokeStyle = colors.stroke;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Label
+            const label = pos.symbol || (i + 1).toString();
+            ctx.font = "bold 11px " + getComputedStyle(document.body).getPropertyValue("--mono");
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillStyle = isCurrent ? "#fff" : colors.stroke.replace("0.80", "1.0");
+            ctx.fillText(label, px, py);
+        });
+    }
+
+    /**
+     * T123: Apply color filter to PDF background based on legend item's color.
+     * Fetches colors data if needed, finds matching hex values, and loads filtered render.
+     */
+    async function applyLegendColorFilter(item) {
+        const colorName = item.color;
+        const filterResetBtn = document.getElementById("find-nav-filter-reset");
+
+        if (!colorName || colorName === "black" || !COLOR_NAME_TO_HEX[colorName]) {
+            // No meaningful color to filter by (black is the default, grey is ambiguous)
+            legendColorFilterActive = false;
+            legendColorFilterHex = null;
+            legendColorFilterName = "";
+            if (filterResetBtn) filterResetBtn.classList.add("hidden");
+            return;
+        }
+
+        // We need to find the actual hex values from the PDF's color palette
+        // that match this color category, so render_filtered shows the right elements
+        try {
+            // Load color palette if not already loaded
+            if (!colorData) {
+                const resp = await fetch(`/api/file/${FILE_ID}/colors?page=${currentPage}`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                colorData = await resp.json();
+                colorsLoaded = true;
+            }
+
+            // Find hex values matching the color name using the same heuristics
+            // as the existing _isRedHex / _isBlueHex helpers
+            const matchFn = {
+                "red": _isRedHex,
+                "blue": _isBlueHex,
+                "green": (hex) => {
+                    const r = parseInt(hex.substring(0, 2), 16);
+                    const g = parseInt(hex.substring(2, 4), 16);
+                    const b = parseInt(hex.substring(4, 6), 16);
+                    return g > 150 && r < 100 && b < 100;
+                },
+            };
+
+            const matcher = matchFn[colorName];
+            let hexes = [];
+
+            if (matcher && colorData.colors) {
+                hexes = colorData.colors
+                    .filter((c) => matcher(c.hex))
+                    .map((c) => c.hex);
+            }
+
+            // If no palette matches found, the PDF may not have colored elements
+            // (e.g. all black/grey). In that case, skip filtering entirely —
+            // using hardcoded hex like FF0000 on a black-only PDF would show nothing.
+            if (hexes.length === 0) {
+                legendColorFilterActive = false;
+                legendColorFilterHex = null;
+                legendColorFilterName = "";
+                if (filterResetBtn) filterResetBtn.classList.add("hidden");
+                return;
+            }
+
+            // Apply filter
+            legendColorFilterActive = true;
+            legendColorFilterHex = hexes;
+            legendColorFilterName = colorName;
+
+            // Show reset button with color badge
+            if (filterResetBtn) {
+                filterResetBtn.classList.remove("hidden");
+            }
+
+            // Add a color filter badge to the find nav status area
+            const statusEl = document.getElementById("find-nav-status");
+            if (statusEl) {
+                const cssColor = COLOR_NAME_TO_CSS[colorName] || "#999";
+                statusEl.innerHTML += ` <span class="find-filter-badge"><span class="legend-color-dot" style="background:${cssColor}"></span>${colorName}</span>`;
+            }
+
+            // Load the filtered page render
+            await loadFilteredPage(hexes);
+        } catch (err) {
+            console.error("Color filter error:", err);
+            legendColorFilterActive = false;
+        }
+    }
+
+    /**
+     * T123: Remove color filter and restore normal PDF render.
+     */
+    function resetLegendColorFilter() {
+        legendColorFilterActive = false;
+        legendColorFilterHex = null;
+        legendColorFilterName = "";
+
+        const filterResetBtn = document.getElementById("find-nav-filter-reset");
+        if (filterResetBtn) filterResetBtn.classList.add("hidden");
+
+        // Reload unfiltered page
+        loadPage(currentPage);
+    }
+
+    /**
+     * Clear all find state and restore normal view.
+     */
+    function clearFind() {
+        findState.active = false;
+        findState.selections = [];
+        findState.currentIndex = 0;
+        findState.allPositions = [];
+        stopPulseAnimation();
+
+        // Hide nav bar
+        findNav.classList.add("hidden");
+
+        // Remove active state from legend rows
+        legendTbody.querySelectorAll("tr").forEach((r) => r.classList.remove("active-row", "find-selected"));
+
+        // T123: Restore unfiltered page if color filter was active
+        if (legendColorFilterActive) {
+            resetLegendColorFilter();
+        }
+
+        // Redraw canvas to clear overlay
+        drawOverlay();
+    }
+
+    // Keep the old scrollToItem as a simpler alternative when find is not needed
+    // (the new findEquipment replaces its role for legend row clicks)
+
+    // ================================================================
+    // CABLE HIGHLIGHTING (T107)
+    // ================================================================
+
+    let cableData = null;  // cached cable analysis results
+    let cableFilterMode = "type";  // 'type', 'group', 'route'
+    let cableActiveFilters = { red: true, blue: true };
+    let cableActiveGroups = new Set();   // group_full strings to show
+    let cableActiveRoutes = new Set();   // route IDs to show
+    let cableOverlayActive = false;
+    let cableHoveredRoute = null;
+
+    // DOM refs
+    const cableLoading = document.getElementById("cable-loading");
+    const cableStats = document.getElementById("cable-stats");
+    const cableStatsBadges = document.getElementById("cable-stats-badges");
+    const cableFilterBar = document.getElementById("cable-filter-bar");
+    const cableFilterType = document.getElementById("cable-filter-type");
+    const cableFilterGroup = document.getElementById("cable-filter-group");
+    const cableFilterRoute = document.getElementById("cable-filter-route");
+    const cableGroupList = document.getElementById("cable-group-list");
+    const cableRouteList = document.getElementById("cable-route-list");
+    const cableAnnotSection = document.getElementById("cable-annot-section");
+    const cableAnnotTbody = document.getElementById("cable-annot-tbody");
+    const cableTooltip = document.getElementById("cable-tooltip");
+
+    // Run cable analysis
+    document.getElementById("btn-run-cables").addEventListener("click", runCableAnalysis);
+
+    async function runCableAnalysis() {
+        cableLoading.classList.remove("hidden");
+        cableStats.classList.add("hidden");
+        cableFilterBar.classList.add("hidden");
+        cableAnnotSection.classList.add("hidden");
+
+        try {
+            const resp = await fetch(`/api/file/${FILE_ID}/cables`);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            cableData = await resp.json();
+
+            renderCableStats();
+            renderCableFilters();
+            renderCableAnnotations();
+            cableOverlayActive = true;
+            drawCableOverlay();
+        } catch (err) {
+            console.error("Cable analysis error:", err);
+            cableStatsBadges.innerHTML = `<span class="status-badge badge-red">Error: ${escapeHtml(err.message)}</span>`;
+            cableStats.classList.remove("hidden");
+        } finally {
+            cableLoading.classList.add("hidden");
+        }
+    }
+
+    function renderCableStats() {
+        if (!cableData) return;
+        const badges = [];
+        badges.push(`<span class="status-badge badge-blue">${cableData.elapsed_s}s</span>`);
+        badges.push(`<span class="status-badge badge-red">${cableData.red_segments} red</span>`);
+        badges.push(`<span class="status-badge badge-blue">${cableData.blue_segments} blue</span>`);
+        badges.push(`<span class="status-badge badge-green">${cableData.total_routes} routes</span>`);
+        if (cableData.scale) {
+            badges.push(`<span class="status-badge badge-yellow">${cableData.scale.source}</span>`);
+        }
+        cableStatsBadges.innerHTML = badges.join("");
+        cableStats.classList.remove("hidden");
+    }
+
+    function renderCableFilters() {
+        if (!cableData) return;
+
+        // Update type counts
+        document.getElementById("cable-red-count").textContent = cableData.red_segments;
+        document.getElementById("cable-blue-count").textContent = cableData.blue_segments;
+
+        // Build group list
+        const groups = new Map();
+        for (const a of cableData.annotations) {
+            if (!a.group_full) continue;
+            if (!groups.has(a.group_full)) {
+                groups.set(a.group_full, { color: a.color, count: 0 });
+            }
+            groups.get(a.group_full).count++;
+        }
+        cableGroupList.innerHTML = "";
+        cableActiveGroups.clear();
+        for (const [gf, info] of groups) {
+            cableActiveGroups.add(gf);
+            const label = document.createElement("label");
+            label.className = "cable-filter-item";
+            const dotColor = info.color === "red" ? "#dc3545" : (info.color === "blue" ? "#4a90d9" : "#888");
+            label.innerHTML = `
+                <input type="checkbox" class="cable-group-chk" data-group="${escapeHtml(gf)}" checked />
+                <span class="cable-type-dot" style="background:${dotColor}"></span>
+                <span>${escapeHtml(gf)}</span>
+                <span class="cable-type-count">${info.count}</span>
+            `;
+            cableGroupList.appendChild(label);
+        }
+
+        // Build route list (top 20 by length)
+        const sortedRoutes = [...cableData.routes]
+            .sort((a, b) => b.length_m - a.length_m)
+            .slice(0, 30);
+        cableRouteList.innerHTML = "";
+        cableActiveRoutes.clear();
+        for (const r of sortedRoutes) {
+            cableActiveRoutes.add(r.id);
+            const label = document.createElement("label");
+            label.className = "cable-filter-item";
+            const dotColor = r.color === "red" ? "#dc3545" : "#4a90d9";
+            label.innerHTML = `
+                <input type="checkbox" class="cable-route-chk" data-route="${r.id}" checked />
+                <span class="cable-type-dot" style="background:${dotColor}"></span>
+                <span>Route #${r.id} (${r.segment_count} seg)</span>
+                <span class="cable-type-count">${r.length_m}m</span>
+            `;
+            cableRouteList.appendChild(label);
+        }
+
+        // Bind filter events
+        cableFilterType.querySelectorAll(".cable-type-chk").forEach((cb) => {
+            cb.addEventListener("change", () => {
+                cableActiveFilters[cb.dataset.color] = cb.checked;
+                drawCableOverlay();
+            });
+        });
+        cableGroupList.querySelectorAll(".cable-group-chk").forEach((cb) => {
+            cb.addEventListener("change", () => {
+                if (cb.checked) cableActiveGroups.add(cb.dataset.group);
+                else cableActiveGroups.delete(cb.dataset.group);
+                drawCableOverlay();
+            });
+        });
+        cableRouteList.querySelectorAll(".cable-route-chk").forEach((cb) => {
+            cb.addEventListener("change", () => {
+                const rid = parseInt(cb.dataset.route);
+                if (cb.checked) cableActiveRoutes.add(rid);
+                else cableActiveRoutes.delete(rid);
+                drawCableOverlay();
+            });
+        });
+
+        cableFilterBar.classList.remove("hidden");
+    }
+
+    // Filter mode switching
+    document.querySelectorAll(".cable-mode-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            document.querySelectorAll(".cable-mode-btn").forEach((b) => b.classList.remove("active"));
+            btn.classList.add("active");
+            cableFilterMode = btn.dataset.mode;
+
+            // Show/hide panels
+            cableFilterType.classList.toggle("hidden", cableFilterMode !== "type");
+            cableFilterGroup.classList.toggle("hidden", cableFilterMode !== "group");
+            cableFilterRoute.classList.toggle("hidden", cableFilterMode !== "route");
+
+            drawCableOverlay();
+        });
+    });
+
+    function renderCableAnnotations() {
+        if (!cableData || !cableData.annotations.length) return;
+        cableAnnotTbody.innerHTML = "";
+
+        for (const a of cableData.annotations) {
+            const tr = document.createElement("tr");
+            const dotColor = a.color === "red" ? "#dc3545" : (a.color === "blue" ? "#4a90d9" : "#888");
+            tr.innerHTML = `
+                <td>${escapeHtml(a.group_full || "\u2014")}</td>
+                <td style="font-family:var(--mono);font-size:0.78rem">${escapeHtml(a.cross_section)}</td>
+                <td style="font-size:0.75rem">${escapeHtml(a.cable_type || "\u2014")}</td>
+                <td><span class="cable-type-dot" style="background:${dotColor}"></span></td>
+            `;
+            tr.addEventListener("click", () => {
+                scrollToCableAnnotation(a);
+            });
+            cableAnnotTbody.appendChild(tr);
+        }
+        cableAnnotSection.classList.remove("hidden");
+    }
+
+    function scrollToCableAnnotation(annot) {
+        if (!pdfImage.naturalWidth) return;
+        const pxPerPt = renderDPI / 72.0;
+        pdfViewport.scrollTo({
+            left: annot.x * pxPerPt * zoomLevel - pdfViewport.clientWidth / 2,
+            top: annot.y * pxPerPt * zoomLevel - pdfViewport.clientHeight / 2,
+            behavior: "smooth",
+        });
+    }
+
+    /**
+     * Check if a segment should be visible based on current filter mode.
+     */
+    function isSegmentVisible(seg) {
+        if (cableFilterMode === "type") {
+            return cableActiveFilters[seg.color] === true;
+        }
+        if (cableFilterMode === "group") {
+            // Find annotations near this segment
+            if (!cableData.annotations.length) return true;
+            // Match by color at minimum
+            for (const a of cableData.annotations) {
+                if (cableActiveGroups.has(a.group_full) && a.color === seg.color) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (cableFilterMode === "route") {
+            // Check if segment belongs to any active route
+            // We match by checking if segment endpoints are within route bbox
+            for (const r of cableData.routes) {
+                if (!cableActiveRoutes.has(r.id)) continue;
+                if (r.color !== seg.color) continue;
+                const b = r.bbox;
+                const mx = (seg.x0 + seg.x1) / 2;
+                const my = (seg.y0 + seg.y1) / 2;
+                if (mx >= b.x0 - 5 && mx <= b.x1 + 5 && my >= b.y0 - 5 && my <= b.y1 + 5) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Draw cable overlay on canvas.
+     */
+    function drawCableOverlay() {
+        if (!cableData || !pdfImage.naturalWidth || !cableOverlayActive) return;
+
+        // Clear any find overlay first
+        if (findState.active) {
+            clearFind();
+        }
+
+        const w = pdfImage.naturalWidth;
+        const h = pdfImage.naturalHeight;
+        highlightCanvas.width = w;
+        highlightCanvas.height = h;
+        highlightCanvas.style.width = w + "px";
+        highlightCanvas.style.height = h + "px";
+
+        const ctx = highlightCanvas.getContext("2d");
+        ctx.clearRect(0, 0, w, h);
+
+        const pxPerPt = renderDPI / 72.0;
+
+        // Dim layer
+        ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+        ctx.fillRect(0, 0, w, h);
+
+        // Draw cable segments
+        const colors = {
+            red: { line: "rgba(220, 53, 69, 0.85)", glow: "rgba(220, 53, 69, 0.35)" },
+            blue: { line: "rgba(74, 144, 217, 0.85)", glow: "rgba(74, 144, 217, 0.35)" },
+        };
+
+        // Draw glow first (wider, translucent)
+        ctx.lineCap = "round";
+        for (const seg of cableData.segments) {
+            if (!isSegmentVisible(seg)) continue;
+            const c = colors[seg.color] || colors.blue;
+            ctx.beginPath();
+            ctx.moveTo(seg.x0 * pxPerPt, seg.y0 * pxPerPt);
+            ctx.lineTo(seg.x1 * pxPerPt, seg.y1 * pxPerPt);
+            ctx.strokeStyle = c.glow;
+            ctx.lineWidth = 6;
+            ctx.stroke();
+        }
+
+        // Draw actual cable lines
+        for (const seg of cableData.segments) {
+            if (!isSegmentVisible(seg)) continue;
+            const c = colors[seg.color] || colors.blue;
+            ctx.beginPath();
+            ctx.moveTo(seg.x0 * pxPerPt, seg.y0 * pxPerPt);
+            ctx.lineTo(seg.x1 * pxPerPt, seg.y1 * pxPerPt);
+            ctx.strokeStyle = c.line;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        // Draw annotation markers (text positions)
+        for (const a of cableData.annotations) {
+            // Filter by mode
+            if (cableFilterMode === "type" && !cableActiveFilters[a.color]) continue;
+            if (cableFilterMode === "group" && !cableActiveGroups.has(a.group_full)) continue;
+
+            const px = a.x * pxPerPt;
+            const py = a.y * pxPerPt;
+
+            // Clear dim around annotation
+            ctx.save();
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.beginPath();
+            ctx.arc(px, py, 22, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.restore();
+
+            // Draw annotation dot
+            const dotColor = a.color === "red" ? "rgba(220, 53, 69, 0.9)" : "rgba(74, 144, 217, 0.9)";
+            ctx.beginPath();
+            ctx.arc(px, py, 5, 0, 2 * Math.PI);
+            ctx.fillStyle = dotColor;
+            ctx.fill();
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Label
+            if (a.group_full) {
+                ctx.font = "bold 9px " + getComputedStyle(document.body).getPropertyValue("--sans");
+                ctx.textAlign = "left";
+                ctx.textBaseline = "bottom";
+                ctx.fillStyle = "#fff";
+
+                // Background for label
+                const text = a.group_full;
+                const tm = ctx.measureText(text);
+                ctx.fillStyle = a.color === "red" ? "rgba(180,30,40,0.8)" : "rgba(50,110,180,0.8)";
+                ctx.fillRect(px + 7, py - 14, tm.width + 6, 14);
+                ctx.fillStyle = "#fff";
+                ctx.fillText(text, px + 10, py - 2);
+            }
+        }
+    }
+
+    // Tooltip on mouse move over PDF viewport (when cable overlay is active)
+    pdfViewport.addEventListener("mousemove", (e) => {
+        if (!cableOverlayActive || !cableData || !pdfImage.naturalWidth) {
+            cableTooltip.classList.add("hidden");
+            return;
+        }
+
+        const pxPerPt = renderDPI / 72.0;
+        const rect = pdfImage.getBoundingClientRect();
+        const imgX = (e.clientX - rect.left) / zoomLevel;
+        const imgY = (e.clientY - rect.top) / zoomLevel;
+        const pdfX = imgX / pxPerPt;
+        const pdfY = imgY / pxPerPt;
+
+        // Find nearest annotation
+        let nearest = null;
+        let nearestDist = 30; // max distance in PDF pts
+        for (const a of cableData.annotations) {
+            const d = Math.sqrt((a.x - pdfX) ** 2 + (a.y - pdfY) ** 2);
+            if (d < nearestDist) {
+                nearestDist = d;
+                nearest = a;
+            }
+        }
+
+        if (nearest) {
+            const colorLabel = nearest.color === "red" ? "Аварийное" : (nearest.color === "blue" ? "Рабочее" : "");
+            const lengthStr = nearest.length_m ? `${nearest.length_m}m` : "";
+            cableTooltip.innerHTML = `
+                <div class="cable-tt-group">${escapeHtml(nearest.group_full || "—")}</div>
+                <div class="cable-tt-detail">${escapeHtml(nearest.cross_section)} ${escapeHtml(nearest.cable_type || "")}</div>
+                <div class="cable-tt-meta">${colorLabel} ${lengthStr}</div>
+            `;
+            cableTooltip.style.left = (e.clientX + 12) + "px";
+            cableTooltip.style.top = (e.clientY - 10) + "px";
+            cableTooltip.classList.remove("hidden");
+        } else {
+            cableTooltip.classList.add("hidden");
+        }
+    });
+
+    // Hide tooltip when leaving viewport
+    pdfViewport.addEventListener("mouseleave", () => {
+        cableTooltip.classList.add("hidden");
+    });
+
+    // Clear cable overlay when switching tabs away from cables
+    const origTabHandler = document.querySelectorAll(".tab-btn");
+    origTabHandler.forEach((btn) => {
+        btn.addEventListener("click", () => {
+            if (btn.dataset.tab !== "tab-cables" && cableOverlayActive) {
+                cableOverlayActive = false;
+                drawOverlay(); // redraw base overlay
+                cableTooltip.classList.add("hidden");
+            }
+            if (btn.dataset.tab === "tab-cables" && cableData) {
+                cableOverlayActive = true;
+                drawCableOverlay();
+            }
+        });
+    });
 
 })();

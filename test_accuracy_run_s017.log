@@ -1,0 +1,843 @@
+================================================================================
+  MASS PDF TESTING: Generated VOR vs Reference Excel VOR
+================================================================================
+  Cases: 10
+  Fuzzy threshold: 0.45
+
+
+______________________________________________________________________
+[1/10] abk_eo
+  VOR: ВОР АБК ЭО.xlsx
+  PDF: ЭО
+  WARNING: Legend (Условные обозначения) not found!
+    OK  001-Общие данные.pdf: 9 items (0 real, 9 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  002- Схема ЩО1.pdf: 5 items (0 real, 5 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  003- Схема ЩО2.pdf: 3 items (0 real, 3 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  004 - Схема ЩАО1.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  005 - Схема ЩАО2.pdf: 4 items (0 real, 4 auto-detected)
+
+  Unlisted symbols in drawing body (not in legend):
+        8 × 64
+        7 × 16
+        9 × 6
+       13 × 5
+       32 × 5
+       40 × 5
+       8А × 5
+       10 × 4
+       22 × 4
+       9А × 4
+      10А × 3
+       0Л × 2
+       15 × 2
+       27 × 2
+       30 × 2
+       31 × 2
+       84 × 2
+       03 × 1
+       0А × 1
+       11 × 1
+       14 × 1
+       23 × 1
+       54 × 1
+       7А × 1
+    OK  006-План освещения на отм. 0.000.pdf: 10 items (10 real, 0 auto-detected)
+
+  Unlisted symbols in drawing body (not in legend):
+        1 × 5
+       30 × 1
+        8 × 1
+        9 × 1
+    OK  007-План освещения на отм. +4.500, +9.000.pdf: 10 items (4 real, 0 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  008 - План привязки на отм. 0.000.pdf: 39 items (0 real, 39 auto-detected)
+
+  Unlisted symbols in drawing body (not in legend):
+        1 × 3
+       10 × 2
+        9 × 2
+       25 × 1
+        8 × 1
+    OK  009 - План привязки на отм. +4.500.pdf: 11 items (0 real, 11 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  03-01-03 ВОР ЭЛ_АБК_1 ЭО.pdf: 58 items (0 real, 58 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  1) Титульный лист (1Д-24-1-ЭО) рев.2.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  Опросные листы-ОЛ1.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  Опросные листы-ОЛ2.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  Опросные листы-ОЛ3.pdf: 3 items (0 real, 3 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  Опросные листы-ОЛ4.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_01.pdf: 19 items (0 real, 19 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_02.pdf: 30 items (0 real, 30 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_03.pdf: 16 items (0 real, 16 auto-detected)
+  PDFs processed: 18 (0 errors)
+  Reference items: 85
+  Generated items: 10
+
+  RESULTS:
+    Matched (name+qty):      0
+    Count mismatch:          9
+    Missing (not found):    50
+    Extra (not in ref):      1
+    Name match rate:       15.3%
+    Exact accuracy:         0.0%
+    Time: 32.4s
+
+  COUNT MISMATCHES (top 10):
+    ref: Монтаж светильника в подвесных потолках (до 5
+    gen: Монтаж светильника светодиодный UGR
+         ref=   399  gen=   145  delta=-254  ratio=83%
+
+    ref: Светодиодный светильник 4000K 31ВТ 3950Лм SLI
+    gen: Монтаж светильника светодиодный SLICK.PRS
+         ref=     2  gen=   242  delta=+240  ratio=74%
+
+    ref: Светодиодный светильник 4000К 40Вт 5200Лм UNI
+    gen: Монтаж светильника светодиодный OWP EVO (595x
+         ref=   195  gen=     1  delta=-194  ratio=85%
+
+    ref: Монтаж настенного светодиодного светильника н
+    gen: Монтаж светильника светодиодный UNI/R
+         ref=    18  gen=   153  delta=+135  ratio=54%
+
+    ref: Светодиодный светильник 4000К 40Вт 5200Лм UNI
+    gen: Монтаж светильника светодиодный SIMPLE OPTIMA
+         ref=   110  gen=     1  delta=-109  ratio=63%
+
+    ref: Светодиодный светильник 4000К 40Вт 4400 Лм SI
+    gen: Монтаж светильника светодиодный SIMPLE
+         ref=     9  gen=    67  delta=+58  ratio=54%
+
+    ref: Светодиодный светильник 4000К 18Вт 1800Лм UGR
+    gen: Монтаж светильника светодиодный UNI/R EVO (59
+         ref=    51  gen=     1  delta=-50  ratio=61%
+
+    ref: Светодиодный светильник 4000К 32Вт 3900Лм OWP
+    gen: Монтаж светильника светодиодный OWP
+         ref=    19  gen=    33  delta=+14  ratio=49%
+
+    ref: Светодиодный светильник 4000K 31ВТ 3950Лм SLI
+    gen: Монтаж светильника светодиодный SLICK.PRS LED
+         ref=     4  gen=     2  delta=-2  ratio=100%
+
+
+  MISSING from generated (top 10):
+    Монтаж щита распределительного ЩО1                                 qty=1
+    Монтаж щита распределительного ЩО2                                 qty=1
+    Монтаж щита распределительного ЩАО1                                qty=1
+    Монтаж щита распределительного ЩАО2                                qty=1
+    Подключение жил кабелей до 10 мм2                                  qty=218
+    Светодиодный светильник 4000К 32Вт 3900Лм OWP EVO (595x595) 30W O  qty=6
+    Светодиодный светильник 4000К 32Вт 3900Лм OWP EVO (595x595) 30W O  qty=18
+    Светодиодный светильник 4000К 40Вт 4400 Лм SIMPLE OPTIMA (1200) 4  qty=2
+    Светодиодный светильник 4000К 30Вт 4200Лм SLICK.PRS LED 30 with d  qty=6
+    Светодиодный светильник 4000К 30Вт 4200Лм SLICK.PRS LED 30 EM wit  qty=4
+
+  EXTRA in generated (top 10):
+    Монтаж светильника аварийного светодиодный                         qty=33
+
+______________________________________________________________________
+[2/10] abk_em
+  VOR: ВОР АБК ЭМ.xlsx
+  PDF: ЭМ
+  WARNING: Legend (Условные обозначения) not found!
+    OK  005- схема ЩР2.pdf: 7 items (0 real, 7 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  006- схема ЩР3.pdf: 12 items (0 real, 12 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  007- схема ЩР4.pdf: 7 items (0 real, 7 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  008- схема ЩР5.pdf: 5 items (0 real, 5 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  009- схема ЩР6.pdf: 7 items (0 real, 7 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  010- схема ЩВ.pdf: 14 items (0 real, 14 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  011- схема ПД.pdf: 7 items (0 real, 7 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  012-ЩВН.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  013-План об-я на отм. 0.000.pdf: 28 items (0 real, 28 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  014-План об-я на отм. +4.500.pdf: 13 items (0 real, 13 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  015-План оборудования на кровле.pdf: 12 items (0 real, 12 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  016-Планы розеточной сети га отм. 0.000.pdf: 31 items (0 real, 31 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  017-Планы розеточной сети га отм. +4.500.pdf: 18 items (0 real, 18 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  018-Планы лотков на отм 0.000.pdf: 29 items (0 real, 29 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  019-Планы лотков на отм +4.500.pdf: 14 items (0 real, 14 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  020-Узлы.pdf: 20 items (0 real, 20 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  021-Прокладка лотка через перегородки и перекрытия.pdf: 13 items (0 real, 13 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  Опросные листы.pdf: 23 items (0 real, 23 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_01.pdf: 18 items (0 real, 18 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_02.pdf: 20 items (0 real, 20 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_03.pdf: 25 items (0 real, 25 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_04.pdf: 35 items (0 real, 35 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_05.pdf: 42 items (0 real, 42 auto-detected)
+  PDFs processed: 23 (0 errors)
+  Reference items: 209
+  Generated items: 0
+
+  RESULTS:
+    Matched (name+qty):      0
+    Count mismatch:          0
+    Missing (not found):   164
+    Extra (not in ref):      0
+    Name match rate:        0.0%
+    Exact accuracy:         0.0%
+    Time: 114.6s
+
+  MISSING from generated (top 10):
+    Монтаж вводно-распределительного устройства                        qty=1
+    Монтаж щита распределительного ЩР-1                                qty=1
+    Монтаж щита распределительного ЩР-2                                qty=1
+    Монтаж щита распределительного ЩР-3                                qty=1
+    Монтаж щита распределительного ЩР-4                                qty=1
+    Монтаж щита распределительного ЩР-5                                qty=1
+    Монтаж щита распределительного ЩР-6                                qty=1
+    Монтаж щита распределительного ЩВ                                  qty=1
+    Монтаж щита распределительного ПД                                  qty=1
+    Монтаж щита распределительного ЩВН                                 qty=1
+
+______________________________________________________________________
+[3/10] abk_eg
+  VOR: ВОР АБК ЭГ.xlsx
+  PDF: ЭГ
+  WARNING: Legend (Условные обозначения) not found!
+    OK  001-Общие данные.pdf: 7 items (0 real, 7 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  002-СУП.pdf: 17 items (0 real, 17 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  003-План заземления на отм. 0.000.pdf: 16 items (0 real, 16 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  004-План УП на отм. +4.500.pdf: 16 items (0 real, 16 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  005-План молниезащиты.pdf: 17 items (0 real, 17 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  03-01-03 ВОР ЭЛ_АБК_1 ЭГ.pdf: 41 items (0 real, 41 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  1) Титульный лист (1Д-24-1-ЭГ) рев.1.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_01.pdf: 20 items (0 real, 20 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_02.pdf: 14 items (0 real, 14 auto-detected)
+  PDFs processed: 9 (0 errors)
+  Reference items: 33
+  Generated items: 0
+
+  RESULTS:
+    Matched (name+qty):      0
+    Count mismatch:          0
+    Missing (not found):    31
+    Extra (not in ref):      0
+    Name match rate:        0.0%
+    Exact accuracy:         0.0%
+    Time: 34.4s
+
+  MISSING from generated (top 10):
+    Разработка грунта для прокладки горизонтального заземлителя.       qty=81
+    Засыпка траншеи (под горизонтальное заземление).                   qty=81
+    Монтаж точки заземления М10×32, материал — нержавеющая сталь AISI  qty=10
+    Установка проводника точки заземления L=215 мм, с резьбой M10 (дл  qty=10
+    Установка корпуса регулируемого для контрольного соединения пласт  qty=10
+    Забивка заземляющих стержней L=1500 мм, Ø20 мм, горячее цинковани  qty=24
+    Установка наконечника стержня заземления Ø20 мм, покрытие — горяч  qty=12
+    Монтаж забивной головки SDS-MAX D20, оцинкованной, МЗ-224-ЭЦ, 092  qty=2
+    Монтаж диагонального соединителя стержня заземления Ø20 мм, термо  qty=22
+    Монтаж соединителя плоского проводника до 40 мм, две пластины, те  qty=28
+
+______________________________________________________________________
+[4/10] pos_12_3
+  VOR: ВОР поз. 12.3.xlsx
+  PDF: 02_PDF
+  WARNING: Legend (Условные обозначения) not found!
+    OK  001 - ОД.pdf: 5 items (0 real, 5 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  002 - Схема  ВРУ-002.ВРУ.pdf: 9 items (0 real, 9 auto-detected)
+
+  Unlisted symbols in drawing body (not in legend):
+        1 × 14
+        2 × 6
+        5 × 5
+        6 × 3
+       45 × 2
+        7 × 1
+        8 × 1
+        9 × 1
+    OK  003 - Планы освещения.pdf: 1 items (0 real, 1 auto-detected)
+
+  Unlisted symbols in drawing body (not in legend):
+        1 × 8
+        2 × 3
+       45 × 2
+       60 × 2
+        6 × 1
+        9 × 1
+    OK  004 - Планы привязки.pdf: 1 items (0 real, 1 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  1) Титульный лист (1Д-24-12.3-ЭО) рев.1.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  1Д-24-12.3-ЭО ВОР.pdf: 24 items (0 real, 24 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_01.pdf: 19 items (0 real, 19 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_02.pdf: 2 items (0 real, 2 auto-detected)
+  PDFs processed: 8 (0 errors)
+  Reference items: 83
+  Generated items: 0
+
+  RESULTS:
+    Matched (name+qty):      0
+    Count mismatch:          0
+    Missing (not found):    78
+    Extra (not in ref):      0
+    Name match rate:        0.0%
+    Exact accuracy:         0.0%
+    Time: 6.9s
+
+  MISSING from generated (top 10):
+    Монтаж вводно-распределительного устройства напольного             qty=1
+    Подключение жил кабелей до 10 мм2                                  qty=45
+    Подключение жил кабелей до 70 мм2                                  qty=5
+    Подключение жил кабелей до 95 мм2                                  qty=10
+    Монтаж светильников на шпильках к перекрытию на высоте до 5 метро  qty=6
+    Светодиодный светильник 5000K 33ВТ 5048Лм, TL-PROM LINE 33 750 D1  qty=6
+    Монтаж шпилек оцинкованных, подвес к перекрытию L=2000мм, d=8мм,   qty=12
+    Монтаж настенного светодиодного светильника на высоте до 5 м       qty=1
+    Светодиодный светильник 5000К 25Вт 2500Лм IP65, GRANDA LED 26W 84  qty=1
+    Монтаж выключателя 2-клавишного 10А IP44 EKV10-023-10-44 белого E  qty=1
+
+______________________________________________________________________
+[5/10] pos_16_2
+  VOR: ВОР поз. 16.2.xlsx
+  PDF: 02_PDF
+  WARNING: Legend (Условные обозначения) not found!
+    OK  001 -  ОД1.pdf: 10 items (0 real, 10 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  002 - ОД2.pdf: 3 items (0 real, 3 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  003 - Схема  ВРУ.pdf: 8 items (0 real, 8 auto-detected)
+
+  Unlisted symbols in drawing body (not in legend):
+        2 × 3
+        8 × 1
+    OK  004-План расположения электрооборудования.pdf: 2 items (2 real, 0 auto-detected)
+
+  Unlisted symbols in drawing body (not in legend):
+        1 × 5
+        5 × 2
+       00 × 1
+       20 × 1
+       27 × 1
+        4 × 1
+        7 × 1
+        9 × 1
+    OK  005-План освещения.pdf: 4 items (4 real, 0 auto-detected)
+
+  Unlisted symbols in drawing body (not in legend):
+        1 × 4
+    OK  006 - План привязки.pdf: 4 items (4 real, 0 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  007 - Схема СУП.pdf: 13 items (0 real, 13 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  008- План ЭГ.pdf: 21 items (0 real, 21 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  05-02-03 ЭОМ поз.16.2 ВОР.pdf: 66 items (0 real, 66 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  1) Титульный лист (1Д-24-16.2-ЭОМ) рев.1.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  ОЛ.pdf: 21 items (0 real, 21 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_01.pdf: 14 items (0 real, 14 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_02.pdf: 20 items (0 real, 20 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_03.pdf: 24 items (0 real, 24 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_04.pdf: 13 items (0 real, 13 auto-detected)
+  PDFs processed: 15 (0 errors)
+  Reference items: 75
+  Generated items: 9
+
+  RESULTS:
+    Matched (name+qty):      1
+    Count mismatch:          4
+    Missing (not found):    67
+    Extra (not in ref):      4
+    Name match rate:        6.9%
+    Exact accuracy:         1.4%
+    Time: 17.7s
+
+  COUNT MISMATCHES (top 10):
+    ref: Светодиодный светильник 26Вт, IP20, 4000K, 34
+    gen: Монтаж светильника светодиодный OPTIMA.OPL EC
+         ref=     2  gen=    11  delta=+9  ratio=65%
+
+    ref: Светодиодный светильник 26Вт, IP20, 4000K, 34
+    gen: Монтаж светильника светодиодный OPTIMA.OPL EC
+         ref=     8  gen=    16  delta=+8  ratio=85%
+
+    ref: Светодиодный светильник 22Вт, IP65, 4000K, 25
+    gen: Монтаж светильника светодиодный авар. OPTIMA.
+         ref=     2  gen=     4  delta=+2  ratio=57%
+
+    ref: Светодиодный светильник 34т, IP65, 5000K, 640
+    gen: Монтаж светильника светодиодный ARCTIC.OPL EC
+         ref=     2  gen=     3  delta=+1  ratio=83%
+
+
+  MISSING from generated (top 10):
+    Монтаж вводно-распределительного устройства                        qty=1
+    Подключение жил кабелей до 10 мм2                                  qty=99
+    Монтаж настенного светодиодного светильника на высоте до 5 м       qty=20
+    Светодиодный светильник  4Вт IP20 MARS 2223-4 LED, 4501006420      qty=2
+    ПЭУ 010 Выход (210х105) LUNA/MARS пиктограмма                      qty=2
+    Дюбель универсальный fischer с потайным шурупом нейлон/оц. сталь,  qty=2
+    Монтаж коробки пластиковой FS с кабельными вводами и клеммниками,  qty=8
+    Монтаж коробки ответвит. откр.установки 85x85x40 (внутр.размеры),  qty=16
+    Монтаж выключателя 1-клавишного в сборе 10А AtlasDesign 10АХ, бел  qty=5
+    Монтаж выключателя 10А IP44 Etude, белый открытой установки, BA10  qty=1
+
+  EXTRA in generated (top 10):
+    Монтаж [Equipment 3]                                               qty=1
+    Монтаж [Equipment 1]                                               qty=4
+    Монтаж г. Волгодонск, ул. 2-я Заводская, 3                         qty=3
+    Монтаж светильника аварийного светодиодный STAR LED 20W 840 WH EM  qty=4
+
+______________________________________________________________________
+[6/10] pos_27
+  VOR: ВОР поз.27.xlsx
+  PDF: 03_PDF
+  WARNING: Legend (Условные обозначения) not found!
+    OK  001 - ОД (начало).pdf: 18 items (0 real, 18 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  002-ОД (продолжение).pdf: 5 items (0 real, 5 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  003-ОД (окончание).pdf: 3 items (0 real, 3 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  004- Схема ВРУ.pdf: 11 items (0 real, 11 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  005- Схема ЩР.pdf: 8 items (0 real, 8 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  006- Схема ЩВ.pdf: 11 items (0 real, 11 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  007- Схема ЩВН.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  008- Схема ЩО.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  009- Схема ЩАО.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  010-План заземления и молниезащиты-Схема СУП.pdf: 17 items (0 real, 17 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  011 План заземления и молниезащиты-План заземления.pdf: 32 items (0 real, 32 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  012 План заземления и молниезащиты-План молниезащиты.pdf: 34 items (0 real, 34 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  013-План расположения электрооборудования на отм. 0.000.pdf: 28 items (0 real, 28 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  014-План расположения оборудования на кровле.pdf: 27 items (0 real, 27 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  015-План освещения.pdf: 48 items (0 real, 48 auto-detected)
+
+  Unlisted symbols in drawing body (not in legend):
+        7 × 30
+        6 × 28
+        3 × 16
+       8А × 16
+       7А × 15
+       6А × 14
+        1 × 5
+       1А × 2
+       10 × 1
+       11 × 1
+       12 × 1
+       13 × 1
+       14 × 1
+       15 × 1
+       16 × 1
+       17 × 1
+       18 × 1
+       19 × 1
+       23 × 1
+       24 × 1
+       25 × 1
+       26 × 1
+        4 × 1
+        8 × 1
+        9 × 1
+    OK  016-План привязки светильников.pdf: 6 items (5 real, 0 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  017-План лотков.pdf: 30 items (0 real, 30 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  018-Проходки.pdf: 11 items (0 real, 11 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  03-12-03 ВОР ЭОМ_27.pdf: 108 items (0 real, 108 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  1) Титульный лист (1Д-24-27-ЭОМ) рев.1.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  Опросные листы.pdf: 18 items (0 real, 18 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_01.pdf: 22 items (0 real, 22 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_02.pdf: 26 items (0 real, 26 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_03.pdf: 18 items (0 real, 18 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_04.pdf: 18 items (0 real, 18 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_05.pdf: 32 items (0 real, 32 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_06.pdf: 33 items (0 real, 33 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_07.pdf: 21 items (0 real, 21 auto-detected)
+  PDFs processed: 28 (0 errors)
+  Reference items: 223
+  Generated items: 5
+
+  RESULTS:
+    Matched (name+qty):      0
+    Count mismatch:          0
+    Missing (not found):   167
+    Extra (not in ref):      5
+    Name match rate:        0.0%
+    Exact accuracy:         0.0%
+    Time: 108.9s
+
+  MISSING from generated (top 10):
+    Монтаж вводно-распределительного устройства                        qty=1
+    Монтаж щита распределительного ЩР                                  qty=1
+    Монтаж щита распределительного ЩВ                                  qty=1
+    Монтаж щита распределительного ЩВН                                 qty=1
+    Монтаж щита распределительного ЩО                                  qty=1
+    Монтаж щита распределительного ЩАО                                 qty=1
+    Подключение жил кабелей до 10 мм2                                  qty=323
+    Подключение жил кабелей до 16 мм2                                  qty=5
+    Подключение жил кабелей до 35 мм2                                  qty=5
+    Подключение жил кабелей до 70 мм2                                  qty=5
+
+  EXTRA in generated (top 10):
+    Монтаж [Equipment 2]                                               qty=5
+    Монтаж [Equipment 2А]                                              qty=4
+    Монтаж [Equipment 3А]                                              qty=4
+    Монтаж [Equipment 4А]                                              qty=2
+    Монтаж [Equipment 5]                                               qty=9
+
+______________________________________________________________________
+[7/10] pos_28
+  VOR: ВОР поз.28.xlsx
+  PDF: 02_PDF
+  WARNING: Legend (Условные обозначения) not found!
+    OK  1-Д-24-28-ЭОМ  опросный лист-ОЛ.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  1-Д-24-28-ЭОМ-001.ОД.pdf: 7 items (0 real, 7 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  1-Д-24-28-ЭОМ-002.ЩО.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  1-Д-24-28-ЭОМ-003.План ЭГ.pdf: 20 items (0 real, 20 auto-detected)
+
+  Unlisted symbols in drawing body (not in legend):
+        1 × 3
+        2 × 1
+     20Лк × 1
+        6 × 1
+    OK  1-Д-24-28-ЭОМ-004.Планы освещения.pdf: 1 items (0 real, 0 auto-detected)
+
+  Unlisted symbols in drawing body (not in legend):
+        2 × 1
+        6 × 1
+    OK  1-Д-24-28-ЭОМ-005.План привязки.pdf: 1 items (1 real, 0 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  1Д-24-28-ЭОМ ВОР.pdf: 37 items (0 real, 37 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_01.pdf: 8 items (0 real, 8 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_02.pdf: 19 items (0 real, 19 auto-detected)
+  PDFs processed: 9 (0 errors)
+  Reference items: 23
+  Generated items: 1
+
+  RESULTS:
+    Matched (name+qty):      0
+    Count mismatch:          0
+    Missing (not found):    23
+    Extra (not in ref):      1
+    Name match rate:        0.0%
+    Exact accuracy:         0.0%
+    Time: 12.2s
+
+  MISSING from generated (top 10):
+    Монтаж щита распределительного ЩО                                  qty=1
+    Подключение жил кабелей до 10 мм2                                  qty=8
+    Монтаж светильников подвесной на высоте до 5 метров:               qty=3
+    Светодиодный светильник 31Вт, IP65, 5000K, 4990Лм, SVT-SPC-54MPE-  qty=3
+    Монтаж коробки ответвит. с кабельными вводами, IP44, 80х80х40мм,   qty=2
+    Прокладка кабеля в гофре на высоте до 5 м (суммарное сечение до 6  qty=36
+    Кабель ППГнг-(А)-HF сечением  3х1,5                                qty=36
+    Прокладка горизонтального заземлителя по периметру из стальной оц  qty=45
+    Забивка вертикальных электродов из стального прута, оцинкованного  qty=8
+    Установка зажима прута на штыре (пластина 56х56мм) HZ              qty=4
+
+  EXTRA in generated (top 10):
+    Монтаж светильника INSEL LB_S LED G3 70W D120 850 WH SB            qty=3
+
+______________________________________________________________________
+[8/10] pos_30
+  VOR: ВОР поз.30.xlsx
+  PDF: 03_PDF
+  WARNING: Legend (Условные обозначения) not found!
+    OK  001 - Общие данные (начало).pdf: 10 items (0 real, 10 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  002 - Общие данные (окончание).pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  003 - Схема  ВРУ-1.ВРУ.pdf: 7 items (0 real, 7 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  004 - Схема УП.pdf: 12 items (0 real, 12 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  005-План молниезащиты.pdf: 16 items (0 real, 16 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  006-План электрооборудования.pdf: 13 items (0 real, 13 auto-detected)
+
+  Unlisted symbols in drawing body (not in legend):
+        3 × 2
+        5 × 2
+        6 × 2
+        8 × 2
+       28 × 1
+       30 × 1
+        4 × 1
+        7 × 1
+        9 × 1
+    OK  007-План освещения.pdf: 4 items (4 real, 0 auto-detected)
+
+  Unlisted symbols in drawing body (not in legend):
+        3 × 1
+        4 × 1
+        5 × 1
+        6 × 1
+        7 × 1
+        8 × 1
+    OK  008 - План привязки.pdf: 4 items (4 real, 0 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  ОЛ.pdf: 20 items (0 real, 20 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_01.pdf: 14 items (0 real, 14 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_02.pdf: 18 items (0 real, 18 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_03.pdf: 20 items (0 real, 20 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_04.pdf: 10 items (0 real, 10 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  ЭОМ поз.30 ВОР.pdf: 67 items (0 real, 67 auto-detected)
+  PDFs processed: 14 (0 errors)
+  Reference items: 94
+  Generated items: 8
+
+  RESULTS:
+    Matched (name+qty):      1
+    Count mismatch:          3
+    Missing (not found):    68
+    Extra (not in ref):      4
+    Name match rate:        5.6%
+    Exact accuracy:         1.4%
+    Time: 22.3s
+
+  COUNT MISMATCHES (top 10):
+    ref: Светодиодный светильник 46Вт, IP20, 4000K, 48
+    gen: Монтаж светильника светодиодный OPTIMA.OPL EC
+         ref=     8  gen=    16  delta=+8  ratio=86%
+
+    ref: Светодиодный светильник 28Вт, IP54, 4000K, 28
+    gen: Монтаж светильника светодиодный SAFARI DL LED
+         ref=     3  gen=     9  delta=+6  ratio=86%
+
+    ref: Светодиодный светильник 22Вт, IP65, 4000K, 25
+    gen: Монтаж светильника аварийного светодиодный CD
+         ref=     3  gen=     2  delta=-1  ratio=68%
+
+
+  MISSING from generated (top 10):
+    Монтаж вводно-распределительного устройства напольного             qty=1
+    Подключение жил кабелей до 10 мм2                                  qty=107
+    Монтаж настенного светодиодного светильника на высоте до 5 м       qty=14
+    Светодиодный светильник  4Вт IP20 MARS 2223-4 LED, 4501006420      qty=3
+    ПЭУ 010 Выход (210х105) LUNA/MARS пиктограмма                      qty=3
+    Монтаж настенного светодиодного светильника на высоте от 5 до 13   qty=10
+    Монтаж коробки пластиковой FS с кабельными вводами и клеммниками,  qty=8
+    Монтаж коробки ответвит. откр.установки 85x85x40 (внутр.размеры),  qty=20
+    Монтаж выключателя 1-клавишного в сборе 10А AtlasDesign 10АХ, бел  qty=11
+    Монтаж розетки в подрозетник  с заземлением со шторками, 16А, мех  qty=25
+
+  EXTRA in generated (top 10):
+    Монтаж светильника аварийного светодиодный CD LED 27 4000K EM 2.   qty=2
+    Монтаж светильника светодиодный OPTIMA.OPL ECO LED 595 (50) 4000K  qty=10
+    Монтаж светильника аварийного светодиодный OPTIMA.OPL ECO LED 595  qty=4
+    Монтаж крайних на линии.                                           qty=6
+
+______________________________________________________________________
+[9/10] pos_8_2_em
+  VOR: ВОР ЭМ поз. 8.2.xlsx
+  PDF: 02_PDF
+  WARNING: Legend (Условные обозначения) not found!
+    OK  001-ОД.pdf: 7 items (0 real, 7 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  002-ОД.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  003-ВРУ.pdf: 9 items (0 real, 9 auto-detected)
+
+  Unlisted symbols in drawing body (not in legend):
+        2 × 2
+    OK  004-План эм.pdf: 3 items (2 real, 0 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  005-План заземления.pdf: 8 items (0 real, 8 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  ВОР ЭМ_8.2.pdf: 40 items (0 real, 40 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО_001.pdf: 11 items (0 real, 11 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО_002.pdf: 20 items (0 real, 20 auto-detected)
+  PDFs processed: 8 (0 errors)
+  Reference items: 50
+  Generated items: 2
+
+  RESULTS:
+    Matched (name+qty):      0
+    Count mismatch:          0
+    Missing (not found):    48
+    Extra (not in ref):      2
+    Name match rate:        0.0%
+    Exact accuracy:         0.0%
+    Time: 9.9s
+
+  MISSING from generated (top 10):
+    Монтаж вводно-распределительного устройства                        qty=1
+    Подключение жил кабелей до 10 мм2                                  qty=57
+    Монтаж розеток в кабель канале 2Р+Е, со шторками, "Viva", 2 мод.,  qty=8
+    Двухкомпонентная огнестойкая пена , DN1201                         qty=2
+    Пистолет для двухкомпонентной пены, DN1202                         qty=1
+    Гильза закладная труба сталь ВГП Ду 20 (Дн 26,8х2,5) ГОСТ 3262-75  qty=4
+    Гильза закладная труба сталь ВГП Ду 32 (Дн 26,8х2,5) ГОСТ 3262-75  qty=1
+    Прокладка кабеля в земле                                           qty=10
+    Кабель ВБШвнг(А)-LS сечением 5х6                                   qty=70
+    Выемка грунта                                                      qty=4
+
+  EXTRA in generated (top 10):
+    Монтаж [Equipment 3]                                               qty=3
+    Монтаж [Equipment 1]                                               qty=3
+
+______________________________________________________________________
+[10/10] pos_8_2_eo
+  VOR: ВОР поз. 8.2.xlsx
+  PDF: 02_PDF
+  WARNING: Legend (Условные обозначения) not found!
+    OK  001-ОД.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  002-ВРУ.pdf: 9 items (0 real, 9 auto-detected)
+
+  Unlisted symbols in drawing body (not in legend):
+        4 × 7
+       60 × 5
+        5 × 2
+     50Лк × 2
+        6 × 2
+        7 × 2
+        8 × 2
+       10 × 1
+       21 × 1
+       27 × 1
+       30 × 1
+        9 × 1
+    OK  003-План освещения.pdf: 6 items (6 real, 0 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  1) Титульный лист (1Д-24-8.2-ЭО) рев.1.pdf: 4 items (0 real, 4 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_01.pdf: 21 items (0 real, 21 auto-detected)
+  WARNING: Legend (Условные обозначения) not found!
+    OK  СО-СО_02.pdf: 14 items (0 real, 14 auto-detected)
+  PDFs processed: 6 (0 errors)
+  Reference items: 90
+  Generated items: 5
+
+  RESULTS:
+    Matched (name+qty):      0
+    Count mismatch:          1
+    Missing (not found):    69
+    Extra (not in ref):      4
+    Name match rate:        1.4%
+    Exact accuracy:         0.0%
+    Time: 7.8s
+
+  COUNT MISMATCHES (top 10):
+    ref: Монтаж светильников подвесной на высоте до 5 
+    gen: Монтаж светильника аварийного CD LED 27 EM 40
+         ref=    11  gen=     1  delta=-10  ratio=61%
+
+
+  MISSING from generated (top 10):
+    Монтаж вводно-распределительного устройства                        qty=1
+    Подключение жил кабелей до 10 мм2                                  qty=48
+    Подключение жил кабелей до 35мм2                                   qty=5
+    Подключение жил кабелей до 70 мм2                                  qty=5
+    Светодиодный светильник 5000K 27ВТ 4748Лм, TL-PROM APS 25 5K LC D  qty=11
+    Монтаж розеток в кабель канале 2Р+Е, со шторками, "Viva", 2 мод.,  qty=2
+    Монтаж коробки пластиковой FS с кабельными вводами и клеммниками,  qty=2
+    Монтаж коробки ответвит. с кабельными вводами, IP44, 80х80х40мм,   qty=5
+    Прокладка кабеля в земле                                           qty=200
+    Кабель ВБШвнг(А)-LS сечением 5х70                                  qty=76
+
+  EXTRA in generated (top 10):
+    Монтаж светильника CD LED 27 4000K гофротруба Стяжка стальная      qty=15
+    Монтаж светильника SLICK.PRS LED 60 with driver box /tempered gla  qty=49
+    Монтаж металлоконструкция                                          qty=8
+    Монтаж металлоконструкция [авар. цепь]                             qty=1
+
+================================================================================
+  OVERALL SUMMARY
+================================================================================
+  Cases OK / Skip / Error:  10 / 0 / 0
+  Total ref items:          965
+  Matched (name+qty):       2
+  Count mismatches:         17
+  Missing:                  765
+  Extra:                    21
+  Name match rate:          2.0%
+  Exact accuracy:           0.2%
+
+  Case               Ref   Gen Match  MisM  Miss  Xtra  NmRt%   Acc%
+  ---------------- ----- ----- ----- ----- ----- ----- ------ ------
+  abk_eo              85    10     0     9    50     1  15.3%   0.0%
+  abk_em             209     0     0     0   164     0   0.0%   0.0%
+  abk_eg              33     0     0     0    31     0   0.0%   0.0%
+  pos_12_3            83     0     0     0    78     0   0.0%   0.0%
+  pos_16_2            75     9     1     4    67     4   6.9%   1.4%
+  pos_27             223     5     0     0   167     5   0.0%   0.0%
+  pos_28              23     1     0     0    23     1   0.0%   0.0%
+  pos_30              94     8     1     3    68     4   5.6%   1.4%
+  pos_8_2_em          50     2     0     0    48     2   0.0%   0.0%
+  pos_8_2_eo          90     5     0     1    69     4   1.4%   0.0%
+
+  Report saved: C:\Cursor\TayfaProject\EquipmentCounter\test_vor_report.json
+================================================================================
