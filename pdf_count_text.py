@@ -786,7 +786,9 @@ def count_symbols(
             # --- Contextual filters ---
 
             # Filter: skip if near Latin text (model name fragment)
-            if _is_near_latin_text(dw, word_index):
+            # Relax near coloured equipment — markers like "2" next to
+            # "CD LED 27" are legitimate equipment labels.
+            if not near_color_equip and _is_near_latin_text(dw, word_index):
                 continue
 
             # Filter: skip if part of ЛК value

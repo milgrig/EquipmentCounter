@@ -889,6 +889,87 @@ body.dark .cat-эвакуационный   { background: #5a1030; color: #f098b
     flex-shrink: 0;
 }
 
+/* ── Count progress panel ──────────────────────────────────── */
+
+.count-progress {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-light);
+    flex-shrink: 0;
+}
+.progress-bar-wrap {
+    height: 6px;
+    background: var(--bg-darker);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+.progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #4a90d9, #28a745);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+.progress-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.82rem;
+}
+.progress-step {
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+}
+.progress-label {
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.progress-log {
+    max-height: 220px;
+    overflow-y: auto;
+    font-size: 0.78rem;
+    font-family: var(--mono);
+    line-height: 1.6;
+    color: var(--text-muted);
+}
+.progress-log .log-line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+}
+.progress-log .log-icon {
+    flex-shrink: 0;
+    width: 1.2em;
+    text-align: center;
+}
+.progress-log .log-count {
+    margin-left: auto;
+    color: var(--text);
+    font-weight: 600;
+    white-space: nowrap;
+}
+.progress-log .log-line.done .log-text {
+    color: var(--text);
+}
+.progress-log .log-line.error .log-text {
+    color: #dc3545;
+}
+.progress-log .log-sym-img {
+    height: 20px;
+    max-width: 40px;
+    object-fit: contain;
+    flex-shrink: 0;
+    border-radius: 2px;
+    vertical-align: middle;
+}
+.progress-log .log-line {
+    align-items: center;
+}
+
 /* ── Count stats ────────────────────────────────────────────── */
 
 .count-stats {

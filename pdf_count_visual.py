@@ -33,7 +33,7 @@ import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +69,7 @@ class VisualResult:
     matches: list[VisualMatch] = field(default_factory=list)
     counts: dict[int, int] = field(default_factory=dict)   # symbol_index → count
     descriptions: dict[int, str] = field(default_factory=dict)  # symbol_index → desc
+    disambiguated_indices: set[int] = field(default_factory=set)  # symbol indices resolved by text disambiguation (S021)
     # Metadata
     page_index: int = 0
     legend_page: int = 0
@@ -118,6 +119,27 @@ TITLE_BLOCK_MIN_LINES = 6
 FP_LINE_DENSITY_THRESH = 0.45   # max ratio of edge pixels in ROI (hatching)
 FP_TEXT_OVERLAP_THRESH = 0.30   # max ratio of ROI area covered by text chars
 FP_ROI_EXPAND = 1.5             # expand ROI by this factor for context analysis
+
+# Shape verification (visual anti-flood)
+# Verifies that the matched ROI actually resembles the template's binary shape.
+SHAPE_VERIFY_MIN_RECALL = 0.22
+SHAPE_VERIFY_MIN_PRECISION = 0.08
+# Hard cap for simple one-letter compound markers (e.g. 1А) to avoid
+# catastrophic flood when a tiny template matches repetitive background.
+SIMPLE_COMPOUND_MAX_MATCHES = 80
+# Candidate-first detection for simple one-letter compounds.
+SIMPLE_COMPOUND_USE_CANDIDATES = True
+
+# Connected-component candidate proposal (pixel units at render DPI).
+CANDIDATE_BIN_THRESH = 205
+CANDIDATE_LINE_KERNEL = 35
+CANDIDATE_MIN_AREA_PX = 28
+CANDIDATE_MAX_AREA_PX = 6000
+CANDIDATE_MIN_SIDE_PX = 6
+CANDIDATE_MAX_SIDE_PX = 180
+CANDIDATE_MAX_ASPECT = 4.0
+CANDIDATE_PAD_PX = 2
+CANDIDATE_MAX_COUNT = 6000
 
 # Non-equipment template skip patterns (T142)
 # Templates whose description matches these patterns are typically wiring/cable
@@ -499,6 +521,205 @@ def _is_false_positive(
 
 
 # ---------------------------------------------------------------------------
+# Shape verification filter (anti-flood for repetitive backgrounds)
+# ---------------------------------------------------------------------------
+
+def _is_shape_mismatch(
+    page_gray: np.ndarray,
+    template_gray: np.ndarray,
+    cx_px: float,
+    cy_px: float,
+    w_px: float,
+    h_px: float,
+    rot: int,
+    scale: float,
+    dpi_ratio: float,
+    variant_cache: dict[tuple[int, float], np.ndarray],
+    min_recall: float = SHAPE_VERIFY_MIN_RECALL,
+    min_precision: float = SHAPE_VERIFY_MIN_PRECISION,
+) -> bool:
+    """Check whether a matched ROI resembles the template's binary shape.
+
+    Returns True when the ROI shape is too dissimilar from the corresponding
+    rotated/scaled template variant (likely a false-positive flood match).
+    """
+    key = (rot, round(scale, 3))
+    tpl_bin = variant_cache.get(key)
+    if tpl_bin is None:
+        rotated = _rotate_image(template_gray, rot)
+        effective_scale = scale / dpi_ratio
+        scaled = _scale_image(rotated, effective_scale)
+        _, tpl_bin = cv2.threshold(scaled, 200, 255, cv2.THRESH_BINARY_INV)
+        variant_cache[key] = tpl_bin
+
+    tpl_h, tpl_w = tpl_bin.shape[:2]
+    if tpl_h < 4 or tpl_w < 4:
+        return False
+
+    x1 = max(0, int(cx_px - w_px / 2))
+    y1 = max(0, int(cy_px - h_px / 2))
+    x2 = min(page_gray.shape[1], int(cx_px + w_px / 2))
+    y2 = min(page_gray.shape[0], int(cy_px + h_px / 2))
+    if x2 <= x1 or y2 <= y1:
+        return True
+
+    roi = page_gray[y1:y2, x1:x2]
+    if roi.size == 0:
+        return True
+
+    roi_norm = cv2.resize(roi, (tpl_w, tpl_h), interpolation=cv2.INTER_LINEAR)
+    _, roi_bin = cv2.threshold(roi_norm, 200, 255, cv2.THRESH_BINARY_INV)
+
+    # Mild dilation compensates small alignment offsets.
+    k = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+    tpl_d = cv2.dilate(tpl_bin, k, iterations=1)
+    roi_d = cv2.dilate(roi_bin, k, iterations=1)
+
+    tpl_fg = np.count_nonzero(tpl_d)
+    roi_fg = np.count_nonzero(roi_d)
+    if tpl_fg < 12:
+        return False
+
+    overlap = np.count_nonzero(cv2.bitwise_and(tpl_d, roi_d))
+    recall = overlap / tpl_fg
+    precision = overlap / max(roi_fg, 1)
+
+    return recall < min_recall or precision < min_precision
+
+
+def _build_component_candidates(
+    page_gray: np.ndarray,
+    exclusion_zones: list[tuple[str, tuple[float, float, float, float]]],
+    px_per_pt: float,
+) -> list[tuple[int, int, int, int]]:
+    """Propose symbol candidates from connected components on drawing pixels."""
+    _, binary = cv2.threshold(page_gray, CANDIDATE_BIN_THRESH, 255, cv2.THRESH_BINARY_INV)
+
+    # Remove long cable/grid lines so components are closer to symbol blobs.
+    h_k = cv2.getStructuringElement(cv2.MORPH_RECT, (CANDIDATE_LINE_KERNEL, 1))
+    v_k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, CANDIDATE_LINE_KERNEL))
+    h_lines = cv2.morphologyEx(binary, cv2.MORPH_OPEN, h_k)
+    v_lines = cv2.morphologyEx(binary, cv2.MORPH_OPEN, v_k)
+    lines = cv2.bitwise_or(h_lines, v_lines)
+    fg = cv2.bitwise_and(binary, cv2.bitwise_not(lines))
+
+    # Light cleanup of isolated noise pixels.
+    k = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+    fg = cv2.morphologyEx(fg, cv2.MORPH_OPEN, k)
+
+    num_labels, _labels, stats, _ = cv2.connectedComponentsWithStats(fg, connectivity=8)
+    candidates: list[tuple[int, int, int, int, int]] = []
+    img_h, img_w = page_gray.shape[:2]
+    for lbl in range(1, num_labels):
+        x = int(stats[lbl, cv2.CC_STAT_LEFT])
+        y = int(stats[lbl, cv2.CC_STAT_TOP])
+        w = int(stats[lbl, cv2.CC_STAT_WIDTH])
+        h = int(stats[lbl, cv2.CC_STAT_HEIGHT])
+        area = int(stats[lbl, cv2.CC_STAT_AREA])
+
+        if area < CANDIDATE_MIN_AREA_PX or area > CANDIDATE_MAX_AREA_PX:
+            continue
+        if w < CANDIDATE_MIN_SIDE_PX or h < CANDIDATE_MIN_SIDE_PX:
+            continue
+        if w > CANDIDATE_MAX_SIDE_PX or h > CANDIDATE_MAX_SIDE_PX:
+            continue
+        if max(w, h) / max(min(w, h), 1) > CANDIDATE_MAX_ASPECT:
+            continue
+
+        cx_pt = (x + w / 2.0) / px_per_pt
+        cy_pt = (y + h / 2.0) / px_per_pt
+        if _pt_excluded(cx_pt, cy_pt, exclusion_zones):
+            continue
+
+        x0 = max(0, x - CANDIDATE_PAD_PX)
+        y0 = max(0, y - CANDIDATE_PAD_PX)
+        x1 = min(img_w, x + w + CANDIDATE_PAD_PX)
+        y1 = min(img_h, y + h + CANDIDATE_PAD_PX)
+        candidates.append((x0, y0, x1 - x0, y1 - y0, area))
+
+    # Keep strongest (largest) candidates if sheet is extremely dense.
+    if len(candidates) > CANDIDATE_MAX_COUNT:
+        candidates.sort(key=lambda c: c[4], reverse=True)
+        candidates = candidates[:CANDIDATE_MAX_COUNT]
+
+    return [(x, y, w, h) for x, y, w, h, _a in candidates]
+
+
+def _match_template_on_candidates(
+    page_gray: np.ndarray,
+    template_gray: np.ndarray,
+    candidates: list[tuple[int, int, int, int]],
+    threshold: float,
+    scales: list[float],
+    rotations: list[int],
+    dpi_ratio: float,
+) -> list[tuple[float, float, float, float, int, float, float]]:
+    """Classify each candidate ROI by template similarity (best variant wins)."""
+    if not candidates:
+        return []
+
+    best_by_candidate: dict[int, tuple[float, float, float, float, int, float, float]] = {}
+    variant_cache: dict[tuple[int, float], np.ndarray] = {}
+
+    for rot in rotations:
+        for scale in scales:
+            key = (rot, round(scale, 3))
+            tpl = variant_cache.get(key)
+            if tpl is None:
+                rotated = _rotate_image(template_gray, rot)
+                effective_scale = scale / dpi_ratio
+                tpl = _scale_image(rotated, effective_scale)
+                variant_cache[key] = tpl
+
+            th, tw = tpl.shape[:2]
+            if th < 5 or tw < 5:
+                continue
+
+            for ci, (x, y, w, h) in enumerate(candidates):
+                roi = page_gray[y:y + h, x:x + w]
+                if roi.size == 0:
+                    continue
+
+                roi_norm = cv2.resize(roi, (tw, th), interpolation=cv2.INTER_LINEAR)
+                conf = float(cv2.matchTemplate(
+                    roi_norm, tpl, cv2.TM_CCOEFF_NORMED
+                )[0, 0])
+                if conf < threshold:
+                    continue
+
+                cx = x + w / 2.0
+                cy = y + h / 2.0
+                det = (cx, cy, float(w), float(h), rot, scale, conf)
+                prev = best_by_candidate.get(ci)
+                if prev is None or conf > prev[6]:
+                    best_by_candidate[ci] = det
+
+    return list(best_by_candidate.values())
+
+
+def _auto_candidate_threshold(
+    candidate_detections: list[tuple[float, float, float, float, int, float, float]],
+    base_threshold: float,
+) -> float:
+    """Pick adaptive threshold for candidate-classifier confidence.
+
+    Candidate scores are usually lower than dense sliding-template scores.
+    We keep only top-confidence tail (roughly top 3%) with clamps.
+    """
+    if not candidate_detections:
+        return base_threshold
+
+    confs = np.array([d[6] for d in candidate_detections], dtype=np.float32)
+    if confs.size < 20:
+        return base_threshold
+
+    p97 = float(np.percentile(confs, 97))
+    p99 = float(np.percentile(confs, 99))
+    adaptive = max(base_threshold, p97, p99 - 0.015)
+    return float(min(0.62, max(0.30, adaptive)))
+
+
+# ---------------------------------------------------------------------------
 # Symbol extraction from legend
 # ---------------------------------------------------------------------------
 
@@ -666,7 +887,12 @@ def _extract_symbol_images(
         if prev_yc is not None:
             row_top = (prev_yc + yc) / 2
         else:
-            row_top = legend_bbox[1]
+            # For the first item: legend_bbox[1] is the top of the entire
+            # table, which includes the header row ("Обозначение" etc.).
+            # Use the item's own bbox top minus a small margin instead,
+            # so the header text is excluded from the symbol cell crop.
+            item_top = items[i].bbox[1] if items[i].bbox != (0, 0, 0, 0) else yc
+            row_top = max(legend_bbox[1], item_top - 5)
         # bottom boundary: midpoint to next item, or legend bottom
         next_yc = None
         for j in range(i + 1, len(y_centres)):
@@ -699,9 +925,19 @@ def _extract_symbol_images(
         # Define clip rect for this symbol cell
         clip = fitz.Rect(sx0 + pad, row_top + pad, sx1 - pad, row_bot - pad)
 
+        # Guard: if clip is degenerate (too small), skip
+        if clip.is_empty or clip.width < 2 or clip.height < 2:
+            results.append((item_idx, item, None))
+            continue
+
         # Render at high DPI
         mat = fitz.Matrix(zoom, zoom)
         pix = fitz_page.get_pixmap(matrix=mat, clip=clip, alpha=False)
+
+        # Guard: empty pixmap (can happen with tiny clips at high zoom)
+        if pix.width < 1 or pix.height < 1 or len(pix.samples) == 0:
+            results.append((item_idx, item, None))
+            continue
 
         # Convert to numpy array
         img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(
@@ -1085,6 +1321,7 @@ def _nms(
     detections: list[tuple[float, float, float, float, int, float, float]],
     overlap_thresh: float = NMS_OVERLAP_THRESH,
     adaptive_ratio: float = NMS_ADAPTIVE_RATIO,
+    min_radius_px: float = 60.0,
 ) -> list[tuple[float, float, float, float, int, float, float]]:
     """
     Non-maximum suppression using both IoU and adaptive distance criteria.
@@ -1109,8 +1346,10 @@ def _nms(
 
         bcx, bcy, bw, bh = best[0], best[1], best[2], best[3]
 
-        # Adaptive suppress radius: proportional to template size
-        suppress_radius = max(bw, bh) * adaptive_ratio
+        # Adaptive suppress radius: proportional to template size.
+        # Floor at configurable minimum radius to prevent duplicate detections
+        # of small templates at closely-spaced fixtures (S021).
+        suppress_radius = max(max(bw, bh) * adaptive_ratio, min_radius_px)
 
         remaining = []
         for det in sorted_dets:
@@ -1298,6 +1537,214 @@ def detect_pictograms(
 
 
 # ---------------------------------------------------------------------------
+# Confusable template disambiguation (S021)
+# ---------------------------------------------------------------------------
+
+# Tokens that distinguish visually identical template variants.
+# If two legend descriptions differ only by one of these tokens,
+# they are "confusable" — template matching cannot separate them,
+# but reading nearby text on the drawing can.
+_DISAMBIG_TOKENS = {
+    "TH", "EM", "EX", "IP65", "IP66", "AT", "FP", "DLW",
+    # Russian operational variants for visually identical symbols/templates.
+    "АВАРИЙНОГО", "АВАРИЙНОЕ", "АВАРИЙНЫЙ",
+    "РАБОЧЕГО", "РАБОЧЕЕ", "РАБОЧИЙ",
+}
+
+
+def _find_confusable_groups(
+    templates: list[tuple[int, object, object, str, float]],
+) -> list[tuple[int, int, set[str], set[str]]]:
+    """Identify pairs of templates whose descriptions differ only by
+    a few distinguishing tokens (e.g. 'TH', 'Ex').
+
+    Returns list of (idx_a, idx_b, tokens_a, tokens_b) where tokens_X
+    are the words present in description X but not in the other.
+    """
+    import re as _re
+
+    groups: list[tuple[int, int, set[str], set[str]]] = []
+    n = len(templates)
+    for i in range(n):
+        for j in range(i + 1, n):
+            idx_a = templates[i][0]
+            idx_b = templates[j][0]
+            desc_a = templates[i][1].description or ""
+            desc_b = templates[j][1].description or ""
+            # Tokenize: split into words
+            words_a = set(
+                tok.upper()
+                for tok in _re.findall(r"[A-Za-zА-Яа-яЁё0-9.]+", desc_a)
+            )
+            words_b = set(
+                tok.upper()
+                for tok in _re.findall(r"[A-Za-zА-Яа-яЁё0-9.]+", desc_b)
+            )
+            only_a = words_a - words_b
+            only_b = words_b - words_a
+            # They are confusable if they share most words and differ
+            # only by known disambiguation tokens
+            diff_all = only_a | only_b
+            if not diff_all:
+                continue  # identical descriptions — not our problem
+            common = words_a & words_b
+            # For short labels (e.g. "Щит аварийного освещения" vs
+            # "Щит рабочего освещения"), allow 2 shared words.
+            if len(common) < 3:
+                if not (len(common) >= 2 and max(len(words_a), len(words_b)) <= 4):
+                    continue  # too different to be confusable
+            # Require high word overlap. For long descriptions keep a strict
+            # threshold; for short labels allow a slightly lower overlap.
+            # This still prevents false grouping of different fixture
+            # families (e.g. SLICK.PRS 50 vs ARCTIC.OPL 1200), while letting
+            # short variants like "щит аварийного/рабочего освещения" pair.
+            max_len = max(len(words_a), len(words_b))
+            required_overlap = 0.80 if max_len > 4 else 0.60
+            if len(common) / max_len < required_overlap:
+                continue
+            # All differing tokens must be known disambig tokens or
+            # trivial (empty set on one side).  If the difference
+            # includes unknown words (e.g. different model numbers
+            # like '50' vs '30'), they are genuinely different items.
+            non_disambig = diff_all - _DISAMBIG_TOKENS
+            if non_disambig:
+                continue  # different model/size — not confusable
+            # Check that at least one side has a known disambig token
+            if diff_all & _DISAMBIG_TOKENS:
+                groups.append((idx_a, idx_b, only_a, only_b))
+    return groups
+
+
+def _collect_text_near_point(
+    x_pt: float,
+    y_pt: float,
+    drawing_chars: list[dict],
+    radius_pt: float = 40.0,
+) -> str:
+    """Collect all text characters within radius_pt of (x_pt, y_pt).
+
+    Returns concatenated text (uppercase) for keyword search.
+    """
+    chars = []
+    for ch in drawing_chars:
+        cx = float(ch.get("x0", 0))
+        cy = float(ch.get("top", 0))
+        if abs(cx - x_pt) <= radius_pt and abs(cy - y_pt) <= radius_pt:
+            chars.append(ch.get("text", ""))
+    return "".join(chars).upper()
+
+
+def _disambiguate_matches(
+    matches: list,  # list[VisualMatch]
+    confusable_groups: list[tuple[int, int, set[str], set[str]]],
+    drawing_chars: list[dict],
+) -> list:
+    """For matches at locations where confusable templates overlap,
+    assign each match to the correct template variant based on
+    nearby text keywords.
+
+    Returns updated list of matches with duplicates removed.
+    """
+    if not confusable_groups:
+        return matches
+
+    # Build lookup: symbol_index → list of (partner_index, my_tokens, partner_tokens)
+    confusable_map: dict[int, list[tuple[int, set[str], set[str]]]] = {}
+    for idx_a, idx_b, tok_a, tok_b in confusable_groups:
+        confusable_map.setdefault(idx_a, []).append((idx_b, tok_a, tok_b))
+        confusable_map.setdefault(idx_b, []).append((idx_a, tok_b, tok_a))
+
+    CLUSTER_RADIUS = 25.0  # pt — matches within this radius are at "same location"
+
+    # Group matches by physical location (cluster nearby matches)
+    used = [False] * len(matches)
+    clusters: list[list[int]] = []  # list of match-index lists
+    for i, m in enumerate(matches):
+        if used[i]:
+            continue
+        cluster = [i]
+        used[i] = True
+        for j in range(i + 1, len(matches)):
+            if used[j]:
+                continue
+            dist = math.sqrt((m.x - matches[j].x) ** 2 +
+                             (m.y - matches[j].y) ** 2)
+            if dist < CLUSTER_RADIUS:
+                cluster.append(j)
+                used[j] = True
+        clusters.append(cluster)
+
+    result = []
+    for cluster in clusters:
+        cluster_matches = [matches[i] for i in cluster]
+        # Check if cluster contains a confusable pair
+        sym_indices = {m.symbol_index for m in cluster_matches}
+        has_confusable = False
+        for si in sym_indices:
+            if si in confusable_map:
+                for partner, _, _ in confusable_map[si]:
+                    if partner in sym_indices:
+                        has_confusable = True
+                        break
+            if has_confusable:
+                break
+
+        if not has_confusable or len(cluster_matches) == 1:
+            # No disambiguation needed — keep all
+            result.extend(cluster_matches)
+            continue
+
+        # Read text near this location
+        cx = sum(m.x for m in cluster_matches) / len(cluster_matches)
+        cy = sum(m.y for m in cluster_matches) / len(cluster_matches)
+        nearby_text = _collect_text_near_point(cx, cy, drawing_chars)
+
+        # For each confusable pair in this cluster, decide which template wins
+        winners: dict[int, float] = {}  # symbol_index → best confidence
+        for m in cluster_matches:
+            if m.symbol_index not in confusable_map:
+                # Not confusable — keep as-is
+                winners[m.symbol_index] = max(
+                    winners.get(m.symbol_index, 0), m.confidence
+                )
+                continue
+
+            # Check which variant's distinguishing tokens appear in text
+            for partner, my_tokens, partner_tokens in confusable_map[m.symbol_index]:
+                if partner not in sym_indices:
+                    continue
+                # Count how many of MY distinguishing tokens appear nearby
+                my_hits = sum(1 for t in my_tokens if t.upper() in nearby_text)
+                partner_hits = sum(1 for t in partner_tokens if t.upper() in nearby_text)
+                if my_hits > partner_hits:
+                    # My tokens found — I'm the right variant
+                    winners[m.symbol_index] = max(
+                        winners.get(m.symbol_index, 0), m.confidence
+                    )
+                elif partner_hits > my_hits:
+                    # Partner tokens found — partner wins, skip me
+                    pass
+                else:
+                    # Tie — keep higher confidence
+                    winners[m.symbol_index] = max(
+                        winners.get(m.symbol_index, 0), m.confidence
+                    )
+
+        # Build output: one match per winning symbol at this location
+        for m in cluster_matches:
+            if m.symbol_index in winners:
+                result.append(m)
+                # Remove from winners so we don't add duplicates of same symbol
+                del winners[m.symbol_index]
+
+    logger.debug(
+        "disambiguate: %d matches in, %d out, %d confusable groups",
+        len(matches), len(result), len(confusable_groups),
+    )
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Core matching logic
 # ---------------------------------------------------------------------------
 
@@ -1310,6 +1757,7 @@ def match_symbols(
     rotations: Optional[list[int]] = None,
     render_dpi: int = RENDER_DPI,
     detect_colors: bool = True,
+    progress_callback: Optional[Callable] = None,
 ) -> VisualResult:
     """
     Find and count equipment by matching legend symbols on drawing pages.
@@ -1486,6 +1934,15 @@ def match_symbols(
 
     # Conversion factor: pixel → PDF pt
     px_per_pt = render_dpi / 72.0
+    simple_compound_candidates: list[tuple[int, int, int, int]] = []
+    if SIMPLE_COMPOUND_USE_CANDIDATES:
+        simple_compound_candidates = _build_component_candidates(
+            page_gray, exclusion_zones, px_per_pt,
+        )
+        logger.debug(
+            "candidate_proposal: %d component candidates",
+            len(simple_compound_candidates),
+        )
 
     all_matches: list[VisualMatch] = []
     counts: dict[int, int] = {}
@@ -1493,6 +1950,8 @@ def match_symbols(
 
     for idx, item, template, sym_color, adj_threshold in templates:
         descriptions[idx] = item.description
+        sym_text = (item.symbol or "").strip()
+        is_simple_compound = bool(re.fullmatch(r"\d{1,2}[А-Яа-яЁё]", sym_text))
 
         # Determine expected color for this item.
         # Use the legend parser's color (from PDF stroking_color analysis)
@@ -1507,11 +1966,32 @@ def match_symbols(
         # the legend parser is used for POST-HOC validation only.
         match_target = page_gray
 
-        # Match template on page (using per-template adjusted threshold)
-        raw_detections = _match_template_multi(
-            match_target, template, adj_threshold, scales, rotations, dpi_ratio,
-            page_gray_coarse=page_gray_coarse,
-        )
+        # Match template on page. For tiny one-letter compounds use
+        # candidate-first path: propose components, then classify each ROI.
+        if is_simple_compound and SIMPLE_COMPOUND_USE_CANDIDATES:
+            # Candidate classifier scores are lower than dense sliding
+            # template matching scores (ROI normalized to candidate box),
+            # so we calibrate threshold from score distribution per symbol.
+            all_candidate_detections = _match_template_on_candidates(
+                match_target, template, simple_compound_candidates,
+                0.0, scales, rotations, dpi_ratio,
+            )
+            candidate_thresh = _auto_candidate_threshold(
+                all_candidate_detections, base_threshold=0.32,
+            )
+            raw_detections = [
+                d for d in all_candidate_detections if d[6] >= candidate_thresh
+            ]
+            logger.debug(
+                "candidate_calib[%d] %s: all=%d thr=%.3f kept=%d",
+                idx, sym_text, len(all_candidate_detections),
+                candidate_thresh, len(raw_detections),
+            )
+        else:
+            raw_detections = _match_template_multi(
+                match_target, template, adj_threshold, scales, rotations, dpi_ratio,
+                page_gray_coarse=page_gray_coarse,
+            )
 
         # Pre-filter: remove raw detections inside exclusion zones BEFORE
         # NMS (T141). Without this, high-confidence legend-zone matches
@@ -1528,7 +2008,12 @@ def match_symbols(
                 drawing_detections.append(det)
 
         # Apply NMS only on drawing-area detections
-        filtered = _nms(drawing_detections, NMS_OVERLAP_THRESH)
+        nms_ratio = 1.2 if is_simple_compound else NMS_ADAPTIVE_RATIO
+        nms_min_radius = 120.0 if is_simple_compound else 60.0
+        filtered = _nms(
+            drawing_detections, NMS_OVERLAP_THRESH,
+            adaptive_ratio=nms_ratio, min_radius_px=nms_min_radius,
+        )
 
         # --- Diagnostic counters (T141) ---
         n_raw = len(raw_detections)
@@ -1536,8 +2021,10 @@ def match_symbols(
         n_nms = len(filtered)
         n_excluded = 0
         n_fp = 0
+        n_shape_reject = 0
         n_color_reject = 0
         excluded_zone_names: dict[str, int] = {}
+        variant_cache: dict[tuple[int, float], np.ndarray] = {}
 
         # Convert pixel coords to PDF pt and filter exclusion zones
         valid_matches: list[VisualMatch] = []
@@ -1563,6 +2050,17 @@ def match_symbols(
                 drawing_chars, px_per_pt,
             ):
                 n_fp += 1
+                continue
+
+            # Shape verification: reject repetitive-background matches that
+            # pass template score but don't resemble the actual symbol form.
+            if _is_shape_mismatch(
+                match_target, template, cx_px, cy_px, w_px, h_px,
+                rot, scale, dpi_ratio, variant_cache,
+                min_recall=(0.35 if is_simple_compound else SHAPE_VERIFY_MIN_RECALL),
+                min_precision=(0.12 if is_simple_compound else SHAPE_VERIFY_MIN_PRECISION),
+            ):
+                n_shape_reject += 1
                 continue
 
             # Post-hoc color validation: since we match on full grayscale,
@@ -1603,6 +2101,36 @@ def match_symbols(
             )
             valid_matches.append(vm)
 
+        # Spatial dedup for tiny one-letter compounds (e.g. 1А).
+        # Keep only the strongest match per local grid cell so repetitive
+        # background fragments cannot explode the count.
+        if is_simple_compound and valid_matches:
+            cell_pt = 120.0  # coarse spatial cell for noisy tiny templates
+            best_by_cell: dict[tuple[int, int], VisualMatch] = {}
+            for m in valid_matches:
+                cell = (int(m.x // cell_pt), int(m.y // cell_pt))
+                prev = best_by_cell.get(cell)
+                if prev is None or m.confidence > prev.confidence:
+                    best_by_cell[cell] = m
+            if len(best_by_cell) < len(valid_matches):
+                logger.debug(
+                    "match_symbols[%d] spatial_dedup: %d -> %d",
+                    idx, len(valid_matches), len(best_by_cell),
+                )
+            valid_matches = list(best_by_cell.values())
+
+        # Flood guard for simple one-letter compounds (e.g. 1А, 2А):
+        # these tiny templates are prone to massive accidental repeats.
+        if (re.fullmatch(r"\d{1,2}[А-Яа-яЁё]", sym_text)
+                and len(valid_matches) > SIMPLE_COMPOUND_MAX_MATCHES):
+            valid_matches.sort(key=lambda m: m.confidence, reverse=True)
+            dropped = len(valid_matches) - SIMPLE_COMPOUND_MAX_MATCHES
+            valid_matches = valid_matches[:SIMPLE_COMPOUND_MAX_MATCHES]
+            logger.warning(
+                "match_symbols[%d] flood_guard: symbol=%s limited %d->%d",
+                idx, sym_text, len(valid_matches) + dropped, len(valid_matches),
+            )
+
         counts[idx] = len(valid_matches)
         all_matches.extend(valid_matches)
 
@@ -1614,26 +2142,36 @@ def match_symbols(
         )
         logger.debug(
             "match_symbols[%d] %s: raw=%d pre_excl=%d drawing=%d nms=%d "
-            "excl=%d fp=%d color_rej=%d valid=%d thr=%.2f%s",
+            "excl=%d fp=%d shape_rej=%d color_rej=%d valid=%d thr=%.2f%s",
             idx, item.description[:40], n_raw, n_pre_excluded,
             n_drawing_raw, n_nms,
-            n_excluded, n_fp, n_color_reject, n_valid,
+            n_excluded, n_fp, n_shape_reject, n_color_reject, n_valid,
             adj_threshold, zones_str,
         )
 
-    # --- Cross-symbol NMS (T147, refined T148) --------------------------------
-    # When two DIFFERENT templates match at the same physical location
-    # (e.g. ARCTIC.OPL ECO LED 1200 TH vs non-TH), both get counted.
-    # Deduplicate: keep only the highest-confidence match at each location,
-    # but ONLY suppress when the winner has a clear confidence advantage.
-    #
-    # Confidence gap guard (T148): nearly-identical templates (e.g. ARCTIC
-    # TH vs non-TH) produce near-equal confidences at every location.
-    # Without a gap threshold the more generic template always wins and
-    # steals counts from the specific one.  Requiring a minimum gap
-    # ensures both survive at ambiguous locations — correct, because
-    # per-symbol NMS already prevents each template from double-counting
-    # its own matches.
+        # --- Progress callback (SSE streaming support) ---
+        if progress_callback is not None:
+            progress_callback(idx, item, n_valid)
+
+    # --- Confusable group detection (S021) ------------------------------------
+    # Identify template pairs that are visually identical but differ by a
+    # text token in their description (e.g. "TH", "Ex").  These pairs
+    # cannot be separated by confidence alone and need text disambiguation.
+    confusable_groups = _find_confusable_groups(templates)
+    confusable_pair_set: set[tuple[int, int]] = set()
+    for idx_a, idx_b, _, _ in confusable_groups:
+        confusable_pair_set.add((min(idx_a, idx_b), max(idx_a, idx_b)))
+    if confusable_groups:
+        logger.debug(
+            "confusable_groups: %d pairs: %s",
+            len(confusable_groups),
+            [(a, b) for a, b, _, _ in confusable_groups],
+        )
+
+    # --- Cross-symbol NMS (T147, refined T148, S021) --------------------------
+    # When two DIFFERENT templates match at the same physical location,
+    # deduplicate.  But SKIP suppression for confusable pairs — they will
+    # be resolved by text disambiguation instead.
     CROSS_NMS_RADIUS_PT = 25.0   # ~25pt ≈ 9mm — catches offset matches
     CROSS_NMS_CONF_GAP = 0.04   # min confidence advantage to suppress
 
@@ -1647,6 +2185,12 @@ def match_symbols(
             for kept in deduped:
                 if kept.symbol_index == m.symbol_index:
                     continue  # same symbol — already handled by per-symbol NMS
+                # Skip suppression for confusable pairs (S021) — they need
+                # text disambiguation, not confidence-based suppression.
+                pair_key = (min(kept.symbol_index, m.symbol_index),
+                            max(kept.symbol_index, m.symbol_index))
+                if pair_key in confusable_pair_set:
+                    continue
                 dist = math.sqrt((m.x - kept.x) ** 2 + (m.y - kept.y) ** 2)
                 if dist < CROSS_NMS_RADIUS_PT:
                     conf_gap = kept.confidence - m.confidence
@@ -1665,17 +2209,33 @@ def match_symbols(
                 n_cross_suppressed, len(all_matches), len(deduped),
             )
             all_matches = deduped
-            # Rebuild counts from deduplicated matches
-            counts = {}
-            for desc_idx in descriptions:
-                counts[desc_idx] = 0
-            for m in all_matches:
-                counts[m.symbol_index] = counts.get(m.symbol_index, 0) + 1
+
+    # --- Text-aided disambiguation (S021) -------------------------------------
+    # For confusable pairs that survived cross-NMS (both templates matched
+    # at the same location), read nearby text to decide which variant wins.
+    if confusable_groups and drawing_chars:
+        all_matches = _disambiguate_matches(
+            all_matches, confusable_groups, drawing_chars,
+        )
+
+    # Rebuild counts from final matches
+    counts = {}
+    for desc_idx in descriptions:
+        counts[desc_idx] = 0
+    for m in all_matches:
+        counts[m.symbol_index] = counts.get(m.symbol_index, 0) + 1
+
+    # Collect indices that were resolved by text disambiguation
+    disambig_set: set[int] = set()
+    for idx_a, idx_b, _, _ in confusable_groups:
+        disambig_set.add(idx_a)
+        disambig_set.add(idx_b)
 
     return VisualResult(
         matches=all_matches,
         counts=counts,
         descriptions=descriptions,
+        disambiguated_indices=disambig_set,
         page_index=scan_page,
         legend_page=legend_page,
         symbols_extracted=len(templates),

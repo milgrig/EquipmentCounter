@@ -784,6 +784,117 @@ def _detect_sheets(dxf_path: str, log=print) -> list[_SheetRegion] | None:
     return sheets
 
 
+# ── Cable-to-sheet assignment for multi-sheet DXF ─────────────────────
+
+_CABLE_MTEXT_RE = re.compile(
+    r"(?:ВБШвнг|ВБбШвнг|ВВГнг|ППГнг|АВВГнг|КГнг|АПвПу|ПвПу|ПуВВнг|ПуВВ|ПВС)"
+    r"[^,;]{0,60}L\s*[=\-]\s*(\d+)",
+    re.IGNORECASE,
+)
+
+
+def _cable_lengths_by_sheet(
+    dxf_path: str,
+    sheets: list[_SheetRegion],
+    log=print,
+) -> dict[str, int]:
+    """Scan DXF for cable data in MTEXT/TEXT and ACAD_TABLE, distribute by sheet.
+
+    Returns dict mapping HeightCategory -> total cable metres for that sheet.
+    Only returns entries for sheets with actual cable data found.
+    Uses X-coordinate of entities to assign cables to sheet boundaries.
+    """
+    if _ezdxf is None or not sheets:
+        return {}
+
+    try:
+        doc = _ezdxf.readfile(dxf_path)
+    except Exception:
+        return {}
+
+    msp = doc.modelspace()
+
+    # Collect (x_coord, cable_length) from all sources with cable info
+    cable_hits: list[tuple[float, int]] = []
+
+    # Source 1: Modelspace MTEXT/TEXT
+    for ent in msp:
+        try:
+            if ent.dxftype() == "MTEXT":
+                plain = ent.plain_text()
+                x = ent.dxf.insert.x
+            elif ent.dxftype() == "TEXT":
+                plain = ent.dxf.get("text", "")
+                x = ent.dxf.insert.x
+            else:
+                continue
+
+            if not plain:
+                continue
+
+            for m in _CABLE_MTEXT_RE.finditer(plain):
+                length = int(m.group(1))
+                if 1 <= length <= 5000:
+                    cable_hits.append((x, length))
+        except Exception:
+            continue
+
+    # Source 2: ACAD_TABLE entities — read cell content and use table X-coord
+    try:
+        from ezdxf.entities.acad_table import (
+            read_acad_table_content as _read_table,
+        )
+    except ImportError:
+        _read_table = None
+
+    if _read_table is not None:
+        for ent in msp.query("ACAD_TABLE"):
+            try:
+                x = ent.dxf.insert.x
+                rows = _read_table(ent)
+                for row in rows:
+                    for cell in row:
+                        if not cell or not cell.strip():
+                            continue
+                        # Strip MTEXT formatting
+                        plain = re.sub(r"\\[A-Za-z][^;]*;", "", cell)
+                        plain = re.sub(r"[{}]", "", plain).strip()
+                        for m in _CABLE_MTEXT_RE.finditer(plain):
+                            length = int(m.group(1))
+                            if 1 <= length <= 5000:
+                                cable_hits.append((x, length))
+            except Exception:
+                continue
+
+    if not cable_hits:
+        return {}
+
+    # Assign each hit to a sheet by X-coordinate
+    by_height: dict[str, int] = {}
+    unassigned = 0
+    for x, length in cable_hits:
+        assigned = False
+        for sheet in sheets:
+            if sheet.x_left <= x <= sheet.x_right and sheet.height_category:
+                by_height[sheet.height_category] = (
+                    by_height.get(sheet.height_category, 0) + length
+                )
+                assigned = True
+                break
+        if not assigned:
+            unassigned += length
+
+    if by_height:
+        log(f"    [cable-sheet] Cable lengths by sheet X-coord:")
+        for hcat in HEIGHT_CATEGORIES:
+            if hcat in by_height:
+                log(f"      {hcat}: {by_height[hcat]}m")
+        if unassigned:
+            log(f"      (unassigned: {unassigned}m)")
+
+    return by_height
+
+
 def _match_annotation_to_legend(annotation: str, legend_items: list[str]) -> str:
     """Find the best matching legend item for an abbreviated annotation."""
     ann_lower = annotation.lower().strip()
@@ -851,12 +962,15 @@ def scan_and_classify(folder: Path) -> list[tuple[Path, str, float | None]]:
         seen_stems.add(stem_lower)
         plan_type = _classify_plan(f.name)
         elevs = _extract_all_elevations(f.name)
-        elev = elevs[0] if elevs else None
         if plan_type == "другое" and f.suffix.lower() == ".dxf":
             plan_type, content_elev = _classify_by_content(str(f))
-            if elev is None and content_elev is not None:
-                elev = content_elev
-        _vor_logger.debug("classify: %s -> %s (elev=%s)", f.name, plan_type, elev)
+            if not elevs and content_elev is not None:
+                elevs = [content_elev]
+        elev = elevs[0] if elevs else None
+        _vor_logger.debug(
+            "classify: %s -> %s (elev=%s, elevs=%s)",
+            f.name, plan_type, elev, elevs,
+        )
         results.append((f, plan_type, elev))
     return results
 
@@ -900,10 +1014,18 @@ def parse_all_files(
         fkey = str(fpath)
 
         if fkey not in combined_cache:
+            # Check for multi-sheet layout in files that might contain
+            # multiple plans at different elevations.  This includes:
+            # - "другое" files with no filename elevation (original logic)
+            # - "схема" files where elevation was inferred from content
+            #   (these are often combined DXF with plans + schemas)
+            _fname_elev = _extract_all_elevations(fpath.name)
             should_check = (
                 fpath.suffix.lower() == ".dxf"
-                and plan_type == "другое"
-                and elev is None
+                and (
+                    (plan_type in ("другое", "схема") and not _fname_elev)
+                    or len(_fname_elev) > 1  # multi-elevation file
+                )
             )
             if should_check:
                 try:
@@ -930,15 +1052,16 @@ def parse_all_files(
                 results.append(result)
 
             cables: list[CableItem] = []
+            panels: list[PanelInfo] = []
             if fpath.suffix.lower() == ".dxf":
                 try:
                     cables = extract_cables_dxf(fkey)
                     if cables:
-                        _elev_stamp = extract_elevation_float(fpath.name)
-                        for c in cables:
-                            c.elevation_m = _elev_stamp
+                        # Multi-sheet DXF: leave elevation_m=None so Phase 2
+                        # distributes cables proportionally across the heights
+                        # detected from equipment on each sheet.
                         total_m = sum(c.total_length_m for c in cables)
-                        log(f"    Cables: {len(cables)} types, {total_m}m")
+                        log(f"    Cables: {len(cables)} types, {total_m}m (multi-sheet, elev=None)")
                 except Exception as e:
                     log(f"    Cable error: {e}")
                 try:
@@ -951,6 +1074,73 @@ def parse_all_files(
                 filename=fpath.name, plan_type="схема",
                 elevation=None, height_category=None,
                 cables=cables, panels=panels,
+            )
+            results.append(cable_result)
+            continue
+
+        # ── Multi-elevation fallback ──────────────────────────────────
+        # When filename contains 2+ elevations but _detect_sheets failed
+        # to identify separate sheets, split equipment evenly across
+        # the elevations so Phase 2 cable distribution works correctly.
+        _fname_elevs = _extract_all_elevations(fpath.name)
+        if len(_fname_elevs) > 1 and sheets is None:
+            n_elevs = len(_fname_elevs)
+            log(f"    Multi-elevation fallback: {n_elevs} elevations from filename")
+
+            # Parse equipment and cables once
+            if fkey in parse_cache:
+                items, cables = parse_cache[fkey]
+            else:
+                items = []
+                cables = []
+                try:
+                    items = process_dxf(str(fpath))
+                except Exception as e:
+                    log(f"    Equipment error: {e}")
+                if fpath.suffix.lower() == ".dxf":
+                    try:
+                        cables = extract_cables_dxf(str(fpath))
+                    except Exception as e:
+                        log(f"    Cable error: {e}")
+                parse_cache[fkey] = (items, cables)
+
+            eq_total = sum(it.count + it.count_ae for it in items)
+            log(f"    Equipment: {len(items)} types, {eq_total} total → split across {n_elevs} elevs")
+
+            # Create one FileParseResult per elevation with equipment
+            # counts divided by the number of elevations.
+            for e_idx, e_val in enumerate(_fname_elevs):
+                e_hcat = elevation_to_height(e_val)
+                split_items = []
+                for it in items:
+                    split_count = it.count // n_elevs
+                    split_ae = it.count_ae // n_elevs
+                    # Give remainder to last elevation
+                    if e_idx == n_elevs - 1:
+                        split_count = it.count - it.count // n_elevs * (n_elevs - 1)
+                        split_ae = it.count_ae - it.count_ae // n_elevs * (n_elevs - 1)
+                    if split_count > 0 or split_ae > 0:
+                        split_items.append(EquipmentItem(
+                            symbol=it.symbol, name=it.name,
+                            count=split_count, count_ae=split_ae,
+                        ))
+                r = FileParseResult(
+                    filename=f"{fpath.name}__elev_{e_val}",
+                    plan_type=plan_type,
+                    elevation=e_val, height_category=e_hcat,
+                    equipment=split_items,
+                )
+                results.append(r)
+                log(f"      elev={e_val} ({e_hcat}): {sum(i.count + i.count_ae for i in split_items)} items")
+
+            # Cables: leave elevation_m=None for Phase 2 distribution
+            if cables:
+                total_m = sum(c.total_length_m for c in cables)
+                log(f"    Cables: {len(cables)} types, {total_m}m (multi-elev, Phase 2 will distribute)")
+            cable_result = FileParseResult(
+                filename=fpath.name, plan_type="схема",
+                elevation=None, height_category=None,
+                cables=cables, panels=[],
             )
             results.append(cable_result)
             continue
@@ -1260,11 +1450,106 @@ def _normalize_brand_for_vor(brand: str) -> str:
     return s
 
 
+def _parse_cable_section(cable_type: str) -> tuple[int, float] | None:
+    """Parse cable cross-section from cable_type string.
+
+    Returns (cores, section_mm2) tuple, e.g. ('3×2.5' → (3, 2.5)).
+    Returns None if pattern not found.
+    """
+    m = _CABLE_SECTION_RE.search(cable_type)
+    if not m:
+        return None
+    try:
+        cores = int(m.group(1))
+        section = float(m.group(2).replace(",", "."))
+        return (cores, section)
+    except (ValueError, IndexError):
+        return None
+
+
+def _cable_total_section(cable_type: str) -> float:
+    """Compute total conductor cross-section area in mm² for a cable type.
+
+    E.g. '3×2.5' → 7.5,  '5×16' → 80.
+    Returns 0.0 if cannot parse.
+    """
+    parsed = _parse_cable_section(cable_type)
+    if parsed is None:
+        return 0.0
+    cores, section = parsed
+    return cores * section
+
+
+# Cable weight-per-metre (kg/m) approximations for common cross-sections.
+# Used to determine mass category for tray laying descriptions.
+# Based on typical ВВГнг/ППГнг cable weight tables.
+_CABLE_WEIGHT_KG_PER_M: dict[tuple[int, float], float] = {
+    (2, 1.5): 0.10, (3, 1.5): 0.15, (4, 1.5): 0.18, (5, 1.5): 0.22,
+    (2, 2.5): 0.14, (3, 2.5): 0.22, (4, 2.5): 0.27, (5, 2.5): 0.33,
+    (3, 4): 0.31, (4, 4): 0.39, (5, 4): 0.47,
+    (3, 6): 0.42, (4, 6): 0.54, (5, 6): 0.66,
+    (3, 10): 0.65, (4, 10): 0.82, (5, 10): 0.95,
+    (5, 16): 1.30, (4, 16): 1.10,
+    (5, 25): 1.90, (4, 25): 1.55,
+    (5, 35): 2.70, (4, 35): 2.15,
+    (5, 50): 3.60, (4, 50): 2.90,
+    (5, 70): 5.00, (4, 70): 4.00,
+    (5, 95): 7.00, (4, 95): 5.50,
+    (5, 120): 8.70, (4, 120): 7.00,
+    (5, 150): 10.5, (4, 150): 8.50,
+    (5, 185): 13.0, (4, 185): 10.5,
+    (5, 240): 17.0, (4, 240): 13.5,
+}
+
+# Mass categories (kg) used in VOR work descriptions for tray laying.
+_MASS_THRESHOLDS = [1, 2, 3, 6, 9, 15, 20, 30]
+
+
+def _cable_mass_category(cable_type: str) -> str:
+    """Determine cable mass category string for VOR work descriptions.
+
+    Returns e.g. 'массой до 2 кг' or '' if cannot determine.
+    Used for tray/lоток laying descriptions.
+    """
+    parsed = _parse_cable_section(cable_type)
+    if parsed is None:
+        return ""
+    cores, section = parsed
+    # Look up exact weight or estimate from cross-section
+    weight = _CABLE_WEIGHT_KG_PER_M.get((cores, section))
+    if weight is None:
+        # Rough estimation: copper cable ≈ 0.012 * total_section + 0.05 * cores
+        weight = 0.012 * cores * section + 0.05 * cores
+    for threshold in _MASS_THRESHOLDS:
+        if weight <= threshold:
+            return f"массой до {threshold} кг"
+    return f"массой до {_MASS_THRESHOLDS[-1]} кг"
+
+
+# Cross-section categories (mm²) for conduit/gofra laying.
+_SECTION_THRESHOLDS = [6, 16, 35, 70, 120, 240]
+
+
+def _cable_section_category(cable_type: str) -> str:
+    """Determine total cross-section category for VOR work descriptions.
+
+    Returns e.g. 'суммарное сечение до 16 мм2' or '' if cannot determine.
+    Used for conduit/gofra laying descriptions.
+    """
+    total = _cable_total_section(cable_type)
+    if total <= 0:
+        return ""
+    for threshold in _SECTION_THRESHOLDS:
+        if total <= threshold:
+            return f"суммарное сечение до {threshold} мм2"
+    return f"суммарное сечение до {_SECTION_THRESHOLDS[-1]} мм2"
+
+
 def _format_cable_material_desc(cable_type: str, is_wire: bool = False) -> str:
     """Format cable/wire type as a material description for VOR rows.
 
     Reference VOR format uses 'сечением' before the cross-section:
-        'ППГнг(А)-HF 3×1.5'  -> 'Кабель ППГнг-(А)-HF сечением 3х1.5'
+        'ППГнг(А)-HF 3×1.5'  -> 'Кабель ППГнг-(А)-HF сечением 3х1,5'
         'ПуВВнг 1×6'         -> 'Провод ПуВВнг сечением 1х6' (is_wire=True)
     """
     ct = cable_type.strip()
@@ -1278,6 +1563,8 @@ def _format_cable_material_desc(cable_type: str, is_wire: bool = False) -> str:
         # T072: Normalize ППГнг(А) → ППГнг-(А)
         brand_part = re.sub(r'(ППГнг)\(', r'\1-(', brand_part)
         section_part = m.group(2).replace('×', 'х').replace('x', 'х')
+        # Normalize decimal separator: dot → comma for Russian format
+        section_part = section_part.replace('.', ',')
         rest = m.group(3).strip()
         prefix = "Провод" if is_wire else "Кабель"
         desc = f"{prefix} {brand_part} сечением {section_part}"
@@ -1618,12 +1905,24 @@ def aggregate_by_height(
             else:
                 unknown_elevation_m += c.total_length_m
 
-    # Phase 2: cables without elevation — distribute proportionally
+    # Phase 2: cables without elevation — distribute proportionally.
+    # Weight by midpoint height of each category: equipment on higher floors
+    # typically consumes more cable metres (longer runs from the panel).
+    _HEIGHT_MIDPOINTS: dict[str, float] = {
+        "до 5 метров": 2.5,
+        "от 5 до 13 метров": 9.0,
+        "от 13 до 20 метров": 16.5,
+        "от 20 до 35 метров": 27.5,
+    }
     if unknown_elevation_m > 0 and equip_count_by_height:
-        total_equip = sum(equip_count_by_height.values())
-        if total_equip > 0:
-            for hcat, ecnt in equip_count_by_height.items():
-                share = round(unknown_elevation_m * ecnt / total_equip)
+        weighted: dict[str, float] = {}
+        for hcat, ecnt in equip_count_by_height.items():
+            midpt = _HEIGHT_MIDPOINTS.get(hcat, 5.0)
+            weighted[hcat] = ecnt * midpt
+        total_weight = sum(weighted.values())
+        if total_weight > 0:
+            for hcat, w in weighted.items():
+                share = round(unknown_elevation_m * w / total_weight)
                 if share > 0:
                     cable_lengths_by_height[hcat] = (
                         cable_lengths_by_height.get(hcat, 0) + share
@@ -1962,6 +2261,26 @@ def aggregate_by_height(
             log(f"\n  [cable-fix] Spec cables found: {_valid_count} valid, "
                 f"{_invalid_count} invalid - using spec "
                 f"(spec={_spec_cable_total_m}m, derived={_derived_cable_total_m}m)")
+
+            # Transfer length_by_laying from derived cables to spec cables.
+            # Match by normalized cable_type.  Scale laying proportions to
+            # the new spec length when total differs.
+            _derived_lbl: dict[str, dict[str, int]] = {}
+            for c in cables:
+                if c.length_by_laying and c.total_length_m > 0:
+                    _derived_lbl[c.cable_type] = c.length_by_laying
+            for nc in _new_cables.values():
+                donor_lbl = _derived_lbl.get(nc.cable_type)
+                if donor_lbl:
+                    donor_total = sum(donor_lbl.values())
+                    if donor_total > 0:
+                        scaled: dict[str, int] = {}
+                        for lay, lay_len in donor_lbl.items():
+                            scaled[lay] = round(
+                                nc.total_length_m * lay_len / donor_total
+                            )
+                        nc.length_by_laying = scaled
+
             cables = sorted(
                 _new_cables.values(), key=lambda c: -c.total_length_m,
             )
@@ -2500,6 +2819,42 @@ def generate_vor_docx(
     if has_lighting:
         _add_section_header(table, "Монтаж светильников и ламп")
 
+    # Classify luminaires by mounting type for correct work descriptions.
+    # Reference VOR uses different work rows per mounting type:
+    #   "на шпильках к перекрытию" — standard ceiling (SLICK.PRS, ARCTIC.OPL, OPTIMA, etc.)
+    #   "настенного светодиодного светильника" — wall (CD LED, MARS, small/emergency)
+    #   "анкерный" — heavy/industrial (INSEL LB/S, large fixtures)
+    #   "подвесной" — pendant/suspended (OWP, подвесн)
+    _WALL_PATTERNS = re.compile(
+        r"CD\s*LED|MARS\s+\d|SAFARI\s+DL|SVT-ZKH|"
+        r"аварийн|emergency|CONVERSION\s+KIT",
+        re.IGNORECASE,
+    )
+    _ANCHOR_PATTERNS = re.compile(
+        r"INSEL\s+LB|INSEL\s+LED|LB/S\s+LED",
+        re.IGNORECASE,
+    )
+    _PENDANT_PATTERNS = re.compile(
+        r"OWP\s+OPTIMA|подвесн",
+        re.IGNORECASE,
+    )
+
+    def _mounting_type(name: str) -> str:
+        if _WALL_PATTERNS.search(name):
+            return "wall"
+        if _ANCHOR_PATTERNS.search(name):
+            return "anchor"
+        if _PENDANT_PATTERNS.search(name):
+            return "pendant"
+        return "stud"
+
+    _MOUNTING_WORK_DESC = {
+        "stud": "Монтаж светильников на шпильках к перекрытию на высоте {hcat}:",
+        "wall": "Монтаж настенного светодиодного светильника на высоте {hcat}:",
+        "anchor": "Монтаж светильников анкерный на высоте {hcat}:",
+        "pendant": "Монтаж светильников подвесной на высоте {hcat}:",
+    }
+
     for hcat in HEIGHT_CATEGORIES:
         items_in_height = [
             (lum, lum.counts_by_height.get(hcat, 0))
@@ -2509,17 +2864,26 @@ def generate_vor_docx(
         if not items_in_height:
             continue
 
-        height_total = sum(cnt for _, cnt in items_in_height)
-        item_num += 1
-        _add_work_row(
-            table, item_num,
-            f"Монтаж светильников на шпильках к перекрытию "
-            f"на высоте {hcat}:",
-            "шт", height_total, ref=drawing_ref,
-        )
+        # Group by mounting type
+        _by_mount: dict[str, list[tuple]] = {}
         for lum, cnt in items_in_height:
-            desc = f"Светодиодный светильник {lum.name}"
-            _add_material_row(table, desc, "шт", cnt, ref=drawing_ref)
+            mt = _mounting_type(lum.name)
+            _by_mount.setdefault(mt, []).append((lum, cnt))
+
+        for mt in ("stud", "wall", "anchor", "pendant"):
+            grp = _by_mount.get(mt)
+            if not grp:
+                continue
+            grp_total = sum(cnt for _, cnt in grp)
+            item_num += 1
+            work_desc = _MOUNTING_WORK_DESC[mt].format(hcat=hcat)
+            _add_work_row(
+                table, item_num, work_desc,
+                "шт", grp_total, ref=drawing_ref,
+            )
+            for lum, cnt in grp:
+                desc = f"Светодиодный светильник {lum.name}"
+                _add_material_row(table, desc, "шт", cnt, ref=drawing_ref)
 
     # Wall-mounted indicators by height
     has_indicators = any(
@@ -2694,21 +3058,18 @@ def generate_vor_docx(
                 norm_brand = _normalize_brand_for_vor(brand)
                 _add_section_header(table, f"Кабель {norm_brand}")
 
-                # T077: Per-cable-type work rows with height breakdown.
-                # Each cable type gets its own "Прокладка кабеля" work row
-                # per height category, matching reference VOR structure
-                # where separate rows exist per cross-section size.
+                # T077/T085: Cable laying rows grouped by
+                # (height × laying_method × sub-category).
                 for hcat in HEIGHT_CATEGORIES:
                     prop = _height_props.get(hcat, 0)
                     if prop <= 0:
                         continue
+
+                    _cable_lay_entries: list[tuple[CableItem, str, int]] = []
                     for c in group:
                         cable_h_len = round(c.total_length_m * prop)
                         if cable_h_len <= 0:
                             continue
-
-                        # Use actual laying methods from DXF when available,
-                        # otherwise fall back to "в лотке".
                         laying_rows: list[tuple[str, int]] = []
                         if c.length_by_laying:
                             for lay_method, lay_len in c.length_by_laying.items():
@@ -2717,30 +3078,94 @@ def generate_vor_docx(
                                     laying_rows.append((lay_method, lay_h_len))
                         if not laying_rows:
                             laying_rows = [("в лотке", cable_h_len)]
-
                         for lay_method, lay_len in laying_rows:
-                            # Format the laying description for VOR.
-                            # Underground methods don't use height categories.
-                            lay_lower = lay_method.lower()
-                            if "в трубе" in lay_lower or "в земле" in lay_lower or "в траншее" in lay_lower:
+                            _cable_lay_entries.append((c, lay_method, lay_len))
+
+                    if not _cable_lay_entries:
+                        continue
+
+                    _heavy: list[tuple[CableItem, str, int, str]] = []
+                    _underground: list[tuple[CableItem, int]] = []
+                    _grouped: dict[str, list[tuple[CableItem, int]]] = {}
+
+                    for c, lay_method, lay_len in _cable_lay_entries:
+                        lay_lower = lay_method.lower()
+
+                        if "в трубе" in lay_lower or "в земле" in lay_lower or "в траншее" in lay_lower:
+                            _underground.append((c, lay_len))
+                            continue
+
+                        if "лотке" in lay_lower or "лотк" in lay_lower:
+                            mass_cat = _cable_mass_category(c.cable_type)
+                            if mass_cat and mass_cat != "массой до 1 кг":
                                 work_desc = (
-                                    f"Прокладка кабеля {lay_method} в земле:"
+                                    f"Прокладка кабеля ({mass_cat}) {lay_method} "
+                                    f"на высоте {hcat}"
+                                )
+                                _heavy.append((c, lay_method, lay_len, work_desc))
+                            else:
+                                work_desc = (
+                                    f"Прокладка кабеля {lay_method} "
+                                    f"на высоте {hcat}:"
+                                )
+                                _grouped.setdefault(work_desc, []).append((c, lay_len))
+                        elif "гофре" in lay_lower or "кабель-канал" in lay_lower:
+                            sect_cat = _cable_section_category(c.cable_type)
+                            if sect_cat:
+                                work_desc = (
+                                    f"Прокладка кабеля {lay_method} "
+                                    f"на высоте {hcat} ({sect_cat}):"
                                 )
                             else:
                                 work_desc = (
                                     f"Прокладка кабеля {lay_method} "
                                     f"на высоте {hcat}:"
                                 )
-                            item_num += 1
-                            _add_work_row(
-                                table, item_num, work_desc,
-                                "м", lay_len, ref=drawing_ref,
+                            _grouped.setdefault(work_desc, []).append((c, lay_len))
+                        else:
+                            work_desc = (
+                                f"Прокладка кабеля {lay_method} "
+                                f"на высоте {hcat}:"
                             )
+                            _grouped.setdefault(work_desc, []).append((c, lay_len))
+
+                    for c, _lm, lay_len, work_desc in _heavy:
+                        item_num += 1
+                        _add_work_row(
+                            table, item_num, work_desc,
+                            "м", lay_len, ref=drawing_ref,
+                        )
+                        desc = _format_cable_material_desc(c.cable_type)
+                        _add_material_row(
+                            table, desc,
+                            "м", lay_len, ref=drawing_ref,
+                        )
+
+                    for work_desc, entries in _grouped.items():
+                        total_len = sum(ln for _, ln in entries)
+                        item_num += 1
+                        _add_work_row(
+                            table, item_num, work_desc,
+                            "м", total_len, ref=drawing_ref,
+                        )
+                        for c, lay_len in entries:
                             desc = _format_cable_material_desc(c.cable_type)
                             _add_material_row(
                                 table, desc,
                                 "м", lay_len, ref=drawing_ref,
                             )
+
+                    for c, lay_len in _underground:
+                        item_num += 1
+                        _add_work_row(
+                            table, item_num, "Прокладка кабеля в земле",
+                            "м", lay_len, ref=drawing_ref,
+                        )
+                        desc = _format_cable_material_desc(c.cable_type)
+                        _add_material_row(
+                            table, desc,
+                            "м", lay_len, ref=drawing_ref,
+                        )
 
         if wire_items:
             _add_section_header(table, "Провод")

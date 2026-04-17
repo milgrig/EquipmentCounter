@@ -924,15 +924,52 @@ def _extract_laying_method(text: str) -> str:
     return m.group(1).strip().lower() if m else ""
 
 
+def _split_laying_methods(laying: str) -> list[tuple[str, float]]:
+    """Split combined laying methods into individual (method, fraction) pairs.
+
+    E.g. "в гофре, в лотке" → [("в лотке", 0.9), ("в гофре", 0.1)]
+    Single methods return [(method, 1.0)].
+
+    When both 'лоток' and 'гофра' appear, the gofra portion is typically
+    short (luminaire-to-tray segment ≈ 10%), so we use 90/10 split.
+    """
+    parts = [p.strip() for p in laying.split(",") if p.strip()]
+    if len(parts) <= 1:
+        return [(laying, 1.0)]
+
+    has_tray = any("лотке" in p for p in parts)
+    has_gofra = any("гофре" in p for p in parts)
+
+    if has_tray and has_gofra and len(parts) == 2:
+        result = []
+        for p in parts:
+            if "лотке" in p:
+                result.append((p, 0.9))
+            elif "гофре" in p:
+                result.append((p, 0.1))
+        return result
+
+    # Generic: equal split
+    frac = 1.0 / len(parts)
+    return [(p, frac) for p in parts]
+
+
 def _add_laying(item: CableItem, laying: str, length: int) -> None:
-    """Record *length* metres under *laying* method inside *item*."""
+    """Record *length* metres under *laying* method inside *item*.
+
+    Combined methods like "в гофре, в лотке" are automatically split
+    into separate entries with estimated proportions.
+    """
     if not laying:
         return
     if item.length_by_laying is None:
         item.length_by_laying = {}
-    item.length_by_laying[laying] = (
-        item.length_by_laying.get(laying, 0) + length
-    )
+    for method, frac in _split_laying_methods(laying):
+        m_len = round(length * frac)
+        if m_len > 0:
+            item.length_by_laying[method] = (
+                item.length_by_laying.get(method, 0) + m_len
+            )
 
 
 def _extract_cables_mtext(

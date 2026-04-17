@@ -1,6 +1,7 @@
 @echo off
 chcp 65001 >nul 2>&1
 title Equipment Counter — Web
+setlocal EnableExtensions EnableDelayedExpansion
 
 :: Change to script directory
 cd /d "%~dp0"
@@ -37,6 +38,19 @@ if %errorlevel% neq 0 (
 
 :: Launch web app
 echo.
+echo  Checking for existing server on :8050...
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$killed = $false; " ^
+  "$procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue ^| Where-Object { " ^
+  "  ($_.Name -eq 'python.exe' -or $_.Name -eq 'pythonw.exe') -and " ^
+  "  ($_.CommandLine -match 'web_app\.py' -or $_.CommandLine -match 'uvicorn.*web_app') " ^
+  "}; " ^
+  "foreach ($p in $procs) { " ^
+  "  try { Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop; Write-Output ('  Stopped existing web server PID ' + $p.ProcessId); $killed = $true } catch {} " ^
+  "}; " ^
+  "if (-not $killed) { Write-Output '  No existing web_app server process found.' }"
+timeout /t 1 /nobreak >nul
+
 echo  Starting web server on http://localhost:8050
 echo  Press Ctrl+C to stop
 echo.
@@ -47,3 +61,4 @@ if %errorlevel% neq 0 (
     echo  Error launching web app.
     pause
 )
+endlocal

@@ -172,6 +172,9 @@
 
             pdfImage.src = URL.createObjectURL(blob);
             pdfImage.onload = () => {
+                if (findState && findState.active) {
+                    invalidateFindPixelMask();
+                }
                 drawOverlay();
                 // Auto-fit on first load
                 if (zoomLevel === 1.0 && pdfImage.naturalWidth > pdfViewport.clientWidth) {
@@ -583,7 +586,12 @@
             }
 
             pdfImage.src = URL.createObjectURL(blob);
-            pdfImage.onload = () => drawOverlay();
+            pdfImage.onload = () => {
+                if (findState && findState.active) {
+                    invalidateFindPixelMask();
+                }
+                drawOverlay();
+            };
         } catch (err) {
             console.error("Filtered render error:", err);
         } finally {
@@ -699,9 +707,15 @@
 
     let countData = null; // cached results from /count/all
     let countOverlayState = { text: false, visual: false, cables: false };
+    let countEventSource = null; // SSE connection
 
     const countLoading = document.getElementById("count-loading");
     const countLoadingText = document.getElementById("count-loading-text");
+    const countProgress = document.getElementById("count-progress");
+    const countProgressBar = document.getElementById("count-progress-bar");
+    const countProgressStep = document.getElementById("count-progress-step");
+    const countProgressLabel = document.getElementById("count-progress-label");
+    const countProgressLog = document.getElementById("count-progress-log");
     const countStats = document.getElementById("count-stats");
     const countStatsBadges = document.getElementById("count-stats-badges");
     const overlayControls = document.getElementById("overlay-controls");
@@ -710,40 +724,161 @@
     const equipTbody = document.getElementById("equip-tbody");
     const cableTbody = document.getElementById("cable-tbody");
 
-    // ── Run all counting methods ────────────────────────────────
+    // ── Run all counting methods (SSE streaming) ────────────────
     document.getElementById("btn-run-count").addEventListener("click", runCounting);
+
+    function appendLogLine(text, icon) {
+        const div = document.createElement("div");
+        div.className = "log-line running";
+        div.innerHTML = `<span class="log-icon">${icon || "\u23f3"}</span><span class="log-text">${escapeHtml(text)}</span>`;
+        countProgressLog.appendChild(div);
+        countProgressLog.scrollTop = countProgressLog.scrollHeight;
+        return div;
+    }
+
+    function finishLastLogLine(countVal, isError) {
+        const lines = countProgressLog.querySelectorAll(".log-line.running");
+        const last = lines[lines.length - 1];
+        if (!last) return;
+        last.classList.remove("running");
+        last.classList.add(isError ? "error" : "done");
+        const iconEl = last.querySelector(".log-icon");
+        if (iconEl) iconEl.textContent = isError ? "\u274c" : "\u2705";
+        if (countVal !== undefined && countVal !== null && !isError) {
+            const span = document.createElement("span");
+            span.className = "log-count";
+            span.textContent = `${countVal} \u0448\u0442.`;
+            last.appendChild(span);
+        }
+    }
 
     async function runCounting() {
         if (!legendData) {
-            alert("Legend not loaded yet.");
+            alert("\u041b\u0435\u0433\u0435\u043d\u0434\u0430 \u043d\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043d\u0430.");
             return;
         }
 
-        countLoading.classList.remove("hidden");
-        countLoadingText.textContent = "Running all methods...";
+        // Close previous SSE if running
+        if (countEventSource) {
+            countEventSource.close();
+            countEventSource = null;
+        }
+
+        // Reset UI
+        countLoading.classList.add("hidden");
+        countProgress.classList.remove("hidden");
+        countProgressBar.style.width = "0%";
+        countProgressStep.textContent = "";
+        countProgressLabel.textContent = "\u041f\u043e\u0434\u0433\u043e\u0442\u043e\u0432\u043a\u0430...";
+        countProgressLog.innerHTML = "";
         countStats.classList.add("hidden");
         equipSection.classList.add("hidden");
         cableSection.classList.add("hidden");
         overlayControls.classList.add("hidden");
+        equipTbody.innerHTML = "";
 
-        try {
-            const resp = await fetch(`/api/file/${FILE_ID}/count/all`);
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            countData = await resp.json();
+        // Accumulate results
+        countData = { results: {}, errors: {} };
+        let estimatedTotal = 5; // will be updated from start event
+        let currentStep = 0;
+
+        const es = new EventSource(`/api/file/${FILE_ID}/count/stream`);
+        countEventSource = es;
+
+        es.addEventListener("start", (e) => {
+            const d = JSON.parse(e.data);
+            // legend_items + 4 (legend parse, text, cables, geometry)
+            estimatedTotal = (d.legend_items || 0) + 4;
+        });
+
+        es.addEventListener("progress", (e) => {
+            const d = JSON.parse(e.data);
+            currentStep = d.step;
+            const pct = Math.min(95, Math.round((currentStep / estimatedTotal) * 100));
+            countProgressBar.style.width = `${pct}%`;
+            countProgressStep.textContent = `${currentStep}`;
+            countProgressLabel.textContent = d.label || "";
+            // Only add log line for non-symbol progress (text/cables/geometry)
+            // Symbol log lines are created from step_done where we have the real label
+            if (d.label && !d.label.startsWith("\u041f\u043e\u0434\u0433\u043e\u0442\u043e\u0432\u043a\u0430") && !d.label.startsWith("\u0412\u0438\u0437\u0443\u0430\u043b\u044c\u043d\u044b\u0439")) {
+                appendLogLine(d.label, "\u23f3");
+            }
+        });
+
+        es.addEventListener("step_done", (e) => {
+            const d = JSON.parse(e.data);
+            currentStep = d.step;
+            const pct = Math.min(95, Math.round((currentStep / estimatedTotal) * 100));
+            countProgressBar.style.width = `${pct}%`;
+            countProgressStep.textContent = `${currentStep}`;
+
+            if (d.error) {
+                // If there's a pending running line, finish it as error
+                finishLastLogLine(null, true);
+            } else if (d.type === "symbol") {
+                // Create log line with symbol image for visual items
+                const div = document.createElement("div");
+                div.className = "log-line done";
+                const imgUrl = `/api/file/${FILE_ID}/symbol_image/${d.symbol_index}`;
+                const descText = d.description || "";
+                const symText = d.symbol && d.symbol !== "?" ? d.symbol + " — " : "";
+                div.innerHTML = `<span class="log-icon">\u2705</span>`
+                    + `<img class="log-sym-img" src="${imgUrl}" alt="" onerror="this.style.display='none'" />`
+                    + `<span class="log-text">${escapeHtml(symText + descText)}</span>`;
+                if (d.count !== undefined) {
+                    const span = document.createElement("span");
+                    span.className = "log-count";
+                    span.textContent = `${d.count} \u0448\u0442.`;
+                    div.appendChild(span);
+                }
+                countProgressLog.appendChild(div);
+                countProgressLog.scrollTop = countProgressLog.scrollHeight;
+                countProgressLabel.textContent = d.label || "";
+                // Accumulate visual counts
+                if (!countData.results.visual) {
+                    countData.results.visual = { counts: {}, descriptions: {}, matches: [] };
+                }
+                countData.results.visual.counts[String(d.symbol_index)] = d.count;
+            } else {
+                finishLastLogLine(d.count, false);
+            }
+        });
+
+        es.addEventListener("done", (e) => {
+            const d = JSON.parse(e.data);
+            es.close();
+            countEventSource = null;
+
+            countProgressBar.style.width = "100%";
+            countProgressLabel.textContent = `\u0413\u043e\u0442\u043e\u0432\u043e \u0437\u0430 ${d.total_elapsed_s}\u0441`;
+
+            // Merge full results from done event
+            if (d.results) {
+                countData.results = d.results;
+            }
+            if (d.errors) {
+                countData.errors = d.errors;
+            }
+            countData.elapsed_s = d.total_elapsed_s;
+            countData.legend_page = d.legend_page;
+            countData.legend_items = d.legend_items;
 
             renderCountStats(countData);
             renderEquipTable(countData);
             renderCableTable(countData);
-
             overlayControls.classList.remove("hidden");
+        });
 
-        } catch (err) {
-            console.error("Count error:", err);
-            countStatsBadges.innerHTML = `<span class="status-badge badge-red">Error: ${escapeHtml(err.message)}</span>`;
+        es.addEventListener("error", (e) => {
+            // SSE error (connection lost, etc.)
+            if (es.readyState === EventSource.CLOSED) return;
+            es.close();
+            countEventSource = null;
+            finishLastLogLine(null, true);
+            countProgressLabel.textContent = "\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u043e\u0435\u0434\u0438\u043d\u0435\u043d\u0438\u044f";
+            countStatsBadges.innerHTML = `<span class="status-badge badge-red">\u041e\u0448\u0438\u0431\u043a\u0430 SSE</span>`;
             countStats.classList.remove("hidden");
-        } finally {
-            countLoading.classList.add("hidden");
-        }
+        });
     }
 
     // ── Render count stats badges ───────────────────────────────
@@ -1067,7 +1202,185 @@
         allPositions: [],     // flat list of all found positions across selections
         pulseTimer: null,     // animation timer
         pulsePhase: 0,
+        pixelMaskCanvas: null, // offscreen canvas with highlighted equipment pixels
+        pixelMaskCount: 0,     // number of pixels in mask (debug/status)
     };
+
+    function invalidateFindPixelMask() {
+        findState.pixelMaskCanvas = null;
+        findState.pixelMaskCount = 0;
+    }
+
+    function buildFindPixelMask() {
+        if (!pdfImage.naturalWidth || !findState.active || findState.allPositions.length === 0) {
+            return null;
+        }
+
+        const w = pdfImage.naturalWidth;
+        const h = pdfImage.naturalHeight;
+        const pxPerPt = renderDPI / 72.0;
+
+        // Read rendered PDF pixels once (base layer).
+        const srcCanvas = document.createElement("canvas");
+        srcCanvas.width = w;
+        srcCanvas.height = h;
+        const srcCtx = srcCanvas.getContext("2d", { willReadFrequently: true });
+        srcCtx.drawImage(pdfImage, 0, 0, w, h);
+        const srcData = srcCtx.getImageData(0, 0, w, h).data;
+
+        // Build output mask canvas: only equipment-related pixels are painted.
+        const maskCanvas = document.createElement("canvas");
+        maskCanvas.width = w;
+        maskCanvas.height = h;
+        const maskCtx = maskCanvas.getContext("2d");
+        const maskImg = maskCtx.createImageData(w, h);
+        const out = maskImg.data;
+        const seen = new Uint8Array(w * h);
+
+        let selectedPixels = 0;
+        const radius = 28;   // local window around each found position
+        const r2 = radius * radius;
+        const lumaThreshold = 228;
+        const seedSearchRadius = 8;
+        const maxBlobPixels = 3200;
+
+        function inBounds(x, y) {
+            return x >= 0 && y >= 0 && x < w && y < h;
+        }
+
+        function isDarkPixelAt(x, y) {
+            const idx = (y * w + x) * 4;
+            const a = srcData[idx + 3];
+            if (a < 8) return false;
+            const luma = (srcData[idx] + srcData[idx + 1] + srcData[idx + 2]) / 3;
+            return luma <= lumaThreshold;
+        }
+
+        for (const pos of findState.allPositions) {
+            const cx = Math.round(pos.x * pxPerPt);
+            const cy = Math.round(pos.y * pxPerPt);
+            const x0 = Math.max(0, cx - radius);
+            const x1 = Math.min(w - 1, cx + radius);
+            const y0 = Math.max(0, cy - radius);
+            const y1 = Math.min(h - 1, cy + radius);
+
+            // 1) Find a seed dark pixel nearest to reported position.
+            let seedX = -1;
+            let seedY = -1;
+            let bestD2 = Infinity;
+            for (let y = Math.max(y0, cy - seedSearchRadius); y <= Math.min(y1, cy + seedSearchRadius); y++) {
+                for (let x = Math.max(x0, cx - seedSearchRadius); x <= Math.min(x1, cx + seedSearchRadius); x++) {
+                    if (!isDarkPixelAt(x, y)) continue;
+                    const dx = x - cx;
+                    const dy = y - cy;
+                    const d2 = dx * dx + dy * dy;
+                    if (d2 < bestD2) {
+                        bestD2 = d2;
+                        seedX = x;
+                        seedY = y;
+                    }
+                }
+            }
+
+            // If no near seed found, fallback to circular selection around center.
+            if (seedX < 0 || seedY < 0) {
+                for (let y = y0; y <= y1; y++) {
+                    for (let x = x0; x <= x1; x++) {
+                        const dx = x - cx;
+                        const dy = y - cy;
+                        if (dx * dx + dy * dy > r2) continue;
+                        if (!isDarkPixelAt(x, y)) continue;
+                        const pi = y * w + x;
+                        if (seen[pi]) continue;
+                        seen[pi] = 1;
+                        selectedPixels++;
+                        const idx = pi * 4;
+                        out[idx] = 255;
+                        out[idx + 1] = 190;
+                        out[idx + 2] = 30;
+                        out[idx + 3] = 255;
+                    }
+                }
+                continue;
+            }
+
+            // 2) Flood-fill connected dark pixels from seed within local window.
+            const queue = [[seedX, seedY]];
+            const visitedLocal = new Uint8Array((x1 - x0 + 1) * (y1 - y0 + 1));
+            const localWidth = x1 - x0 + 1;
+            let qIndex = 0;
+            let blobCount = 0;
+
+            while (qIndex < queue.length && blobCount < maxBlobPixels) {
+                const [x, y] = queue[qIndex++];
+                if (!inBounds(x, y)) continue;
+                if (x < x0 || x > x1 || y < y0 || y > y1) continue;
+                const dx = x - cx;
+                const dy = y - cy;
+                if (dx * dx + dy * dy > r2) continue;
+
+                const li = (y - y0) * localWidth + (x - x0);
+                if (visitedLocal[li]) continue;
+                visitedLocal[li] = 1;
+
+                if (!isDarkPixelAt(x, y)) continue;
+
+                const pi = y * w + x;
+                if (!seen[pi]) {
+                    seen[pi] = 1;
+                    selectedPixels++;
+                    blobCount++;
+                    const idx = pi * 4;
+                    out[idx] = 255;
+                    out[idx + 1] = 190;
+                    out[idx + 2] = 30;
+                    out[idx + 3] = 255;
+                }
+
+                queue.push([x + 1, y]);
+                queue.push([x - 1, y]);
+                queue.push([x, y + 1]);
+                queue.push([x, y - 1]);
+                queue.push([x + 1, y + 1]);
+                queue.push([x + 1, y - 1]);
+                queue.push([x - 1, y + 1]);
+                queue.push([x - 1, y - 1]);
+            }
+        }
+
+        if (selectedPixels === 0) {
+            return null;
+        }
+
+        maskCtx.putImageData(maskImg, 0, 0);
+        findState.pixelMaskCount = selectedPixels;
+        return maskCanvas;
+    }
+
+    function ensureFindPixelMask() {
+        if (!findState.pixelMaskCanvas) {
+            findState.pixelMaskCanvas = buildFindPixelMask();
+        }
+        return findState.pixelMaskCanvas;
+    }
+
+    function drawCurrentFindCursor(ctx, pxPerPt) {
+        const pos = findState.allPositions[findState.currentIndex];
+        if (!pos) return;
+        const px = pos.x * pxPerPt;
+        const py = pos.y * pxPerPt;
+        const r = 8;
+        ctx.save();
+        ctx.strokeStyle = "rgba(255,255,255,0.95)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(px - r, py);
+        ctx.lineTo(px + r, py);
+        ctx.moveTo(px, py - r);
+        ctx.lineTo(px, py + r);
+        ctx.stroke();
+        ctx.restore();
+    }
 
     // DOM refs for find nav bar
     const findNav = document.getElementById("find-nav");
@@ -1190,6 +1503,7 @@
 
             findState.selections.push({ rowIndex, item, data });
             rebuildAllPositions();
+            invalidateFindPixelMask();
             findState.currentIndex = 0;
             updateFindNavBar();
             drawFindOverlay();
@@ -1223,6 +1537,7 @@
                 }
             }
         }
+        invalidateFindPixelMask();
     }
 
     /**
@@ -1323,6 +1638,19 @@
         ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
         ctx.fillRect(0, 0, w, h);
 
+        // 1b. Blink-able pixel mask (equipment pixels around found markers).
+        const maskCanvas = ensureFindPixelMask();
+        if (maskCanvas) {
+            const t = findState.pulsePhase / 60;
+            const blinkAlpha = 0.35 + 0.35 * (0.5 + 0.5 * Math.sin(t * 2 * Math.PI));
+            ctx.save();
+            ctx.globalCompositeOperation = "lighter";
+            ctx.globalAlpha = blinkAlpha;
+            ctx.drawImage(maskCanvas, 0, 0);
+            ctx.restore();
+        }
+        const renderClassicMarkers = !maskCanvas;
+
         // 2. Draw markers for each found position
         const catColors = {
             "default":    { fill: "rgba(74, 144, 217, 0.25)", stroke: "rgba(74, 144, 217, 0.80)" },
@@ -1330,7 +1658,8 @@
             "visual":     { fill: "rgba(40, 167, 69, 0.25)",  stroke: "rgba(40, 167, 69, 0.80)" },
         };
 
-        findState.allPositions.forEach((pos, i) => {
+        if (renderClassicMarkers) {
+            findState.allPositions.forEach((pos, i) => {
             const px = pos.x * pxPerPt;
             const py = pos.y * pxPerPt;
             const radius = 18;
@@ -1375,7 +1704,10 @@
             ctx.textBaseline = "middle";
             ctx.fillStyle = isCurrent ? "#fff" : colors.stroke.replace("0.80", "1.0");
             ctx.fillText(label, px, py);
-        });
+            });
+        } else {
+            drawCurrentFindCursor(ctx, pxPerPt);
+        }
 
         // Start pulse animation if not too many positions and not already running
         if (!manyPositions && !findState.pulseTimer) {
@@ -1430,13 +1762,26 @@
         ctx.fillStyle = "rgba(0, 0, 0, 0.3)";
         ctx.fillRect(0, 0, w, h);
 
+        // Draw blinking equipment-pixel mask.
+        const maskCanvas = ensureFindPixelMask();
+        if (maskCanvas) {
+            const blinkAlpha = 0.25 + 0.55 * (0.5 + 0.5 * Math.sin((findState.pulsePhase / 60) * 2 * Math.PI));
+            ctx.save();
+            ctx.globalCompositeOperation = "lighter";
+            ctx.globalAlpha = blinkAlpha;
+            ctx.drawImage(maskCanvas, 0, 0);
+            ctx.restore();
+        }
+        const renderClassicMarkers = !maskCanvas;
+
         const catColors = {
             "default":    { fill: "rgba(74, 144, 217, 0.25)", stroke: "rgba(74, 144, 217, 0.80)" },
             "text":       { fill: "rgba(74, 144, 217, 0.25)", stroke: "rgba(74, 144, 217, 0.80)" },
             "visual":     { fill: "rgba(40, 167, 69, 0.25)",  stroke: "rgba(40, 167, 69, 0.80)" },
         };
 
-        findState.allPositions.forEach((pos, i) => {
+        if (renderClassicMarkers) {
+            findState.allPositions.forEach((pos, i) => {
             const px = pos.x * pxPerPt;
             const py = pos.y * pxPerPt;
             const isCurrent = (i === findState.currentIndex);
@@ -1482,7 +1827,10 @@
             ctx.textBaseline = "middle";
             ctx.fillStyle = isCurrent ? "#fff" : colors.stroke.replace("0.80", "1.0");
             ctx.fillText(label, px, py);
-        });
+            });
+        } else {
+            drawCurrentFindCursor(ctx, pxPerPt);
+        }
     }
 
     /**
@@ -1594,6 +1942,7 @@
         findState.selections = [];
         findState.currentIndex = 0;
         findState.allPositions = [];
+        invalidateFindPixelMask();
         stopPulseAnimation();
 
         // Hide nav bar

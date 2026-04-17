@@ -671,6 +671,262 @@ def _detect_section_type(pdf_path: str) -> str:
     return "unknown"
 
 
+_LUMINAIRE_NAME_RE = re_mod.compile(r"светильник", re_mod.IGNORECASE)
+_LEVEL_MARK_RE = re_mod.compile(r"^[+\-]?\d{1,2}[.,]\d{3}$")
+_LEVEL_FROM_NAME_RE = re_mod.compile(r"отм\.\s*([+\-]?\d{1,2}[.,]\d{3})", re_mod.IGNORECASE)
+_HEIGHT_INLINE_RE = re_mod.compile(
+    r"^[HНhн]\s*[:=]?\s*(\d{1,2}(?:[.,]\d{1,3})?)$"
+)
+_HEIGHT_VALUE_RE = re_mod.compile(r"^\d{1,2}(?:[.,]\d{1,3})?$")
+_HEIGHT_VALUE_WITH_UNIT_RE = re_mod.compile(
+    r"^(\d{1,2}(?:[.,]\d{1,3})?)\s*[mм]$"
+)
+_HEIGHT_PREFIX_TOKENS = {"H", "Н", "h", "н", "H=", "Н=", "h=", "н="}
+
+
+def _to_float_maybe(raw: str) -> Optional[float]:
+    try:
+        return float(raw.replace(",", "."))
+    except Exception:
+        return None
+
+
+def _detect_sheet_level_elevation(pdf_path: Path, page_index: int) -> tuple[Optional[float], str]:
+    """Detect sheet elevation level (e.g. +4.200) from filename/page."""
+    m = _LEVEL_FROM_NAME_RE.search(pdf_path.name)
+    if m:
+        level = _to_float_maybe(m.group(1))
+        if level is not None:
+            return level, "filename"
+
+    try:
+        with pdfplumber.open(str(pdf_path)) as pdf:
+            if page_index >= len(pdf.pages):
+                return None, ""
+            words = pdf.pages[page_index].extract_words() or []
+    except Exception:
+        return None, ""
+
+    candidates: list[float] = []
+    for w in words:
+        t = (w.get("text") or "").strip()
+        if not _LEVEL_MARK_RE.match(t):
+            continue
+        val = _to_float_maybe(t)
+        if val is None:
+            continue
+        if -10.0 <= val <= 120.0:
+            candidates.append(val)
+
+    if not candidates:
+        return None, ""
+
+    # Pick the median-like representative to avoid outlier labels.
+    candidates.sort()
+    return candidates[len(candidates) // 2], "page"
+
+
+def _extract_mount_height_near_anchor(
+    words: list[dict],
+    anchor_x: float,
+    anchor_y: float,
+    search_radius_pt: float = 90.0,
+) -> tuple[Optional[float], str, float, str]:
+    """Extract mount height text nearest to an anchor point."""
+    nearby: list[tuple[int, dict, float]] = []
+    for i, w in enumerate(words):
+        x0 = float(w.get("x0", 0))
+        y0 = float(w.get("top", 0))
+        x1 = float(w.get("x1", x0))
+        y1 = float(w.get("bottom", y0))
+        cx = (x0 + x1) / 2.0
+        cy = (y0 + y1) / 2.0
+        dist = math.sqrt((cx - anchor_x) ** 2 + (cy - anchor_y) ** 2)
+        if dist <= search_radius_pt:
+            nearby.append((i, w, dist))
+
+    if not nearby:
+        return None, "", 0.0, ""
+
+    nearby.sort(key=lambda t: t[2])
+
+    for i, w, _dist in nearby:
+        t = (w.get("text") or "").strip()
+        m = _HEIGHT_INLINE_RE.match(t)
+        if m:
+            val = _to_float_maybe(m.group(1))
+            if val is not None and 1.0 <= val <= 20.0:
+                return val, "nearby_text:inline", 0.95, t
+
+        m = _HEIGHT_VALUE_WITH_UNIT_RE.match(t)
+        if m:
+            val = _to_float_maybe(m.group(1))
+            if val is not None and 1.0 <= val <= 20.0:
+                return val, "nearby_text:value+unit", 0.85, t
+
+        if t in _HEIGHT_PREFIX_TOKENS and i + 1 < len(words):
+            t2 = (words[i + 1].get("text") or "").strip()
+            if _HEIGHT_VALUE_RE.match(t2):
+                v2 = _to_float_maybe(t2)
+                if v2 is not None and 1.0 <= v2 <= 20.0:
+                    return v2, "nearby_text:prefix+next", 0.75, f"{t} {t2}"
+
+        # Common compact token like "Н2"
+        if len(t) >= 2 and t[0] in ("Н", "н", "H", "h") and t[1:].isdigit():
+            val = _to_float_maybe(t[1:])
+            if val is not None and 1.0 <= val <= 20.0:
+                return val, "nearby_text:compact", 0.65, t
+
+    return None, "", 0.0, ""
+
+
+def _detect_default_mount_height(words: list[dict]) -> tuple[Optional[float], str]:
+    """Detect page-level default mount height token (e.g. repeated 'Н2')."""
+    counts: dict[float, int] = {}
+    for w in words:
+        t = (w.get("text") or "").strip()
+        val: Optional[float] = None
+        if len(t) >= 2 and t[0] in ("Н", "н", "H", "h") and t[1:].isdigit():
+            val = _to_float_maybe(t[1:])
+        else:
+            m = _HEIGHT_INLINE_RE.match(t)
+            if m:
+                val = _to_float_maybe(m.group(1))
+        if val is None or not (1.0 <= val <= 20.0):
+            continue
+        key = round(val, 3)
+        counts[key] = counts.get(key, 0) + 1
+
+    if not counts:
+        return None, ""
+
+    best_val, best_cnt = max(counts.items(), key=lambda kv: kv[1])
+    if best_cnt < 1:
+        return None, ""
+    return float(best_val), "page_default"
+
+
+def extract_luminaire_heights(pdf_path: str) -> dict:
+    """Extract per-luminaire mount height candidates from one PDF page."""
+    path = Path(pdf_path)
+    legend = parse_legend(pdf_path)
+    if not legend.items:
+        return {
+            "page_index": 0,
+            "level_elevation": None,
+            "level_source": "",
+            "total_anchors": 0,
+            "with_mount_height": 0,
+            "rows": [],
+        }
+
+    page_index = legend.page_index
+    level_elevation, level_source = _detect_sheet_level_elevation(path, page_index)
+
+    # Detect luminaires in legend.
+    lum_idx_to_item: dict[int, object] = {}
+    lum_sym_to_name: dict[str, str] = {}
+    for idx, item in enumerate(legend.items):
+        name = (item.description or "").strip()
+        sym = (item.symbol or "").strip()
+        if not name or not _LUMINAIRE_NAME_RE.search(name):
+            continue
+        lum_idx_to_item[idx] = item
+        if sym:
+            lum_sym_to_name[sym] = name
+
+    # Build anchors from text positions + visual matches.
+    anchors: list[dict] = []
+    try:
+        text_result = count_symbols(pdf_path, legend)
+        for p in text_result.positions:
+            if p.symbol not in lum_sym_to_name:
+                continue
+            anchors.append({
+                "symbol": p.symbol,
+                "name": lum_sym_to_name[p.symbol],
+                "x": float(p.x),
+                "y": float(p.y),
+                "method": "text",
+            })
+    except Exception:
+        pass
+
+    try:
+        vis_result = match_symbols(pdf_path, legend)
+        for m in vis_result.matches:
+            if m.symbol_index not in lum_idx_to_item:
+                continue
+            item = lum_idx_to_item[m.symbol_index]
+            anchors.append({
+                "symbol": (item.symbol or "").strip(),
+                "name": item.description or "",
+                "x": float(m.x),
+                "y": float(m.y),
+                "method": "visual",
+            })
+    except Exception:
+        pass
+
+    # Deduplicate anchors by coarse coordinate key.
+    deduped: list[dict] = []
+    seen: set[tuple[str, int, int]] = set()
+    for a in anchors:
+        key = (a["symbol"], int(round(a["x"] / 3.0)), int(round(a["y"] / 3.0)))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(a)
+    anchors = deduped
+
+    # Read page words once for nearby-height lookup.
+    words: list[dict] = []
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            if page_index < len(pdf.pages):
+                words = pdf.pages[page_index].extract_words() or []
+    except Exception:
+        words = []
+    default_mount_height, default_mount_source = _detect_default_mount_height(words)
+
+    rows: list[dict] = []
+    with_mount_height = 0
+    for a in anchors:
+        mount_h, mount_src, conf, raw = _extract_mount_height_near_anchor(
+            words, a["x"], a["y"],
+        )
+        if mount_h is None and default_mount_height is not None:
+            mount_h = default_mount_height
+            mount_src = default_mount_source
+            conf = 0.35
+            raw = ""
+        if mount_h is not None:
+            with_mount_height += 1
+        rows.append({
+            "symbol": a["symbol"],
+            "name": a["name"],
+            "x": round(a["x"], 1),
+            "y": round(a["y"], 1),
+            "method": a["method"],
+            "page_index": page_index,
+            "level_elevation": level_elevation,
+            "level_source": level_source,
+            "mount_height": mount_h,
+            "mount_height_source": mount_src,
+            "confidence": round(conf, 2),
+            "raw_text": raw,
+        })
+
+    return {
+        "page_index": page_index,
+        "level_elevation": level_elevation,
+        "level_source": level_source,
+        "total_anchors": len(rows),
+        "with_mount_height": with_mount_height,
+        "rows": rows,
+    }
+
+
 def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
     """Run legend extraction + counting methods on a single PDF.
 
@@ -705,9 +961,11 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
     if has_legend:
         # Step 2: run VISUAL counting first (primary method)
         visual_counts: dict[int, int] = {}  # symbol_index -> count
+        disambiguated_indices: set[int] = set()
         try:
             vis_result = match_symbols(pdf_path, legend_result)
             visual_counts = vis_result.counts  # symbol_index -> count
+            disambiguated_indices = vis_result.disambiguated_indices
         except Exception as exc:
             log.warning("Visual counting failed for %s: %s", pdf_path, exc)
 
@@ -741,10 +999,10 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
 
             # Determine count: smart priority between visual and text.
             #
-            # Compound text markers (containing Cyrillic, e.g. '7АЭ', '8АЭ')
-            # are highly reliable — they cannot be confused with axis labels,
-            # room numbers, or other non-equipment text.  When a compound
-            # text count exceeds visual, trust text.  (T148)
+            # Compound markers (containing Cyrillic, e.g. '7АЭ', '8АЭ'):
+            # prefer visual count when available so pictogram/template
+            # detections participate in final totals; fall back to text if
+            # visual has no hits.
             #
             # For standalone digit symbols: visual is preferred, but if
             # suspiciously high vs text (>3×), fall back to text when
@@ -756,13 +1014,27 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
             vis_count = visual_counts.get(idx, 0)
             txt_count = text_counts.get(sym, 0) if sym else 0
             is_compound = bool(sym and re_mod.search(r'[А-Яа-яЁё]', sym))
+            is_simple_compound = bool(sym and re_mod.fullmatch(r'\d{1,2}[А-Яа-яЁё]', sym))
+            is_disambiguated = idx in disambiguated_indices
             count = 0
-            if is_compound and txt_count > 0:
-                # Compound text markers (e.g. '7АЭ', '8АЭ') are highly
-                # reliable — they cannot be confused with axis labels or
-                # room numbers.  Always prefer text for compound symbols.
+            if is_compound and vis_count > 0:
+                # For simple one-letter variants (e.g. 1А), visual matching can
+                # flood with false positives on dense sheets. If visual is much
+                # higher than text, prefer text as a safer estimate.
+                if is_simple_compound and txt_count > 0 and vis_count > txt_count * 3:
+                    count = txt_count
+                else:
+                    # For more specific compound markers (e.g. 7АЭ), keep visual
+                    # as primary when it exists.
+                    count = vis_count
+            elif is_compound and txt_count > 0:
                 count = txt_count
-            elif (vis_count > 0 and txt_count >= 5
+            elif is_disambiguated and vis_count > 0:
+                # Symbol was resolved by text-aided disambiguation (S021).
+                # Each visual match has already been verified against nearby
+                # PDF text — trust visual count directly.
+                count = vis_count
+            elif (vis_count > 0 and txt_count >= 3
                     and vis_count > txt_count * 3):
                 count = txt_count  # visual likely has false positives
             elif vis_count > 0 and txt_count > vis_count:
@@ -771,6 +1043,15 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
                 # similar templates.  Trust text as the better estimate.
                 count = txt_count
             elif vis_count > 0:
+                # Guard: if visual is very high but text found nothing,
+                # visual likely has massive false positives from a generic
+                # template matching background noise (S021).
+                if txt_count == 0 and vis_count > 20 and not is_compound:
+                    log.debug(
+                        "skip sym=%s vis=%d txt=0 — likely FP flood",
+                        sym, vis_count,
+                    )
+                    continue
                 count = vis_count
             elif txt_count > 0:
                 count = txt_count
@@ -792,8 +1073,9 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
         picto_result = detect_pictograms(pdf_path, legend_result)
         for name, count in picto_result.counts.items():
             if count > 0:
+                # Use "ВЫХОД" symbol to match DXF ground truth naming.
                 items.append({
-                    "symbol": "",
+                    "symbol": "ВЫХОД",
                     "name": name,
                     "count": count,
                     "count_ae": 0,
@@ -1870,6 +2152,22 @@ async def api_count_visual(
         raise HTTPException(status_code=500, detail=f"Visual matching error: {e}")
 
 
+@app.get("/api/file/{file_id}/luminaire_heights")
+async def api_luminaire_heights(file_id: str):
+    """Extract mount-height hints near detected luminaires."""
+    pdf_path = _id_to_path(file_id)
+    if pdf_path is None:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    try:
+        t0 = time.time()
+        result = await asyncio.to_thread(extract_luminaire_heights, str(pdf_path))
+        result["elapsed_s"] = round(time.time() - t0, 2)
+        return JSONResponse(content=result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Luminaire height extraction error: {e}")
+
+
 @app.get("/api/file/{file_id}/count/all")
 async def api_count_all(file_id: str):
     """Run ALL counting methods and return combined results."""
@@ -1996,6 +2294,278 @@ async def api_count_all(file_id: str):
         "legend_items": len(legend.items),
         "elapsed_s": total_elapsed,
     })
+
+
+# ---------------------------------------------------------------------------
+# 9b. GET /api/file/{file_id}/count/stream — SSE step-by-step counting
+# ---------------------------------------------------------------------------
+
+def _sse(event: str, data: dict) -> str:
+    """Format a single SSE message."""
+    return f"event: {event}\ndata: {json_mod.dumps(data, ensure_ascii=False)}\n\n"
+
+
+@app.get("/api/file/{file_id}/count/stream")
+async def api_count_stream(file_id: str):
+    """SSE stream: step-by-step equipment counting with real-time progress."""
+    pdf_path = _id_to_path(file_id)
+    if pdf_path is None:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    async def event_stream():
+        t0 = time.time()
+        results: dict = {}
+        errors: dict = {}
+        step_counter = 0  # running step number
+
+        def next_step():
+            nonlocal step_counter
+            step_counter += 1
+            return step_counter
+
+        # ── Step 1: Parse legend ──────────────────────────────
+        s = next_step()
+        yield _sse("progress", {"step": s, "label": "Парсинг легенды", "status": "running"})
+        try:
+            legend = await asyncio.to_thread(_get_legend, pdf_path, file_id)
+        except Exception as e:
+            yield _sse("error", {"step": s, "label": "Парсинг легенды", "error": str(e)})
+            yield _sse("done", {"total_elapsed_s": round(time.time() - t0, 2), "ok": False})
+            return
+        legend_page = legend.page_index if legend.items else 0
+        n_items = len(legend.items)
+
+        yield _sse("start", {
+            "legend_items": n_items,
+        })
+        yield _sse("step_done", {
+            "step": s,
+            "label": "Парсинг легенды",
+            "count": n_items,
+            "elapsed_s": round(time.time() - t0, 2),
+        })
+
+        # ── Visual matching per symbol ────────────────────────
+        # Use progress_callback + asyncio.Queue to stream per-symbol results
+        queue: asyncio.Queue = asyncio.Queue()
+        loop = asyncio.get_event_loop()
+
+        def on_symbol_progress(idx, item, count):
+            """Called from worker thread for each symbol."""
+            asyncio.run_coroutine_threadsafe(
+                queue.put(("symbol_done", idx, item.symbol or "?",
+                           (item.description or "")[:50], count)),
+                loop,
+            )
+
+        vis_error = None
+
+        async def run_visual():
+            nonlocal vis_error
+            try:
+                result = await asyncio.to_thread(
+                    match_symbols, str(pdf_path), legend,
+                    progress_callback=on_symbol_progress,
+                )
+                await queue.put(("visual_done", result))
+            except Exception as e:
+                vis_error = str(e)
+                await queue.put(("visual_done", None))
+
+        # Emit "running" for first symbol
+        if n_items > 0:
+            s = next_step()
+            yield _sse("progress", {
+                "step": s, "label": "Подготовка визуального поиска...",
+                "status": "running",
+            })
+
+        vis_task = asyncio.create_task(run_visual())
+
+        while not vis_task.done() or not queue.empty():
+            try:
+                msg = await asyncio.wait_for(queue.get(), timeout=0.3)
+            except asyncio.TimeoutError:
+                continue
+
+            if msg[0] == "symbol_done":
+                _, idx, sym, desc, count = msg
+                label = f"Поиск: {sym} — {desc}" if sym != "?" else f"Поиск: {desc}"
+                yield _sse("step_done", {
+                    "step": s,
+                    "type": "symbol",
+                    "label": label,
+                    "symbol": sym, "description": desc,
+                    "symbol_index": idx, "count": count,
+                })
+                # Advance step for next symbol
+                s = next_step()
+                yield _sse("progress", {
+                    "step": s, "label": "Визуальный поиск...",
+                    "status": "running",
+                })
+
+            elif msg[0] == "visual_done":
+                vis_result = msg[1]
+                break
+
+        # Wait for task to fully complete
+        await vis_task
+
+        # Process visual results
+        if vis_result is not None:
+            vis_matches = []
+            for m in vis_result.matches:
+                vis_matches.append({
+                    "symbol_index": m.symbol_index,
+                    "description": m.description,
+                    "x": m.x, "y": m.y,
+                    "confidence": m.confidence, "color": m.color,
+                })
+            results["visual"] = {
+                "counts": vis_result.counts,
+                "descriptions": vis_result.descriptions,
+                "matches": vis_matches,
+                "symbols_extracted": vis_result.symbols_extracted,
+            }
+        elif vis_error:
+            errors["visual"] = vis_error
+
+        # ── Text markers ──────────────────────────────────────
+        s = next_step()
+        yield _sse("progress", {
+            "step": s, "label": "Текстовый поиск маркеров", "status": "running",
+        })
+        try:
+            t1 = time.time()
+            text_result = await asyncio.to_thread(
+                count_symbols, str(pdf_path), legend,
+            )
+            positions_by_sym: dict[str, list[dict]] = {}
+            for p in text_result.positions:
+                if p.symbol not in positions_by_sym:
+                    positions_by_sym[p.symbol] = []
+                positions_by_sym[p.symbol].append({
+                    "x": round(p.x, 1), "y": round(p.y, 1),
+                })
+            results["text"] = {
+                "counts": text_result.counts,
+                "positions": positions_by_sym,
+                "total": sum(text_result.counts.values()),
+                "elapsed_s": round(time.time() - t1, 2),
+            }
+            yield _sse("step_done", {
+                "step": s,
+                "type": "text", "label": "Текстовый поиск маркеров",
+                "count": sum(text_result.counts.values()),
+                "elapsed_s": round(time.time() - t1, 2),
+            })
+        except Exception as e:
+            errors["text"] = str(e)
+            yield _sse("step_done", {
+                "step": s,
+                "type": "text", "label": "Текстовый поиск маркеров",
+                "error": str(e),
+            })
+
+        # ── Cables ────────────────────────────────────────────
+        s = next_step()
+        yield _sse("progress", {
+            "step": s, "label": "Анализ кабелей", "status": "running",
+        })
+        try:
+            t1 = time.time()
+            cable_result = await asyncio.to_thread(
+                extract_cables, str(pdf_path), legend, [legend_page],
+            )
+            cable_runs = []
+            for r in cable_result.runs:
+                cable_runs.append({
+                    "panel": r.panel, "group_full": r.group_full,
+                    "cross_section": r.cross_section,
+                    "length_m": r.length_m, "cable_type": r.cable_type,
+                    "color": r.color,
+                    "position": {"x": r.position[0], "y": r.position[1]},
+                })
+            results["cables"] = {
+                "total_runs": cable_result.total_runs,
+                "runs": cable_runs,
+                "panels": {k: len(v) for k, v in cable_result.panels.items()},
+                "schedule": cable_result.cable_schedule,
+                "elapsed_s": round(time.time() - t1, 2),
+            }
+            yield _sse("step_done", {
+                "step": s,
+                "type": "cables", "label": "Анализ кабелей",
+                "count": cable_result.total_runs,
+                "elapsed_s": round(time.time() - t1, 2),
+            })
+        except Exception as e:
+            errors["cables"] = str(e)
+            yield _sse("step_done", {
+                "step": s,
+                "type": "cables", "label": "Анализ кабелей",
+                "error": str(e),
+            })
+
+        # ── Geometry ──────────────────────────────────────────
+        s = next_step()
+        yield _sse("progress", {
+            "step": s, "label": "Измерение маршрутов", "status": "running",
+        })
+        try:
+            t1 = time.time()
+            geo_result = await asyncio.to_thread(
+                measure_cables, str(pdf_path), legend, [legend_page],
+            )
+            routes_json = []
+            for r in geo_result.routes:
+                routes_json.append({
+                    "color": r.color,
+                    "total_length_m": round(r.total_length_m, 1),
+                    "segment_count": r.segment_count,
+                })
+            scale_info = None
+            if geo_result.scale:
+                scale_info = {
+                    "mm_per_pt": round(geo_result.scale.mm_per_pt, 4),
+                    "source": geo_result.scale.source,
+                }
+            results["geometry"] = {
+                "routes": routes_json,
+                "scale": scale_info,
+                "elapsed_s": round(time.time() - t1, 2),
+            }
+            yield _sse("step_done", {
+                "step": s,
+                "type": "geometry", "label": "Измерение маршрутов",
+                "elapsed_s": round(time.time() - t1, 2),
+            })
+        except Exception as e:
+            errors["geometry"] = str(e)
+            yield _sse("step_done", {
+                "step": s,
+                "type": "geometry", "label": "Измерение маршрутов",
+                "error": str(e),
+            })
+
+        # ── Done ─────────────────────────────────────────────
+        total_elapsed = round(time.time() - t0, 2)
+        yield _sse("done", {
+            "total_elapsed_s": total_elapsed,
+            "total_steps": step_counter,
+            "ok": True,
+            "results": results,
+            "errors": errors,
+            "legend_page": legend_page,
+            "legend_items": n_items,
+        })
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # ---------------------------------------------------------------------------

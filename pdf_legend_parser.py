@@ -260,6 +260,124 @@ def _detect_row_color(
     return best
 
 
+def _collect_cell_colors(
+    lines: list[dict],
+    rects: list[dict],
+    row_bbox: tuple[float, float, float, float],
+    sym_x_boundary: float,
+) -> set[str]:
+    """Collect the set of distinct non-black color labels in the symbol cell.
+
+    Uses the same spatial filtering as _detect_row_color but returns ALL
+    colors present rather than the most frequent one.  Used to detect
+    dual-color rows (e.g. blue working + red emergency) that need splitting.
+    """
+    x0, y0, x1, y1 = row_bbox
+    sym_x1 = min(x1, sym_x_boundary + 10)
+    colors: set[str] = set()
+
+    for ln in lines:
+        lx0 = min(ln["x0"], ln["x1"])
+        lx1 = max(ln["x0"], ln["x1"])
+        ly0 = min(ln["top"], ln["bottom"])
+        ly1 = max(ln["top"], ln["bottom"])
+        if lx1 < x0 - 5 or lx0 > sym_x1 + 5:
+            continue
+        if ly1 < y0 - 3 or ly0 > y1 + 3:
+            continue
+        line_len = max(abs(ln["x1"] - ln["x0"]), abs(ln["bottom"] - ln["top"]))
+        if line_len > (y1 - y0) * 2 and line_len > 100:
+            continue
+        rgb = _normalize_color(ln.get("stroking_color"))
+        if rgb is None:
+            continue
+        label = _classify_rgb(rgb)
+        if label and label != "black":
+            colors.add(label)
+
+    for rect in rects:
+        rx0, ry0 = rect["x0"], rect["top"]
+        rx1, ry1 = rect["x1"], rect["bottom"]
+        if rx1 < x0 - 5 or rx0 > sym_x1 + 5:
+            continue
+        if ry1 < y0 - 3 or ry0 > y1 + 3:
+            continue
+        rect_w = rx1 - rx0
+        rect_h = ry1 - ry0
+        if rect_w > sym_x1 - x0 + 20 and rect_h > y1 - y0 + 10:
+            continue
+        for color_key in ("stroking_color", "non_stroking_color"):
+            rgb = _normalize_color(rect.get(color_key))
+            if rgb is None:
+                continue
+            label = _classify_rgb(rgb)
+            if label and label != "black":
+                colors.add(label)
+
+    return colors
+
+
+def _detect_sub_row_color(
+    lines: list[dict],
+    rects: list[dict],
+    row_bbox: tuple[float, float, float, float],
+    sym_x_boundary: float,
+    y_min: float,
+    y_max: float,
+) -> str:
+    """Detect dominant color in a vertical sub-range of the symbol cell.
+
+    Like _detect_row_color but restricts the Y range to [y_min, y_max]
+    instead of the full row_bbox height.  Used after splitting a
+    dual-color row to assign a color to each sub-item.
+    """
+    x0, _, x1, _ = row_bbox
+    sym_x1 = min(x1, sym_x_boundary + 10)
+    color_counts: dict[str, int] = {}
+
+    for ln in lines:
+        lx0 = min(ln["x0"], ln["x1"])
+        lx1 = max(ln["x0"], ln["x1"])
+        ly0 = min(ln["top"], ln["bottom"])
+        ly1 = max(ln["top"], ln["bottom"])
+        if lx1 < x0 - 5 or lx0 > sym_x1 + 5:
+            continue
+        if ly1 < y_min - 3 or ly0 > y_max + 3:
+            continue
+        line_len = max(abs(ln["x1"] - ln["x0"]), abs(ln["bottom"] - ln["top"]))
+        if line_len > (y_max - y_min) * 2 and line_len > 100:
+            continue
+        rgb = _normalize_color(ln.get("stroking_color"))
+        if rgb is None:
+            continue
+        label = _classify_rgb(rgb)
+        if label and label != "black":
+            color_counts[label] = color_counts.get(label, 0) + 1
+
+    for rect in rects:
+        rx0, ry0 = rect["x0"], rect["top"]
+        rx1, ry1 = rect["x1"], rect["bottom"]
+        if rx1 < x0 - 5 or rx0 > sym_x1 + 5:
+            continue
+        if ry1 < y_min - 3 or ry0 > y_max + 3:
+            continue
+        rect_w = rx1 - rx0
+        rect_h = ry1 - ry0
+        if rect_w > sym_x1 - x0 + 20 and rect_h > (y_max - y_min) + 10:
+            continue
+        for color_key in ("stroking_color", "non_stroking_color"):
+            rgb = _normalize_color(rect.get(color_key))
+            if rgb is None:
+                continue
+            label = _classify_rgb(rgb)
+            if label and label != "black":
+                color_counts[label] = color_counts.get(label, 0) + 1
+
+    if not color_counts:
+        return ""
+    return max(color_counts, key=color_counts.get)  # type: ignore[arg-type]
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -754,16 +872,7 @@ def _extract_items_from_table(
         numeric_syms = [w for w in sym_parts if SYMBOL_RE.match(w["text"])]
         text_syms = [w for w in sym_parts if TEXT_SYMBOL_RE.match(w["text"])]
 
-        # Prefer numeric symbol (1, 1А, 9А, 10А) over text symbol (ВЫХОД)
-        # If both exist, use numeric as the item symbol
-        if numeric_syms:
-            sym_text = numeric_syms[0]["text"]
-        elif text_syms:
-            sym_text = text_syms[0]["text"]
-        else:
-            sym_text = ""
-
-        # Build full description: group by text lines, join all
+        # Build full description early (shared by all sub-items if split)
         desc_lines = _y_group(desc_parts, tol=y_tol)
         desc_text = " ".join(_join_words(ws) for _, ws in desc_lines).strip()
 
@@ -781,11 +890,7 @@ def _extract_items_from_table(
         # Sanitize overly long descriptions (concatenated equipment names)
         desc_text = _sanitize_long_description(desc_text)
 
-        # Skip empty rows
-        if not sym_text and not desc_text:
-            continue
-
-        # Compute row bbox
+        # Compute row bbox (needed for both split and normal paths)
         all_cell_words = sym_parts + desc_parts
         if all_cell_words:
             row_bbox = (
@@ -797,6 +902,82 @@ def _extract_items_from_table(
         else:
             row_bbox = (bounds.x0, data_row_ys[slot_idx] if slot_idx < len(data_row_ys) else bounds.y0,
                        bounds.x1, bounds.y1)
+
+        # --- Dual-color split detection ---
+        # On ГПК-style drawings, a single legend row may contain two symbols
+        # stacked vertically: e.g. blue "4" (working) above red "4АЭ" (emergency).
+        # Detect this pattern and split into separate LegendItems.
+        if (len(numeric_syms) >= 2
+                and (page_lines is not None or page_rects is not None)):
+            sym_y_groups = _y_group(numeric_syms, tol=3)
+
+            if len(sym_y_groups) >= 2:
+                colors_in_cell = _collect_cell_colors(
+                    page_lines or [], page_rects or [],
+                    row_bbox, sym_x_boundary,
+                )
+
+                if len(colors_in_cell) >= 2:
+                    # SPLIT: create one LegendItem per Y-group
+                    sym_y_groups.sort(key=lambda g: g[0])
+                    category = _detect_category(desc_text)
+
+                    # Compute Y boundaries between consecutive symbol groups.
+                    # Use bottom of previous group / top of next group to find
+                    # the gap between the two stacked symbols.  This is more
+                    # accurate than using tops, because the symbol TEXT sits
+                    # above the graphical symbol and may overlap in Y range
+                    # with the graphics below it.
+                    y_boundaries: list[float] = []
+                    for g_idx in range(len(sym_y_groups)):
+                        if g_idx == 0:
+                            y_boundaries.append(row_bbox[1])
+                        else:
+                            # bottom of previous group's words
+                            prev_words = sym_y_groups[g_idx - 1][1]
+                            prev_bottom = max(w["bottom"] for w in prev_words)
+                            # top of current group's words
+                            curr_top = sym_y_groups[g_idx][0]
+                            y_boundaries.append((prev_bottom + curr_top) / 2)
+                    y_boundaries.append(row_bbox[3])
+
+                    for g_idx, (g_y, g_words) in enumerate(sym_y_groups):
+                        sub_sym_text = g_words[0]["text"]
+                        sub_y_min = y_boundaries[g_idx]
+                        sub_y_max = y_boundaries[g_idx + 1]
+                        sub_bbox = (row_bbox[0], sub_y_min, row_bbox[2], sub_y_max)
+
+                        sub_color = _detect_sub_row_color(
+                            page_lines or [], page_rects or [],
+                            row_bbox, sym_x_boundary,
+                            sub_y_min, sub_y_max,
+                        )
+
+                        if not sub_sym_text and not desc_text:
+                            continue
+
+                        items.append(LegendItem(
+                            symbol=sub_sym_text,
+                            description=desc_text,
+                            category=category,
+                            bbox=sub_bbox,
+                            color=sub_color,
+                        ))
+
+                    continue  # skip normal single-item creation below
+
+        # --- Normal single-item path ---
+        # Prefer numeric symbol (1, 1А, 9А, 10А) over text symbol (ВЫХОД)
+        if numeric_syms:
+            sym_text = numeric_syms[0]["text"]
+        elif text_syms:
+            sym_text = text_syms[0]["text"]
+        else:
+            sym_text = ""
+
+        # Skip empty rows
+        if not sym_text and not desc_text:
+            continue
 
         category = _detect_category(desc_text)
 
