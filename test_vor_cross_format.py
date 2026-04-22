@@ -48,6 +48,15 @@ from pdf_count_visual import match_symbols, detect_pictograms  # noqa: E402
 from vor_work_mapping import map_items as vor_map_items  # noqa: E402
 from equipment_counter import process_dxf  # noqa: E402
 
+
+# S1.9 (T024): per-PDF legend parse stats collected by
+# ``_count_equipment_in_pdf`` and dumped to ``legend_parse_stats.json``
+# at the end of ``main()``.  Each entry:
+#   {case, pdf, page_index, method_used, items_found, bbox}
+# ``method_used`` is one of: header / content / spec / density / none
+# with an optional "reversed:" prefix (S1.8 / T023).
+_LEGEND_PARSE_STATS: list[dict] = []
+
 try:
     import openpyxl  # noqa: E402
 except ImportError:
@@ -358,9 +367,28 @@ def read_reference_vor(xlsx_path: str) -> list[RefItem]:
 #  PDF Pipeline (same as test_vor_accuracy.py)
 # =====================================================================
 
-def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
-    """Run legend extraction + counting on a single PDF."""
+def _count_equipment_in_pdf(pdf_path: str, case_name: str = "") -> list[dict]:
+    """Run legend extraction + counting on a single PDF.
+
+    S1.9 (T024): records per-page parse stats to ``_LEGEND_PARSE_STATS``
+    so ``main()`` can dump them to ``legend_parse_stats.json`` at the
+    end of the run.
+    """
     legend_result = parse_legend(pdf_path)
+
+    # Record stats about the winning legend candidate (one entry per
+    # PDF).  Individual per-page detection attempts are collapsed to
+    # the ``detection_method`` that actually produced the final result
+    # — this is the signal we want for regression monitoring.
+    _LEGEND_PARSE_STATS.append({
+        "case": case_name,
+        "pdf": Path(pdf_path).name,
+        "page_index": legend_result.page_index,
+        "method_used": legend_result.detection_method or "none",
+        "items_found": len(legend_result.items),
+        "bbox": list(legend_result.legend_bbox),
+    })
+
     if not legend_result.items:
         return []
 
@@ -457,8 +485,12 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
     return items
 
 
-def process_pdf_folder(folder_path: str) -> tuple[dict[str, GenItem], int, int]:
-    """Process all PDFs in folder via PDF pipeline. Returns (items_by_key, count, errors)."""
+def process_pdf_folder(folder_path: str, case_name: str = "") -> tuple[dict[str, GenItem], int, int]:
+    """Process all PDFs in folder via PDF pipeline. Returns (items_by_key, count, errors).
+
+    S1.9 (T024): ``case_name`` flows through to ``_count_equipment_in_pdf``
+    so per-PDF legend parse stats can be tagged with the case label.
+    """
     pdf_dir = Path(folder_path)
     pdf_files = sorted(pdf_dir.glob("*.pdf"))
     all_items: dict[str, GenItem] = {}
@@ -467,7 +499,7 @@ def process_pdf_folder(folder_path: str) -> tuple[dict[str, GenItem], int, int]:
 
     for pdf_path in pdf_files:
         try:
-            items = _count_equipment_in_pdf(str(pdf_path))
+            items = _count_equipment_in_pdf(str(pdf_path), case_name=case_name)
             for item in items:
                 work_name = item.get("work_name", "").strip()
                 raw_name = item.get("name", "").strip()
@@ -743,7 +775,7 @@ def run_case(case: dict, threshold: float = 0.45) -> CaseResult:
                               elapsed_sec=time.time() - t0)
 
         # 2. Run PDF pipeline
-        pdf_items, pdf_proc, pdf_errs = process_pdf_folder(pdf_dir)
+        pdf_items, pdf_proc, pdf_errs = process_pdf_folder(pdf_dir, case_name=name)
 
         # 3. Run DXF pipeline (if available)
         dxf_items: dict[str, GenItem] = {}
@@ -1067,6 +1099,25 @@ def main():
     with open(report_path, "w", encoding="utf-8") as f:
         json.dump(report, f, ensure_ascii=False, indent=2, default=str)
     print(f"\n  Report saved: {report_path}")
+
+    # S1.9 (T024): dump legend parse stats (method distribution,
+    # items_found per PDF, bbox) for regression monitoring.  If the
+    # proportion of header/content/spec/density/reversed changes
+    # drastically between runs, something regressed.
+    stats_path = PROJECT_ROOT / "legend_parse_stats.json"
+    method_counts: dict[str, int] = {}
+    for entry in _LEGEND_PARSE_STATS:
+        m = entry.get("method_used", "none")
+        method_counts[m] = method_counts.get(m, 0) + 1
+    stats_payload = {
+        "total_pdfs": len(_LEGEND_PARSE_STATS),
+        "method_distribution": method_counts,
+        "entries": _LEGEND_PARSE_STATS,
+    }
+    with open(stats_path, "w", encoding="utf-8") as f:
+        json.dump(stats_payload, f, ensure_ascii=False, indent=2, default=str)
+    print(f"  Legend parse stats saved: {stats_path}")
+    print(f"  Method distribution: {method_counts}")
     print("=" * 80)
 
 

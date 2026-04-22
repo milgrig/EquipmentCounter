@@ -1,0 +1,792 @@
+{
+  "total_pdfs": 60,
+  "method_distribution": {
+    "none": 19,
+    "header": 13,
+    "spec": 1,
+    "density": 18,
+    "content": 9
+  },
+  "entries": [
+    {
+      "case": "abk_em",
+      "pdf": "005- схема ЩР2.pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "006- схема ЩР3.pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "007- схема ЩР4.pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "008- схема ЩР5.pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "009- схема ЩР6.pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "010- схема ЩВ.pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "011- схема ПД.pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "012-ЩВН.pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "013-План об-я на отм. 0.000.pdf",
+      "page_index": 0,
+      "method_used": "header",
+      "items_found": 11,
+      "bbox": [
+        1267.0,
+        1281.0,
+        1750.0,
+        1557.4
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "014-План об-я на отм. +4.500.pdf",
+      "page_index": 0,
+      "method_used": "header",
+      "items_found": 11,
+      "bbox": [
+        1216.0,
+        1286.6,
+        1698.0,
+        1563.0
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "015-План оборудования на кровле.pdf",
+      "page_index": 0,
+      "method_used": "header",
+      "items_found": 3,
+      "bbox": [
+        1027.0,
+        1500.2,
+        1509.0,
+        1595.2
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "016-Планы розеточной сети га отм. 0.000.pdf",
+      "page_index": 0,
+      "method_used": "header",
+      "items_found": 8,
+      "bbox": [
+        1100.0,
+        1321.1,
+        1583.0,
+        1530.2
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "017-Планы розеточной сети га отм. +4.500.pdf",
+      "page_index": 0,
+      "method_used": "header",
+      "items_found": 7,
+      "bbox": [
+        1314.0,
+        1375.7,
+        1796.0,
+        1562.6
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "018-Планы лотков на отм 0.000.pdf",
+      "page_index": 0,
+      "method_used": "header",
+      "items_found": 2,
+      "bbox": [
+        1193.0,
+        1488.6,
+        1652.0,
+        1569.8
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "019-Планы лотков на отм +4.500.pdf",
+      "page_index": 0,
+      "method_used": "header",
+      "items_found": 2,
+      "bbox": [
+        1265.0,
+        1422.4,
+        1723.0,
+        1503.6
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "020-Узлы.pdf",
+      "page_index": 0,
+      "method_used": "spec",
+      "items_found": 17,
+      "bbox": [
+        247.7421981936,
+        1118.3251314593895,
+        689.3825531056,
+        1537.7830670254698
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "021-Прокладка лотка через перегородки и перекрытия.pdf",
+      "page_index": 0,
+      "method_used": "density",
+      "items_found": 6,
+      "bbox": [
+        1151.1254591962647,
+        290.8400761295177,
+        1190.1960849348259,
+        314.73833458960223
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "Опросные листы.pdf",
+      "page_index": 0,
+      "method_used": "density",
+      "items_found": 5,
+      "bbox": [
+        629.04,
+        841.9168308000001,
+        1004.8904855134515,
+        987.4383108
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "СО-СО_01.pdf",
+      "page_index": 0,
+      "method_used": "content",
+      "items_found": 4,
+      "bbox": [
+        72.96,
+        175.87588315999994,
+        1148.10012,
+        278.0819423600001
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "СО-СО_02.pdf",
+      "page_index": 0,
+      "method_used": "density",
+      "items_found": 10,
+      "bbox": [
+        71.28,
+        186.9276160400001,
+        174.20527427999997,
+        493.24189604000003
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "СО-СО_03.pdf",
+      "page_index": 0,
+      "method_used": "density",
+      "items_found": 21,
+      "bbox": [
+        71.52,
+        146.36626028,
+        509.18988251999997,
+        762.64222028
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "СО-СО_04.pdf",
+      "page_index": 0,
+      "method_used": "density",
+      "items_found": 14,
+      "bbox": [
+        70.32,
+        67.04674448000003,
+        488.54150591999996,
+        481.84210448000005
+      ]
+    },
+    {
+      "case": "abk_em",
+      "pdf": "СО-СО_05.pdf",
+      "page_index": 0,
+      "method_used": "density",
+      "items_found": 9,
+      "bbox": [
+        70.8,
+        515.12684132,
+        470.31578939999997,
+        764.32208132
+      ]
+    },
+    {
+      "case": "abk_eg",
+      "pdf": "001-Общие данные.pdf",
+      "page_index": 0,
+      "method_used": "density",
+      "items_found": 4,
+      "bbox": [
+        135.6,
+        111.05273172000011,
+        487.18482408,
+        268.32077172000004
+      ]
+    },
+    {
+      "case": "abk_eg",
+      "pdf": "002-СУП.pdf",
+      "page_index": 0,
+      "method_used": "content",
+      "items_found": 11,
+      "bbox": [
+        541.0,
+        753.1,
+        850.0,
+        1089.4
+      ]
+    },
+    {
+      "case": "abk_eg",
+      "pdf": "003-План заземления на отм. 0.000.pdf",
+      "page_index": 0,
+      "method_used": "density",
+      "items_found": 1,
+      "bbox": [
+        1315.219038956435,
+        319.26407259999996,
+        1697.5789930199999,
+        338.28971260000003
+      ]
+    },
+    {
+      "case": "abk_eg",
+      "pdf": "004-План УП на отм. +4.500.pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "abk_eg",
+      "pdf": "005-План молниезащиты.pdf",
+      "page_index": 0,
+      "method_used": "content",
+      "items_found": 6,
+      "bbox": [
+        334.0,
+        1022.0,
+        719.0,
+        1224.5
+      ]
+    },
+    {
+      "case": "abk_eg",
+      "pdf": "03-01-03 ВОР ЭЛ_АБК_1 ЭГ.pdf",
+      "page_index": 0,
+      "method_used": "density",
+      "items_found": 3,
+      "bbox": [
+        71.52,
+        312.14200000000005,
+        395.33,
+        422.12464
+      ]
+    },
+    {
+      "case": "abk_eg",
+      "pdf": "1) Титульный лист (1Д-24-1-ЭГ) рев.1.pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "abk_eg",
+      "pdf": "СО-СО_01.pdf",
+      "page_index": 0,
+      "method_used": "content",
+      "items_found": 4,
+      "bbox": [
+        71.28,
+        292.52674447999993,
+        983.44449936,
+        416.92210448000003
+      ]
+    },
+    {
+      "case": "abk_eg",
+      "pdf": "СО-СО_02.pdf",
+      "page_index": 0,
+      "method_used": "content",
+      "items_found": 3,
+      "bbox": [
+        73.44,
+        208.52771287999997,
+        983.5794268799999,
+        304.72187288
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "001 - ОД (начало).pdf",
+      "page_index": 0,
+      "method_used": "header",
+      "items_found": 3,
+      "bbox": [
+        759.0,
+        140.3,
+        1067.0,
+        367.6
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "002-ОД (продолжение).pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "003-ОД (окончание).pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "004- Схема ВРУ.pdf",
+      "page_index": 0,
+      "method_used": "header",
+      "items_found": 3,
+      "bbox": [
+        168.0,
+        797.5,
+        315.0,
+        994.3
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "005- Схема ЩР.pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "006- Схема ЩВ.pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "007- Схема ЩВН.pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "008- Схема ЩО.pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "009- Схема ЩАО.pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "010-План заземления и молниезащиты-Схема СУП.pdf",
+      "page_index": 0,
+      "method_used": "content",
+      "items_found": 11,
+      "bbox": [
+        483.0,
+        692.3,
+        792.0,
+        1028.5
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "011 План заземления и молниезащиты-План заземления.pdf",
+      "page_index": 0,
+      "method_used": "content",
+      "items_found": 6,
+      "bbox": [
+        1364.0,
+        1259.4,
+        1727.0,
+        1445.1
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "012 План заземления и молниезащиты-План молниезащиты.pdf",
+      "page_index": 0,
+      "method_used": "content",
+      "items_found": 8,
+      "bbox": [
+        716.0,
+        1241.1,
+        1150.0,
+        1521.6
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "013-План расположения электрооборудования на отм. 0.000.pdf",
+      "page_index": 0,
+      "method_used": "header",
+      "items_found": 12,
+      "bbox": [
+        4833.0,
+        1147.2,
+        5315.0,
+        1446.4
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "014-План расположения оборудования на кровле.pdf",
+      "page_index": 0,
+      "method_used": "header",
+      "items_found": 1,
+      "bbox": [
+        4716.0,
+        1428.7,
+        5198.0,
+        1479.5
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "015-План освещения.pdf",
+      "page_index": 0,
+      "method_used": "header",
+      "items_found": 26,
+      "bbox": [
+        3491.0,
+        988.0,
+        4187.0,
+        1608.1
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "016-План привязки светильников.pdf",
+      "page_index": 0,
+      "method_used": "header",
+      "items_found": 26,
+      "bbox": [
+        3874.0,
+        944.4,
+        4570.0,
+        1564.6
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "017-План лотков.pdf",
+      "page_index": 0,
+      "method_used": "density",
+      "items_found": 25,
+      "bbox": [
+        4527.603629403598,
+        1152.5558276039246,
+        4935.781332031245,
+        1462.5329955854604
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "018-Проходки.pdf",
+      "page_index": 0,
+      "method_used": "density",
+      "items_found": 7,
+      "bbox": [
+        893.82694407618,
+        422.07797717475216,
+        1007.4499017573835,
+        441.81026994248185
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "03-12-03 ВОР ЭОМ_27.pdf",
+      "page_index": 2,
+      "method_used": "density",
+      "items_found": 55,
+      "bbox": [
+        65.52,
+        28.544640000000072,
+        493.15,
+        579.58464
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "1) Титульный лист (1Д-24-27-ЭОМ) рев.1.pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "Опросные листы.pdf",
+      "page_index": 0,
+      "method_used": "none",
+      "items_found": 0,
+      "bbox": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "СО-СО_01.pdf",
+      "page_index": 0,
+      "method_used": "density",
+      "items_found": 6,
+      "bbox": [
+        71.39999999999999,
+        399.32742236,
+        451.87511484000004,
+        645.52194236
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "СО-СО_02.pdf",
+      "page_index": 0,
+      "method_used": "density",
+      "items_found": 9,
+      "bbox": [
+        70.92,
+        66.20645396000009,
+        509.82529307999994,
+        415.96217396000003
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "СО-СО_03.pdf",
+      "page_index": 0,
+      "method_used": "density",
+      "items_found": 4,
+      "bbox": [
+        72.84,
+        410.24567924,
+        172.64767668,
+        539.32235924
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "СО-СО_04.pdf",
+      "page_index": 0,
+      "method_used": "density",
+      "items_found": 8,
+      "bbox": [
+        72.72,
+        95.60616344000005,
+        173.36707607999998,
+        342.76224344
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "СО-СО_05.pdf",
+      "page_index": 0,
+      "method_used": "density",
+      "items_found": 9,
+      "bbox": [
+        71.52,
+        362.3660666,
+        506.0708994,
+        630.4022666
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "СО-СО_06.pdf",
+      "page_index": 0,
+      "method_used": "density",
+      "items_found": 6,
+      "bbox": [
+        71.64,
+        66.80606660000012,
+        494.4559854,
+        248.08226660000003
+      ]
+    },
+    {
+      "case": "pos_27",
+      "pdf": "СО-СО_07.pdf",
+      "page_index": 0,
+      "method_used": "content",
+      "items_found": 3,
+      "bbox": [
+        74.28,
+        198.08703500000001,
+        984.42066,
+        278.082035
+      ]
+    }
+  ]
+}
