@@ -60,6 +60,22 @@ class LegendResult:
 # ---------------------------------------------------------------------------
 
 # Legend header patterns (case-insensitive search)
+#
+# Calibration history:
+#   - Original: Условные / Легенда / Обозначени / Спецификац / Перечень /
+#               Экспликац — covered the common cases but missed several
+#               layout conventions seen in DBT / abk_em / abk_eg datasets.
+#   - QW4 (T013, S1.1): extended with additional Russian header tokens
+#     commonly used instead of "Условные обозначения":
+#       * Позиционн  — "Позиционное обозначение" (pozicionnoe oboznachenie),
+#                      common on electrical/panel schematics.
+#       * Пиктограмм — "Пиктограммы" (piktogrammy), used on plan drawings
+#                      where symbols are listed as pictograms.
+#       * Ведомост   — "Ведомость спецификаций / оборудования", seen on
+#                      abk_em-style spec-table layouts.
+#       * Таблиц     — "Таблица условных обозначений", an alternative
+#                      phrasing of the primary Условные header.
+#     Expected gain: +3-5% name match on abk_em and abk_eg.
 LEGEND_HEADER_PATTERNS = [
     re.compile(r"Условные", re.IGNORECASE),
     re.compile(r"Легенда", re.IGNORECASE),
@@ -67,6 +83,11 @@ LEGEND_HEADER_PATTERNS = [
     re.compile(r"Спецификац", re.IGNORECASE),        # "Спецификация"
     re.compile(r"Перечень", re.IGNORECASE),           # "Перечень оборудования"
     re.compile(r"Экспликац", re.IGNORECASE),          # "Экспликация"
+    # QW4 (T013) additions:
+    re.compile(r"Позиционн", re.IGNORECASE),          # "Позиционное обозначение"
+    re.compile(r"Пиктограмм", re.IGNORECASE),         # "Пиктограммы"
+    re.compile(r"Ведомост",  re.IGNORECASE),          # "Ведомость оборудования/спецификаций"
+    re.compile(r"Таблиц",    re.IGNORECASE),          # "Таблица условных обозначений"
 ]
 
 # Symbol regex — 1-2 digits + optional up to 3 Cyrillic letters (1, 1А, 3АЭ, 10А, ...)

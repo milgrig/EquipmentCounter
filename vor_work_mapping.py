@@ -247,8 +247,68 @@ def _classify(name: str) -> tuple[str, str, str]:
 
     Naming follows reference VOR convention (singular form):
       Монтаж светильника, Монтаж розетки, Монтаж выключателя, etc.
+
+    S003-02 (T028) additions:
+      Seven new categories are recognised before the generic fallbacks.
+      See S003-01 analyst mapping in `.tayfa/common/discussions/` for
+      provenance of each template.  Order matters:
+        * cable_strand_connection_small/large — match "подключение жил"
+          BEFORE the generic `terminal` rule catches "соединит".
+        * socket_in_tray — must precede the plain `socket` rule so a
+          legend like "Розетка в кабель-канале" is not mis-classified
+          as a wall socket.
+        * fireproof_sealant — totally new keyword ("огнестойкая пена").
+        * conduit_pvc / conduit_corrugated — specialise the existing
+          `conduit_pipe` catch-all with unit=м and a size-aware template.
+        * cable_tray (specific "кабель-канал" form) — now produces the
+          S003-01 "Монтаж кабель-канала {size} мм" template when the
+          legend literally uses "кабель-канал"; the broader "лоток"
+          rule continues to yield the legacy "Монтаж лотка кабельного".
     """
     lower = name.lower().strip()
+
+    # --- 0a. Cable strand connection (S003-02 / T028) -------------------
+    # Must precede generic terminal rule that catches "соединит".
+    # Reference: S003-01 analyst mapping.
+    if re.search(r"подключени\S*\s+жил", lower):
+        # Section classification: "до 10", "до 10 мм", "10 мм2", "свыше 10",
+        # "более 10", "выше 10" — all treated as size threshold around 10 mm2.
+        if re.search(r"свыш\S*\s*10|более\s*10|выше\s*10", lower):
+            return (
+                "cable_strand_connection_large",
+                "Подключение жил кабелей свыше 10 мм2",
+                "шт",
+            )
+        return (
+            "cable_strand_connection_small",
+            "Подключение жил кабелей до 10 мм2",
+            "шт",
+        )
+
+    # --- 0b. Fireproof sealant / two-component fire foam (S003-02) ------
+    if re.search(r"огнестойк\S*\s+пен|двухкомпонент\S*\s+огнестойк", lower):
+        return (
+            "fireproof_sealant",
+            "Двухкомпонентная огнестойкая пена {detail}",
+            "компл",
+        )
+
+    # --- 0c. Socket in cable channel (S003-02) --------------------------
+    # Must precede the plain `socket` rule on line ~282.
+    if re.search(r"розетк\S*.*кабел[ья]?-?канал", lower):
+        return (
+            "socket_in_tray",
+            "Монтаж розеток в кабель-канале {detail}",
+            "шт",
+        )
+
+    # --- 0d. Cable-channel (S003-02) ------------------------------------
+    # "Кабель-канал" must be detected BEFORE the generic `cable` rule on
+    # section 7 below (which would otherwise greedily swallow the word
+    # "кабель").  Matches names starting with "кабель-канал" OR "кабельканал"
+    # (occasionally written without hyphen on CAD exports).
+    if re.match(r"\s*кабел[ья]?-?канал", lower):
+        return "cable_tray", "Монтаж кабель-канала {detail} мм", "м"
 
     # --- 1. Junction boxes / distribution boxes (BEFORE conduits!) ---
     if re.search(
@@ -325,13 +385,26 @@ def _classify(name: str) -> tuple[str, str, str]:
     if re.search(r"(?:провод(?:\s|$|[а-яё]))|^пугв|^пув\s", lower):
         return "wire", "Прокладка провода {detail}", "м"
 
-    # --- 10. Cable trays ---
+    # --- 10. Cable trays and cable channels ---
+    # S003-02 (T028): cable-channel rows like "Кабель-канал 40х25" get
+    # the dedicated "Монтаж кабель-канала {size} мм" template (unit m).
+    # The broader "лоток / кабельрост" rule retains legacy semantics.
+    if re.search(r"кабел[ья]?-?канал", lower):
+        return "cable_tray", "Монтаж кабель-канала {detail} мм", "м"
     if re.search(r"лот[оа]к|кабельрост", lower):
         return "cable_tray", "Монтаж лотка кабельного {detail}", "м"
 
     # --- 11. Conduit pipes ---
+    # S003-02 (T028): split the former catch-all into three subkinds
+    # based on the material/construction keyword.  The legacy category
+    # key ``conduit_pipe`` stays as the fall-through for tokens that
+    # don't clearly name PVC or a corrugated pipe (e.g. plain "труба").
+    if re.search(r"труб\S*.*гофр|гофр[аы]?(?:труб)?", lower):
+        return "conduit_corrugated", "Монтаж трубы гофрированной {detail}", "м"
+    if re.search(r"труб\S*.*пвх|^пвх\s|пнд\s|пвд\s", lower):
+        return "conduit_pvc", "Монтаж трубы ПВХ {detail}", "м"
     if re.search(
-        r"(?:труба|гофр[аы]?(?:труб)?)|^пнд\s|^пвд\s|кабель-?канал|^короб\s",
+        r"(?:труба)|^короб\s",
         lower,
     ):
         return "conduit_pipe", "Монтаж трубы гофрированной {detail}", "м"
@@ -435,10 +508,33 @@ def map_equipment_to_work(
         detail = _extract_luminaire_detail(name)
     elif category == "luminaire_exit":
         detail = _extract_detail(name)
-    elif category == "conduit_pipe":
+    elif category in ("conduit_pipe", "conduit_pvc", "conduit_corrugated"):
         detail = _make_conduit_detail(name)
     elif category == "cable_tray":
         detail = _make_tray_detail(name)
+    elif category == "socket_in_tray":
+        # S003-02 (T028): "Розетка в кабель-канале ..." -> keep the
+        # size/model descriptor after "кабель-канале".
+        detail = re.sub(
+            r"^розетк\S*.*кабел[ья]?-?канал[еа]?\s*",
+            "",
+            name.strip(),
+            flags=re.IGNORECASE,
+        ).strip() or _extract_detail(name)
+    elif category == "fireproof_sealant":
+        # S003-02 (T028): strip leading "двухкомпонентная огнестойкая
+        # пена" / "огнестойкая пена" so the remainder (typically a
+        # DNxxxx code) drops into {detail}.
+        detail = re.sub(
+            r"^(?:двухкомпонент\S*\s*)?огнестойк\S*\s*пен\S*\s*",
+            "",
+            name.strip(),
+            flags=re.IGNORECASE,
+        ).strip()
+    elif category in ("cable_strand_connection_small",
+                      "cable_strand_connection_large"):
+        # S003-02 (T028): templates are fully literal — no detail.
+        detail = ""
     elif category in ("ground_rod", "ground_strip"):
         # Strip "стержень/полоса" + "заземления/заземлен" from detail
         detail = _extract_detail(name)

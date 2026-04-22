@@ -83,8 +83,18 @@ ROOM_NUMBER_RE = re.compile(r"^\d{3,}$")
 LATIN_CHARS_RE = re.compile(r"[A-Za-z]")
 
 # Max distance (pt) for merging split text (digit + Cyrillic suffix)
-MERGE_MAX_DX = 12    # horizontal gap
-MERGE_MAX_DY = 5     # vertical tolerance
+# Calibration history:
+#   - Original: DX=12, DY=5 — too tight for abk_eo dataset where CAD
+#     exports place the Cyrillic suffix further from the digit (observed
+#     gaps of 14–18pt horizontally and 6–9pt vertically on labels like
+#     "3" + "А" or "1" + "АЭ").  Many tokens failed to merge and
+#     registered as bare digits, missing the legend lookup.
+#   - QW3 (T012, S3.1): DX=20, DY=10 — widens the window to admit the
+#     abk_eo spread while staying safely below the typical inter-token
+#     spacing in running text (>=25pt horizontally, >=12pt vertically).
+#     Expected gain: +2-4% name match on abk_eo.
+MERGE_MAX_DX = 20    # horizontal gap
+MERGE_MAX_DY = 10    # vertical tolerance
 
 # Grid axis margin (pt from page edge)
 GRID_AXIS_MARGIN = 60

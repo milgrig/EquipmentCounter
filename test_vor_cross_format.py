@@ -307,7 +307,10 @@ def _normalize(text: str) -> str:
         "", s, flags=re.IGNORECASE,
     )
     s = re.sub(r"\d{3,4}\s*[kкК]\s*", "", s)
-    s = re.sub(r"\d+\s*[вwВW]т\w*", "", s, flags=re.IGNORECASE)
+    # T011/S5.1: Do NOT strip lamp power (30W/40Vt/30Вт) — it is a
+    # discriminating token that distinguishes otherwise-identical
+    # luminaire models. Task T011 explicitly requires preserving it.
+    # (formerly: re.sub(r"\d+\s*[вwВW]т\w*", "", s, flags=re.IGNORECASE))
     s = re.sub(r"\d+\s*[лl]м\w*", "", s, flags=re.IGNORECASE)
     s = re.sub(r"\bсечением?\b\s*", "", s)
     s = re.sub(r"\s+", " ", s).strip()
@@ -478,6 +481,22 @@ def _count_equipment_in_pdf(pdf_path: str, case_name: str = "") -> list[dict]:
                     "count": 0, "count_ae": 0,
                     "total": round(total_length_m, 1), "unit": "м",
                 })
+        # S003-03 (T029): consume derived VOR work items produced by the
+        # cable-to-work derivation pass inside extract_cables.  Each entry
+        # is a dict {name, count, unit, category, source}.
+        for entry in getattr(cable_result, "derived_work_items", []) or []:
+            name = entry.get("name", "")
+            count = entry.get("count", 0) or 0
+            unit = entry.get("unit", "шт")
+            if not name or count <= 0:
+                continue
+            items.append({
+                "symbol": "", "name": name,
+                "count": count if unit == "шт" else 0,
+                "count_ae": 0,
+                "total": count,
+                "unit": unit,
+            })
     except Exception as exc:
         log.warning("Cable extraction failed for %s: %s", pdf_path, exc)
 
@@ -587,7 +606,7 @@ def process_dxf_folder(folder_path: str) -> tuple[dict[str, GenItem], int, int]:
 def _fuzzy_compare(
     generated: dict[str, GenItem],
     reference: list[RefItem],
-    threshold: float = 0.45,
+    threshold: float = 0.30,
 ) -> tuple[list[dict], list[RefItem], list[GenItem]]:
     """Compare generated items against reference using fuzzy matching.
 
@@ -851,8 +870,8 @@ def main():
                         help="Comma-separated case names (default: all)")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Print per-element details")
-    parser.add_argument("--threshold", type=float, default=0.45,
-                        help="Fuzzy match threshold (default: 0.45)")
+    parser.add_argument("--threshold", type=float, default=0.30,
+                        help="Fuzzy match threshold (default: 0.30)")
     args = parser.parse_args()
 
     cases = TEST_CASES

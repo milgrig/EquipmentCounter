@@ -59,6 +59,10 @@ class CableResult:
     total_runs: int = 0
     panels: dict[str, list[CableRun]] = field(default_factory=dict)  # panel → runs
     cable_schedule: list[dict] = field(default_factory=list)  # grouped summary
+    # S003-03 (T029): VOR-ready work items derived from cable runs.
+    # Each entry is a dict {name, count, unit, category, source}.
+    # Populated by extract_cables() when derive_work_items=True.
+    derived_work_items: list[dict] = field(default_factory=list)
     # Metadata
     pages_scanned: list[int] = field(default_factory=list)
     total_cross_sections_found: int = 0
@@ -675,6 +679,7 @@ def extract_cables(
     pdf_path: str,
     legend_result: Optional[LegendResult] = None,
     pages: Optional[list[int]] = None,
+    derive_work_items: bool = True,
 ) -> CableResult:
     """
     Extract cable annotation data from a PDF drawing.
@@ -683,9 +688,15 @@ def extract_cables(
         pdf_path: Path to the PDF file.
         legend_result: Pre-parsed legend result (for exclusion zones).
         pages: Specific page indices to scan. If None, scans all pages.
+        derive_work_items: S003-03 (T029) — if True (default) run the
+            cable-to-work derivation pass after extraction and populate
+            ``CableResult.derived_work_items`` with VOR-ready rows for
+            "Подключение жил" and "Прокладка кабеля".  Covers S2.7 as
+            well (same task scope per T029 description).
 
     Returns:
-        CableResult with cable runs, panel grouping, and schedule.
+        CableResult with cable runs, panel grouping, schedule, and
+        (when enabled) derived_work_items.
     """
     # Parse legend for exclusion zones if not provided
     if legend_result is None:
@@ -853,16 +864,136 @@ def extract_cables(
     # --- Build cable schedule ---
     schedule = _build_cable_schedule(all_runs)
 
+    # --- S003-03 (T029): derive VOR-ready work items from cable runs ---
+    derived: list[dict] = []
+    if derive_work_items:
+        derived = _derive_work_items(all_runs)
+
     return CableResult(
         runs=all_runs,
         total_runs=len(all_runs),
         panels=dict(panels),
         cable_schedule=schedule,
+        derived_work_items=derived,
         pages_scanned=pages_scanned,
         total_cross_sections_found=total_cs,
         total_group_labels_found=total_gl,
         exclusion_zones=all_zones,
     )
+
+
+# ---------------------------------------------------------------------------
+# S003-03 (T029): Cable-to-work derivation pass
+# ---------------------------------------------------------------------------
+#
+# Each detected cable run carries a cross-section like "3х1,5" (Cyrillic х)
+# or "5x2.5".  We parse the string into (n_conductors, section_mm2) and
+# emit three VOR-ready rows per run:
+#
+#   1. "Подключение жил кабелей до 10 мм2" (шт)   — if section <= 10 mm²
+#      OR
+#      "Подключение жил кабелей свыше 10 мм2" (шт) — if section > 10 mm²
+#      count = run_count * n_conductors * 2         (two ends per conductor)
+#
+#   2. "Прокладка кабеля {mark} {section}" (м)
+#      count = total_length_m
+#
+# Reference: S003-01 analyst mapping / .tayfa/common/discussions/S003-01.md
+
+_CS_PARSE_RE = re.compile(
+    r"^\s*(\d{1,2})\s*[хxХX]\s*(\d{1,4}(?:[,\.]\d{1,2})?)\s*$"
+)
+
+
+def _parse_cross_section_conductors(cross_section: str) -> tuple[int, float]:
+    """Parse a cross-section string like "3х1,5" into (n_conductors, mm2).
+
+    Handles both the Cyrillic х and Latin x separators, decimal commas
+    and decimal dots.  Returns ``(0, 0.0)`` on unparseable input so
+    callers can skip gracefully.
+    """
+    if not cross_section:
+        return 0, 0.0
+    m = _CS_PARSE_RE.match(cross_section)
+    if not m:
+        return 0, 0.0
+    n = int(m.group(1))
+    try:
+        mm2 = float(m.group(2).replace(",", "."))
+    except ValueError:
+        return n, 0.0
+    return n, mm2
+
+
+def _make_cable_work_name(mark: str, section: str) -> str:
+    """Compose a "Прокладка кабеля {mark} {section}" work-name.
+
+    Falls back to a bare "Прокладка кабеля {section}" when mark is
+    empty, and to "Прокладка кабеля" when both are blank.
+    """
+    parts = [p for p in (mark.strip(), section.strip()) if p]
+    tail = " ".join(parts)
+    if tail:
+        return f"Прокладка кабеля {tail}"
+    return "Прокладка кабеля"
+
+
+def _derive_work_items(runs: list[CableRun]) -> list[dict]:
+    """S003-03 (T029): derive VOR-ready work items from cable runs.
+
+    For every run with a parseable cross-section:
+      * Emits a "Подключение жил" row using two-ends * n_conductors
+        accounting, choosing the <=10 / >10 mm² variant.
+      * Emits a "Прокладка кабеля ..." row whose count equals the run's
+        length in metres (0 if unknown).
+
+    Rows are aggregated: identical ``(name, unit)`` keys collapse into a
+    single entry whose ``count`` is the sum.  Each returned dict also
+    carries ``source="cable_derivation"`` so downstream consumers can
+    distinguish these rows from legend-derived rows.
+    """
+    agg: dict[tuple[str, str], dict] = {}
+
+    for run in runs:
+        n_cond, mm2 = _parse_cross_section_conductors(run.cross_section)
+        length_m = run.length_m or 0.0
+
+        # --- 1. Connection rows (strand count * 2 ends) ---
+        if n_cond > 0 and mm2 > 0:
+            count_strands = n_cond * 2  # both ends
+            if mm2 <= 10.0:
+                name = "Подключение жил кабелей до 10 мм2"
+                category = "cable_strand_connection_small"
+            else:
+                name = "Подключение жил кабелей свыше 10 мм2"
+                category = "cable_strand_connection_large"
+            key = (name, "шт")
+            slot = agg.setdefault(key, {
+                "name": name, "unit": "шт", "count": 0,
+                "category": category,
+                "source": "cable_derivation",
+            })
+            slot["count"] += count_strands
+
+        # --- 2. Cable-laying row (metres) ---
+        if length_m > 0:
+            work_name = _make_cable_work_name(run.cable_type, run.cross_section)
+            key = (work_name, "м")
+            slot = agg.setdefault(key, {
+                "name": work_name, "unit": "м", "count": 0.0,
+                "category": "cable",
+                "source": "cable_derivation",
+            })
+            slot["count"] += length_m
+
+    # Round metre-counts to 1 decimal for readability; leave sht counts
+    # as plain ints.
+    out: list[dict] = []
+    for v in agg.values():
+        if v["unit"] == "м":
+            v["count"] = round(v["count"], 1)
+        out.append(v)
+    return out
 
 
 # ---------------------------------------------------------------------------

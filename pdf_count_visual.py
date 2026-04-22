@@ -124,9 +124,13 @@ FP_ROI_EXPAND = 1.5             # expand ROI by this factor for context analysis
 # Verifies that the matched ROI actually resembles the template's binary shape.
 SHAPE_VERIFY_MIN_RECALL = 0.22
 SHAPE_VERIFY_MIN_PRECISION = 0.08
-# Hard cap for simple one-letter compound markers (e.g. 1А) to avoid
-# catastrophic flood when a tiny template matches repetitive background.
-SIMPLE_COMPOUND_MAX_MATCHES = 80
+# Hard cap for simple one-letter compound markers (e.g. 1А).
+# T014/S4.1 (QW5): Disabled (set to 0) — candidate-first detection now handles
+# flood prevention by restricting matches to validated connected-component
+# candidates rather than clamping the final count to an arbitrary ceiling.
+# A value of 0 disables the cap entirely; any positive value re-enables
+# clamping at that count (kept for emergency rollback).
+SIMPLE_COMPOUND_MAX_MATCHES = 0
 # Candidate-first detection for simple one-letter compounds.
 SIMPLE_COMPOUND_USE_CANDIDATES = True
 
@@ -2121,7 +2125,12 @@ def match_symbols(
 
         # Flood guard for simple one-letter compounds (e.g. 1А, 2А):
         # these tiny templates are prone to massive accidental repeats.
-        if (re.fullmatch(r"\d{1,2}[А-Яа-яЁё]", sym_text)
+        # T014/S4.1 (QW5): cap is now opt-in. When SIMPLE_COMPOUND_MAX_MATCHES
+        # is 0 (default) the cap is disabled and we rely on candidate-first
+        # detection to prevent flood. Only clamp when an admin explicitly
+        # sets a positive ceiling.
+        if (SIMPLE_COMPOUND_MAX_MATCHES > 0
+                and re.fullmatch(r"\d{1,2}[А-Яа-яЁё]", sym_text)
                 and len(valid_matches) > SIMPLE_COMPOUND_MAX_MATCHES):
             valid_matches.sort(key=lambda m: m.confidence, reverse=True)
             dropped = len(valid_matches) - SIMPLE_COMPOUND_MAX_MATCHES

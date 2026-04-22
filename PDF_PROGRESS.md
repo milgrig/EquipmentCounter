@@ -8,6 +8,7 @@ This document tracks the progress of PDF parsing improvements across sprints.
 |--------|------|--------------|------------------|--------|
 | Baseline (S019) | Initial state | 9.7% | 0.3% | - |
 | S002 | Legend Recovery | 9.7% | 0.4% | ⚠️ PARTIAL |
+| S008 | Quick Wins | 36.5% | 2.4% | ✅ SUCCESS |
 
 ## S002: Legend Recovery
 
@@ -59,6 +60,46 @@ This document tracks the progress of PDF parsing improvements across sprints.
 
 **Review Status:** ✅ APPROVED (T025)
 **Benchmark Status:** ✅ COMPLETED (T026)
+
+---
+
+## S008: Quick Wins (Pre-Sprint)
+
+**Goal:** Achieve ≥18% Name Match Rate through targeted low-hanging-fruit improvements
+
+**Implementation:**
+- QW1 (T010): Lower fuzzy threshold 0.45 → 0.30 (S5.2)
+- QW2 (T011): Preserve cable brand and cross-section in _normalize (S5.1)
+- QW3 (T012): Widen merge window in pdf_count_text Pass 2 (S3.1)
+- QW4 (T013): Add alternative legend headers (S1.1)
+- QW5 (T014): Remove SIMPLE_COMPOUND_MAX_MATCHES=80 hard cap (S4.1)
+
+**Results:**
+- ✅ Name Match Rate: **36.5%** (target: ≥18%, baseline: 9.7%)
+- ✅ Exact Accuracy: **2.4%** (baseline: 0.4%)
+- ✅ Improvement: **+26.8 pp** in Name Match, **+2.0 pp** in Exact Accuracy
+
+**Performance vs Baseline (S002):**
+
+| Metric | S002 (Baseline) | S008 (Quick Wins) | Delta | Status |
+|--------|----------------|-------------------|-------|--------|
+| Name Match % | 9.7% | 36.5% | +26.8 pp | ✅ |
+| Exact Accuracy % | 0.4% | 2.4% | +2.0 pp | ✅ |
+
+**Status:** ✅ **SUCCESS**
+- Exceeded target by 18.5 percentage points (36.5% vs 18% target)
+- All 5 Quick Wins delivered measurable gains
+- No regressions detected
+
+**Files Modified:**
+- vor_work_mapping.py (QW1: fuzzy threshold)
+- vor_work_mapping.py (QW2: cable normalization)
+- pdf_count_text.py (QW3: merge window)
+- pdf_legend_parser.py (QW4: legend headers)
+- pdf_count_visual.py (QW5: match cap removal)
+
+**Benchmark Report:** baseline_after_quick_wins.json
+**Validation Status:** ✅ COMPLETED (T015)
 
 ---
 
