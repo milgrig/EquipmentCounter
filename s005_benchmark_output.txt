@@ -1,0 +1,300 @@
+================================================================================
+  CROSS-FORMAT TEST: DXF + PDF vs Reference VOR
+================================================================================
+  Cases: 10  |  Threshold: 0.3
+
+
+______________________________________________________________________
+[1/10] abk_eo
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\01_АБК\Обновленные файлы\DWG\ЭО\_converted_dxf\001 - Общие данные.dxf
+  WARNING: Legend not found, auto-detecting symbols...
+  [grid] Detected 226 grid axis labels (excluded)
+  [annotations] Found 16 equipment types from plan text
+    P1: 1 × SLICK.PRS LED 30 EM
+    P2: 2 × OWP EVO 30W OPL 840 WH IP54 mat
+    P3: 6 × OWP EVO OPL 840 WH IP54
+    P4: 15 × UNI/R EVO OPL 840 WH
+    P5: 1 × SIMPLE OPTIMA OPL 840 WH
+    P6: 6 × UGR DL PREMIUM
+    P7: 1 × SLICK.PRS LED 30 with driver box
+    P8: 2 × UNI/R EVO OPL 840 WH EMT
+    P9: 9 × UNI/R EVO OPL 840 WH EM
+    P10: 1 × SIMPLE OPTIMA OPL 840 WH EM
+    P11: 2 × OWP EVO OPL 840 WH IP54 EM
+    P12: 3 × SLICK.PRS LED 30
+    P13: 1 × OWP EVO 30W OPL 840 WH IP54 mat EM
+    P14: 1 × UNI/R EVO OPL 840 WH  EMT
+    P15: 1 × SLICK.PRS LED 30 with driver box EM
+    P16: 1 × UNI/R EVO OPL 840 WH  EM
+
+  Unlisted symbols in drawing body (not in legend):
+       8А × 6
+       9А × 4
+      10А × 3
+  [grid] Detected 262 grid axis labels (excluded)
+  [annotations] Found 9 equipment types from plan text
+    P1: 9 × UNI/R EVO OPL 840 WH
+    P2: 6 × UGR DL PREMIUM
+    P3: 8 × OWP EVO 30W OPL 840 WH IP54 mat
+    P4: 5 × SLICK.PRS LED 30 with driver box
+    P5: 6 × UNI/R EVO OPL 840 WH EM
+    P6: 1 × SIMPLE OPTIMA OPL 840 WH
+    P7: 1 × SIMPLE OPTIMA OPL 840 WH EM
+    P8: 4 × OWP EVO 30W OPL 840 WH IP54 mat EM
+    P9: 3 × SLICK.PRS LED 30 with driver box EM
+  [grid] Detected 208 grid axis labels (excluded)
+
+  Unlisted symbols in drawing body (not in legend):
+      10А × 5
+       9А × 2
+  [grid] Detected 261 grid axis labels (excluded)
+  WARNING: Legend not found, auto-detecting symbols...
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\01_АБК\Обновленные файлы\DWG\ЭО\_converted_dxf\СО.dxf
+  Ref: 85 items  |  PDF(18): 30 items  |  DXF(8): 16 items
+
+  DXF vs VOR:  exact=0  mismatch=11  missing=48  name_match=18.6%  exact=0.0%
+  PDF vs VOR:  exact=3  mismatch=26  missing=30  name_match=49.2%  exact=5.1%
+
+______________________________________________________________________
+[2/10] abk_em
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\01_АБК\Обновленные файлы\DWG\ЭМ\_converted_dxf\001 - Общие данные (начало).dxf
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\01_АБК\Обновленные файлы\DWG\ЭМ\_converted_dxf\002 - Общие данные (окончание).dxf
+  [grid] Detected 34 grid axis labels (excluded)
+  WARNING: Legend not found, auto-detecting symbols...
+  [grid] Detected 32 grid axis labels (excluded)
+  [geometry mode] INSERT blocks=4 << circles=80 — using INSERT count
+  [geometry mode] red(щиты)=2  blue(оборуд.)=4
+  [geometry mode] Cable outlets (Подключение): 28
+  [grid] Detected 32 grid axis labels (excluded)
+  [geometry mode] INSERT blocks=4 << circles=59 — using INSERT count
+  [geometry mode] red(щиты)=3  blue(оборуд.)=4
+  [geometry mode] Cable outlets (Подключение): 11
+  [grid] Detected 32 grid axis labels (excluded)
+  WARNING: Legend not found, auto-detecting symbols...
+  [grid] Detected 32 grid axis labels (excluded)
+  [geometry mode] INSERT blocks=5 << circles=276 — using INSERT count
+  [geometry mode] red(щиты)=0  blue(оборуд.)=5
+  [geometry mode] Cable outlets (Подключение): 28
+  [grid] Detected 32 grid axis labels (excluded)
+  [geometry mode] INSERT blocks=4 << circles=423 — using INSERT count
+  [geometry mode] red(щиты)=0  blue(оборуд.)=4
+  [grid] Detected 32 grid axis labels (excluded)
+  [grid] Detected 32 grid axis labels (excluded)
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\01_АБК\Обновленные файлы\DWG\ЭМ\_converted_dxf\020 - Узлы крепления кабеленесущих систем.dxf
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\01_АБК\Обновленные файлы\DWG\ЭМ\_converted_dxf\021 - Прокладка лотка через перегородки и перекрытия.dxf
+  WARNING: Legend not found, auto-detecting symbols...
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\01_АБК\Обновленные файлы\DWG\ЭМ\_converted_dxf\СО.dxf
+  Ref: 209 items  |  PDF(23): 3 items  |  DXF(14): 14 items
+
+  DXF vs VOR:  exact=0  mismatch=4  missing=160  name_match=2.4%  exact=0.0%
+  PDF vs VOR:  exact=1  mismatch=2  missing=161  name_match=1.8%  exact=0.6%
+
+  ⚡ DXF found but PDF missed (3 items):
+    - Подключение жил кабелей до 10 мм2                        ref=677  dxf=67
+    - Термоусадочная трубка ТТК(4:1)-8/2 КВТ 59674             ref=19  dxf=8
+    - Прокладка кабеля в гофре на высоте до 5 м (суммарное се  ref=4038  dxf=1
+
+______________________________________________________________________
+[3/10] abk_eg
+  [grid] Detected 3 grid axis labels (excluded)
+  WARNING: Legend not found, auto-detecting symbols...
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\01_АБК\Обновленные файлы\DWG\ЭГ\_converted_dxf\СО.dxf
+  Ref: 33 items  |  PDF(9): 6 items  |  DXF(2): 9 items
+
+  DXF vs VOR:  exact=0  mismatch=0  missing=31  name_match=0.0%  exact=0.0%
+  PDF vs VOR:  exact=0  mismatch=3  missing=28  name_match=9.7%  exact=0.0%
+
+______________________________________________________________________
+[4/10] pos_12_3
+  [grid] Detected 4 grid axis labels (excluded)
+  [annotations] Found 4 equipment types from plan text
+    P1: 5 × SLICK.PRS LED 60 with driver box 5000K
+    P2: 1 × SLICK.PRS LED 60 EM with driver box 5000K
+    P3: 3 × SLICK.PRS ECO LED 45 5000K
+    P4: 1 × SLICK.PRS ECO LED 45 5000K EM
+
+  Unlisted symbols in drawing body (not in legend):
+        2 × 6
+        4 × 1
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\12.3 Насосная станция поверхностных стоков\01_DWG\_converted_dxf\СО.dxf
+  Ref: 83 items  |  PDF(8): 9 items  |  DXF(2): 2 items
+
+  DXF vs VOR:  exact=0  mismatch=2  missing=76  name_match=2.6%  exact=0.0%
+  PDF vs VOR:  exact=0  mismatch=9  missing=69  name_match=11.5%  exact=0.0%
+
+______________________________________________________________________
+[5/10] pos_16_2
+  Ref: 75 items  |  PDF(15): 11 items  |  no DXF: 0 items
+  PDF vs VOR:  exact=0  mismatch=10  missing=62  name_match=13.9%  exact=0.0%
+
+______________________________________________________________________
+[6/10] pos_27
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\27_Склад вспомогательных материалов с участком погрузки крытых вагонов\Обновленные файлы\02_DWG\_converted_dxf\001 - Общие данные (начало).dxf
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\27_Склад вспомогательных материалов с участком погрузки крытых вагонов\Обновленные файлы\02_DWG\_converted_dxf\002 - Общие данные (продолжение).dxf
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\27_Склад вспомогательных материалов с участком погрузки крытых вагонов\Обновленные файлы\02_DWG\_converted_dxf\003 - Общие данные (окончание).dxf
+  [grid] Detected 4 grid axis labels (excluded)
+  WARNING: Legend not found, auto-detecting symbols...
+  [grid] Detected 73 grid axis labels (excluded)
+  WARNING: Legend not found, auto-detecting symbols...
+  [grid] Detected 37 grid axis labels (excluded)
+  [geometry mode] red(щиты)=10  blue(оборуд.)=0
+  [geometry mode] Cable outlets (Подключение): 15
+  Using geometric circle counting mode
+  [grid] Detected 156 grid axis labels (excluded)
+  [annotations] Found 10 equipment types from plan text
+    P1: 24 × ZENITH LED Ex G2/B 90W D270 850 HG
+    P2: 11 × INSEL LB/S LED G3 70W D120 750 WH SB
+    P3: 2 × SLICK.PRS LED 50 with driver box /tempered glass/ 5000K
+    P4: 2 × OWP OPTIMA LED 595 (50) IP54/IP54 4000K mat
+    P5: 3 × OPTIMA.OPL ECO LED 595 (40)
+    P6: 2 × CD LED 27 4000K
+    P7: 1 × OPTIMA.OPL ECO LED 595 EM
+    P8: 1 × SLICK.PRS LED 50 with driver box /tempered glass/ EM 5000K
+    P9: 1 × OPTIMA.OPL ECO LED 595 (40)  EM
+    P10: 1 × OWP OPTIMA LED 595 (50) IP54/IP54 EM 4000K mat
+
+  Unlisted symbols in drawing body (not in legend):
+       8А × 5
+     50ЛК × 2
+       16 × 1
+       21 × 1
+       23 × 1
+       25 × 1
+       24 × 1
+       26 × 1
+       9А × 1
+      10А × 1
+  [grid] Detected 125 grid axis labels (excluded)
+
+  Unlisted symbols in drawing body (not in legend):
+       8А × 17
+       10 × 1
+       15 × 1
+       16 × 1
+       20 × 1
+       21 × 1
+       22 × 1
+       23 × 1
+       25 × 1
+       24 × 1
+       26 × 1
+       9А × 1
+      10А × 1
+  [grid] Detected 40 grid axis labels (excluded)
+  WARNING: Legend not found, auto-detecting symbols...
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\27_Склад вспомогательных материалов с участком погрузки крытых вагонов\Обновленные файлы\02_DWG\_converted_dxf\018 - Прокладка лотка через перегородки и перекрытия.dxf
+  [grid] Detected 4 grid axis labels (excluded)
+  WARNING: Legend not found, auto-detecting symbols...
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\27_Склад вспомогательных материалов с участком погрузки крытых вагонов\Обновленные файлы\02_DWG\_converted_dxf\СО.dxf
+  Ref: 223 items  |  PDF(28): 36 items  |  DXF(12): 43 items
+
+  DXF vs VOR:  exact=0  mismatch=14  missing=153  name_match=8.4%  exact=0.0%
+  PDF vs VOR:  exact=1  mismatch=34  missing=132  name_match=21.0%  exact=0.6%
+
+  ⚡ DXF found but PDF missed (1 items):
+    - Пиктограмма ПЭУ 010 Выход (335х190) MERCURY, 2502003090  ref=4  dxf=32
+
+______________________________________________________________________
+[7/10] pos_28
+  WARNING: Legend not found, auto-detecting symbols...
+  [annotations] Found 1 equipment types from plan text
+    P1: 5 × INSEL LB_S LED G3 70W D120 850 WH SB
+
+  Unlisted symbols in drawing body (not in legend):
+        5 × 1
+        2 × 1
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\28. Автовесы\01_DWG\_converted_dxf\СО.dxf
+  Ref: 23 items  |  PDF(9): 4 items  |  DXF(3): 1 items
+
+  DXF vs VOR:  exact=0  mismatch=1  missing=22  name_match=4.3%  exact=0.0%
+  PDF vs VOR:  exact=0  mismatch=4  missing=19  name_match=17.4%  exact=0.0%
+
+______________________________________________________________________
+[8/10] pos_30
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\30. КПП\02_DWG\_converted_dxf\001 - Общие данные (начало).dxf
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\30. КПП\02_DWG\_converted_dxf\002 - Общие данные (продолжение).dxf
+  WARNING: Legend not found, auto-detecting symbols...
+  WARNING: Legend not found, auto-detecting symbols...
+  [grid] Detected 8 grid axis labels (excluded)
+  [geometry mode] red(щиты)=0  blue(оборуд.)=43
+  [geometry mode] Cable outlets (Подключение): 7
+  [grid] Detected 31 grid axis labels (excluded)
+  [annotations] Found 3 equipment types from plan text
+    P1: 1 × SAFARI DL LED G2 26W
+    P2: 2 × OPTIMA.OPL ECO LED
+    P3: 1 × OPTIMA.OPL ECO LED EM
+  [geometry mode] red(щиты)=16  blue(оборуд.)=22
+  [grid] Detected 31 grid axis labels (excluded)
+  [geometry mode] red(щиты)=3  blue(оборуд.)=4
+  WARNING: Legend not found, auto-detecting symbols...
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\30. КПП\02_DWG\_converted_dxf\СО.dxf
+  Ref: 94 items  |  PDF(14): 12 items  |  DXF(9): 12 items
+
+  DXF vs VOR:  exact=0  mismatch=3  missing=69  name_match=4.2%  exact=0.0%
+  PDF vs VOR:  exact=1  mismatch=11  missing=60  name_match=16.7%  exact=1.4%
+
+  ⚡ DXF found but PDF missed (1 items):
+    - Термоусадочная трубка ТТК(4:1)-8/2 КВТ 59674             ref=4  dxf=22
+
+______________________________________________________________________
+[9/10] pos_8_2_em
+  Ref: 50 items  |  PDF(8): 4 items  |  DXF(1): 2 items
+
+  DXF vs VOR:  exact=1  mismatch=1  missing=46  name_match=4.2%  exact=2.1%
+  PDF vs VOR:  exact=0  mismatch=2  missing=46  name_match=4.2%  exact=0.0%
+
+  ⚡ DXF found but PDF missed (1 items):
+    - Монтаж розеток в кабель канале 2Р+Е, со шторками, "Viva  ref=8  dxf=8
+
+______________________________________________________________________
+[10/10] pos_8_2_eo
+  [grid] Detected 4 grid axis labels (excluded)
+  [annotations] Found 3 equipment types from plan text
+    P1: 18 × SLICK.PRS LED 60 5000K
+    P2: 2 × OPTIMA.OPL
+    P3: 10 × SLICK.PRS LED 60 EM 5000K
+  [merge] Annotations (30) >> symbols (7) — using annotation counts (37 items)
+  WARNING: No MTEXT/TEXT found in C:\Cursor\TayfaProject\EquipmentCounter\Data\ДБТ разделы для ИИ\8.2 Участок хранения сульфата аммония\ЭО\01_DWG\_converted_dxf\СО.dxf
+  Ref: 90 items  |  PDF(6): 10 items  |  DXF(2): 7 items
+
+  DXF vs VOR:  exact=0  mismatch=4  missing=66  name_match=5.7%  exact=0.0%
+  PDF vs VOR:  exact=0  mismatch=6  missing=64  name_match=8.6%  exact=0.0%
+
+================================================================================
+  OVERALL CROSS-FORMAT SUMMARY
+================================================================================
+
+  Metric                                     DXF        PDF      Delta
+  ----------------------------------- ---------- ---------- ----------
+  Ref items (total)                          890        965
+  Matched (name+qty)                           1          6         +5
+  Count mismatch                              40        107        +67
+  Missing                                    671        671         +0
+  Name match rate %                         4.6%      11.7%      +7.1%
+  Exact accuracy %                          0.1%       0.6%      +0.5%
+
+  DXF found, PDF missed:                     6
+
+  Case            Ref   DXF%  DXFex   PDF%  PDFex DOnly  Time
+  -------------- ---- ------ ------ ------ ------ ----- -----
+  abk_eo           85  18.6%   0.0%  49.2%   5.1%     0  139s
+  abk_em          209   2.4%   0.0%   1.8%   0.6%     3  108s
+  abk_eg           33   0.0%   0.0%   9.7%   0.0%     0   49s
+  pos_12_3         83   2.6%   0.0%  11.5%   0.0%     0   24s
+  pos_16_2         75     -%     -%  13.9%   0.0%     0   32s
+  pos_27          223   8.4%   0.0%  21.0%   0.6%     1  223s
+  pos_28           23   4.3%   0.0%  17.4%   0.0%     0   34s
+  pos_30           94   4.2%   0.0%  16.7%   1.4%     1   42s
+  pos_8_2_em       50   4.2%   2.1%   4.2%   0.0%     1   24s
+  pos_8_2_eo       90   5.7%   0.0%   8.6%   0.0%     0   38s
+
+  TOP PDF IMPROVEMENT TARGETS (DXF found, PDF missed):
+    [abk_em      ] Прокладка кабеля в гофре на высоте до 5 м (суммарн  ref=4038  dxf=   1
+    [abk_em      ] Подключение жил кабелей до 10 мм2                   ref= 677  dxf=  67
+    [abk_em      ] Термоусадочная трубка ТТК(4:1)-8/2 КВТ 59674        ref=  19  dxf=   8
+    [pos_8_2_em  ] Монтаж розеток в кабель канале 2Р+Е, со шторками,   ref=   8  dxf=   8
+    [pos_27      ] Пиктограмма ПЭУ 010 Выход (335х190) MERCURY, 25020  ref=   4  dxf=  32
+    [pos_30      ] Термоусадочная трубка ТТК(4:1)-8/2 КВТ 59674        ref=   4  dxf=  22
+
+  Report saved: C:\Cursor\TayfaProject\EquipmentCounter\test_vor_cross_format_report.json
+================================================================================

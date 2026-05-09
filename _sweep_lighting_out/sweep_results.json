@@ -1,0 +1,174 @@
+{
+  "per_pair": [
+    {
+      "file": "005",
+      "class": "5АЭ",
+      "gt": 4,
+      "det": 7,
+      "diff": 3
+    },
+    {
+      "file": "005",
+      "class": "6АЭ",
+      "gt": 6,
+      "det": 1,
+      "diff": -5
+    },
+    {
+      "file": "005",
+      "class": "7АЭ",
+      "gt": 7,
+      "det": 5,
+      "diff": -2
+    },
+    {
+      "file": "006",
+      "class": "5АЭ",
+      "gt": 0,
+      "det": 1,
+      "diff": 1
+    },
+    {
+      "file": "006",
+      "class": "6АЭ",
+      "gt": 0,
+      "det": 0,
+      "diff": 0
+    },
+    {
+      "file": "006",
+      "class": "7АЭ",
+      "gt": 2,
+      "det": 2,
+      "diff": 0
+    },
+    {
+      "file": "007",
+      "class": "5АЭ",
+      "gt": 3,
+      "det": 2,
+      "diff": -1
+    },
+    {
+      "file": "007",
+      "class": "6АЭ",
+      "gt": 4,
+      "det": 1,
+      "diff": -3
+    },
+    {
+      "file": "007",
+      "class": "7АЭ",
+      "gt": 0,
+      "det": 1,
+      "diff": 1
+    },
+    {
+      "file": "008",
+      "class": "5АЭ",
+      "gt": 2,
+      "det": 1,
+      "diff": -1
+    },
+    {
+      "file": "008",
+      "class": "6АЭ",
+      "gt": 4,
+      "det": 0,
+      "diff": -4
+    },
+    {
+      "file": "008",
+      "class": "7АЭ",
+      "gt": 0,
+      "det": 4,
+      "diff": 4
+    },
+    {
+      "file": "009",
+      "class": "5АЭ",
+      "gt": 2,
+      "det": 4,
+      "diff": 2
+    },
+    {
+      "file": "009",
+      "class": "6АЭ",
+      "gt": 4,
+      "det": 0,
+      "diff": -4
+    },
+    {
+      "file": "009",
+      "class": "7АЭ",
+      "gt": 0,
+      "det": 1,
+      "diff": 1
+    },
+    {
+      "file": "010",
+      "class": "5АЭ",
+      "gt": 2,
+      "det": 1,
+      "diff": -1
+    },
+    {
+      "file": "010",
+      "class": "6АЭ",
+      "gt": 4,
+      "det": 0,
+      "diff": -4
+    },
+    {
+      "file": "010",
+      "class": "7АЭ",
+      "gt": 0,
+      "det": 2,
+      "diff": 2
+    },
+    {
+      "file": "011",
+      "class": "5АЭ",
+      "gt": 0,
+      "det": 0,
+      "diff": 0
+    },
+    {
+      "file": "011",
+      "class": "6АЭ",
+      "gt": 0,
+      "det": 0,
+      "diff": 0
+    },
+    {
+      "file": "011",
+      "class": "7АЭ",
+      "gt": 0,
+      "det": 5,
+      "diff": 5
+    }
+  ],
+  "aggregate": {
+    "5АЭ": {
+      "tp": 10,
+      "gt_tot": 13,
+      "det_tot": 16
+    },
+    "6АЭ": {
+      "tp": 2,
+      "gt_tot": 22,
+      "det_tot": 2
+    },
+    "7АЭ": {
+      "tp": 7,
+      "gt_tot": 9,
+      "det_tot": 20
+    }
+  },
+  "thresholds": {
+    "NCC_MIN": 0.25,
+    "MARGIN_MIN": 0.05,
+    "MIN_PARTS": 18,
+    "LINK_DIST": 5.0
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "GRID_pt": 1.0,
+  "n_contacts": 4,
+  "contacts": [
+    {
+      "cx": 729.5,
+      "cy": 2756.5,
+      "mass": 498,
+      "in_legend": true
+    },
+    {
+      "cx": 726.5,
+      "cy": 2760.5,
+      "mass": 468,
+      "in_legend": true
+    },
+    {
+      "cx": 730.5,
+      "cy": 2759.5,
+      "mass": 522,
+      "in_legend": true
+    },
+    {
+      "cx": 726.5,
+      "cy": 2756.5,
+      "mass": 444,
+      "in_legend": true
+    }
+  ]
+}

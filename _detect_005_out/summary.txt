@@ -1,0 +1,16 @@
+Text-free pictogram detection — final summary
+==================================================
+PDF : 005-Планы освещения-отм. 0.000.pdf
+Page: 0
+
+Class      Detected    DXF    Diff   Status
+  5АЭ          4        4     +0   OK
+  6АЭ          2        6     -4   under
+  7АЭ          8        7     +1   over
+
+Notes:
+  * detector uses NO text - only red drawing primitives,
+    Union-Find clustering (link=5pt), per-class W/H/n filters,
+    and cross-label NMS (IoU>=0.4).
+  * 6АЭ undercount likely reflects grouped labels pointing at
+    a shared icon - one icon serves multiple text labels.

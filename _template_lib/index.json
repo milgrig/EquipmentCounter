@@ -1,0 +1,224 @@
+{
+  "005": {
+    "6АЭ": {
+      "pdf_stem": "005",
+      "symbol": "6АЭ",
+      "tpl_path": "005/6АЭ.npy",
+      "n_parts": 78,
+      "bw": 9.6,
+      "bh": 9.6,
+      "ar": 1.0,
+      "src_bbox": [
+        720.36,
+        2598.36,
+        729.96,
+        2607.96
+      ],
+      "method": "red_clustered"
+    },
+    "7АЭ": {
+      "pdf_stem": "005",
+      "symbol": "7АЭ",
+      "tpl_path": "005/7АЭ.npy",
+      "n_parts": 78,
+      "bw": 9.6,
+      "bh": 9.6,
+      "ar": 1.0,
+      "src_bbox": [
+        720.36,
+        2619.48,
+        729.96,
+        2629.08
+      ],
+      "method": "red_clustered"
+    }
+  },
+  "006": {
+    "7АЭ": {
+      "pdf_stem": "006",
+      "symbol": "7АЭ",
+      "tpl_path": "006/7АЭ.npy",
+      "n_parts": 78,
+      "bw": 9.6,
+      "bh": 9.72,
+      "ar": 1.013,
+      "src_bbox": [
+        704.64,
+        2656.08,
+        714.24,
+        2665.8
+      ],
+      "method": "red_clustered"
+    }
+  },
+  "007": {
+    "5АЭ": {
+      "pdf_stem": "007",
+      "symbol": "5АЭ",
+      "tpl_path": "007/5АЭ.npy",
+      "n_parts": 78,
+      "bw": 9.6,
+      "bh": 9.6,
+      "ar": 1.0,
+      "src_bbox": [
+        765.84,
+        2742.12,
+        775.44,
+        2751.72
+      ],
+      "method": "red_clustered"
+    },
+    "6АЭ": {
+      "pdf_stem": "007",
+      "symbol": "6АЭ",
+      "tpl_path": "007/6АЭ.npy",
+      "n_parts": 78,
+      "bw": 9.6,
+      "bh": 9.6,
+      "ar": 1.0,
+      "src_bbox": [
+        765.84,
+        2763.24,
+        775.44,
+        2772.84
+      ],
+      "method": "red_clustered"
+    }
+  },
+  "008": {
+    "5АЭ": {
+      "pdf_stem": "008",
+      "symbol": "5АЭ",
+      "tpl_path": "008/5АЭ.npy",
+      "n_parts": 78,
+      "bw": 9.72,
+      "bh": 9.6,
+      "ar": 0.988,
+      "src_bbox": [
+        707.16,
+        2773.08,
+        716.88,
+        2782.68
+      ],
+      "method": "red_clustered"
+    },
+    "6АЭ": {
+      "pdf_stem": "008",
+      "symbol": "6АЭ",
+      "tpl_path": "008/6АЭ.npy",
+      "n_parts": 78,
+      "bw": 9.72,
+      "bh": 9.6,
+      "ar": 0.988,
+      "src_bbox": [
+        707.16,
+        2794.2,
+        716.88,
+        2803.8
+      ],
+      "method": "red_clustered"
+    }
+  },
+  "009": {
+    "5АЭ": {
+      "pdf_stem": "009",
+      "symbol": "5АЭ",
+      "tpl_path": "009/5АЭ.npy",
+      "n_parts": 78,
+      "bw": 9.6,
+      "bh": 9.6,
+      "ar": 1.0,
+      "src_bbox": [
+        696.96,
+        2502.36,
+        706.56,
+        2511.96
+      ],
+      "method": "red_clustered"
+    },
+    "6АЭ": {
+      "pdf_stem": "009",
+      "symbol": "6АЭ",
+      "tpl_path": "009/6АЭ.npy",
+      "n_parts": 78,
+      "bw": 9.6,
+      "bh": 9.6,
+      "ar": 1.0,
+      "src_bbox": [
+        696.96,
+        2523.48,
+        706.56,
+        2533.08
+      ],
+      "method": "red_clustered"
+    }
+  },
+  "010": {
+    "5АЭ": {
+      "pdf_stem": "010",
+      "symbol": "5АЭ",
+      "tpl_path": "010/5АЭ.npy",
+      "n_parts": 78,
+      "bw": 9.6,
+      "bh": 9.6,
+      "ar": 1.0,
+      "src_bbox": [
+        770.88,
+        2403.6,
+        780.48,
+        2413.2
+      ],
+      "method": "red_clustered"
+    },
+    "6АЭ": {
+      "pdf_stem": "010",
+      "symbol": "6АЭ",
+      "tpl_path": "010/6АЭ.npy",
+      "n_parts": 78,
+      "bw": 9.6,
+      "bh": 9.6,
+      "ar": 1.0,
+      "src_bbox": [
+        770.88,
+        2424.72,
+        780.48,
+        2434.32
+      ],
+      "method": "red_clustered"
+    }
+  },
+  "011": {
+    "5АЭ": {
+      "pdf_stem": "011",
+      "symbol": "5АЭ",
+      "tpl_path": "011/5АЭ.npy",
+      "n_parts": 78,
+      "bw": 9.6,
+      "bh": 9.6,
+      "ar": 1.0,
+      "src_bbox": [
+        744.0,
+        2533.44,
+        753.6,
+        2543.04
+      ],
+      "method": "red_clustered"
+    },
+    "6АЭ": {
+      "pdf_stem": "011",
+      "symbol": "6АЭ",
+      "tpl_path": "011/6АЭ.npy",
+      "n_parts": 78,
+      "bw": 9.6,
+      "bh": 9.6,
+      "ar": 1.0,
+      "src_bbox": [
+        744.0,
+        2554.56,
+        753.6,
+        2564.16
+      ],
+      "method": "red_clustered"
+    }
+  }
+}
