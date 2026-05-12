@@ -960,6 +960,31 @@ def _extract_symbol_images(
             results.append((item_idx, item, None))
             continue
 
+        # T054 / KB-015: For legend rows with no symbol marker text
+        # (item.symbol == ""), the cell may be much taller than the actual
+        # icon (e.g. a small switch pictogram inside a 60-pt tall row).
+        # Tight-crop the template to the non-white bounding box so the
+        # foreground/background ratio is high enough for cv2.matchTemplate
+        # (TM_CCOEFF_NORMED) to register peaks above the
+        # content-density-adjusted threshold (0.85–0.88).
+        sym_text = (item.symbol or "").strip()
+        if not sym_text:
+            ys, xs = np.where(gray < 240)
+            if ys.size > 0:
+                y0, y1 = int(ys.min()), int(ys.max()) + 1
+                x0, x1 = int(xs.min()), int(xs.max()) + 1
+                # Apply small padding (in raster px, scaled by DPI)
+                pad_px = max(2, int(2 * zoom))
+                y0 = max(0, y0 - pad_px)
+                x0 = max(0, x0 - pad_px)
+                y1 = min(img.shape[0], y1 + pad_px)
+                x1 = min(img.shape[1], x1 + pad_px)
+                cropped = img[y0:y1, x0:x1]
+                # Guard against degenerate crops
+                if (cropped.shape[0] >= MIN_SYMBOL_SIZE_PX and
+                        cropped.shape[1] >= MIN_SYMBOL_SIZE_PX):
+                    img = cropped
+
         results.append((item_idx, item, img))
 
     doc.close()
