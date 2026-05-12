@@ -2606,6 +2606,61 @@ async def api_count_all(file_id: str):
     except Exception as e:
         errors["visual"] = str(e)
 
+    # Method E: Reverse label-to-legend channel (T060/B051)
+    # Per-file path mirror of the channel added by T058 in
+    # _count_equipment_in_pdf.  Picks up on-drawing colored engineer labels
+    # (e.g. blue PU6/PU7 for "Post upravleniya") that none of the
+    # text/visual stages covered, and attributes them to uncovered legend
+    # rows.  Without this, UI "Zapusk" button never surfaces symbol-less
+    # legend items even though _count_equipment_in_pdf does.
+    try:
+        t1 = time.time()
+        # Build covered_legend_idx from visual counts only.  This is
+        # intentionally a SIMPLER set than what _count_equipment_in_pdf
+        # builds at L1225-1300, because per-file results carry visual
+        # counts by symbol_index but not the visual/text reconciliation
+        # logic.  Reverse channel only fires for legend rows nothing else
+        # covered, so over-conservative covered_idx (only visual hits)
+        # produces at most one extra reverse_label row per family which
+        # is acceptable.
+        covered_legend_idx_pf: set[int] = set()
+        vis_counts_obj = results.get("visual", {}).get("counts") or {}
+        if isinstance(vis_counts_obj, dict):
+            for k, v in vis_counts_obj.items():
+                try:
+                    if int(v) > 0:
+                        covered_legend_idx_pf.add(int(k))
+                except (TypeError, ValueError):
+                    continue
+        # Run extraction + match
+        colored_words = await asyncio.to_thread(
+            _reverse_extract_colored_words, str(pdf_path), legend_page,
+        )
+        label_groups = await asyncio.to_thread(
+            _reverse_match_labels_to_legend,
+            colored_words, legend.items, covered_legend_idx_pf,
+        )
+        reverse_items = []
+        for idx, labels in label_groups.items():
+            try:
+                desc = legend.items[idx].description or ""
+            except (IndexError, AttributeError):
+                desc = f"legend[{idx}]"
+            reverse_items.append({
+                "legend_index": idx,
+                "name": desc,
+                "count": len(labels),
+                "source": "reverse_label_match",
+                "labels": labels,
+            })
+        results["reverse"] = {
+            "items": reverse_items,
+            "blue_words_total": len(colored_words),
+            "elapsed_s": round(time.time() - t1, 2),
+        }
+    except Exception as e:
+        errors["reverse"] = str(e)
+
     total_elapsed = round(time.time() - t0, 2)
 
     return JSONResponse(content={
