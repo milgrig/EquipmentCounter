@@ -40,6 +40,7 @@ from pdf_count_geometry import measure_cables
 from cable_length import measure_cable_lengths_raster
 import height_bucketer
 import route_classifier
+import thickness_extractor
 from pdf_count_visual import match_symbols, detect_pictograms, _extract_symbol_images, build_equipment_cluster_bboxes
 from vor_work_mapping import map_items as vor_map_items
 from legend_validator import validate_legend_symbols
@@ -1573,6 +1574,16 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
         route_classifier.attribute_items(items)
     except Exception as exc:
         log.warning("route-classify attribution failed for %s: %s", pdf_path, exc)
+
+    # Step 10 (T072 / S016-thickness): extract dimensional metadata --
+    # cable cross_section (e.g. "3\u04451,5"), gofra diameter_mm, lotok
+    # width_mm x height_mm.  Reuses the cross-section regex hardened
+    # against KB-007 (Cyrillic \u0445 / Latin x / Unicode MULT \u00d7).
+    # Idempotent over reruns; pre-set fields are preserved.
+    try:
+        thickness_extractor.attribute_items(items)
+    except Exception as exc:
+        log.warning("thickness attribution failed for %s: %s", pdf_path, exc)
 
     return items
 
