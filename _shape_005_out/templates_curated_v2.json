@@ -1,0 +1,59 @@
+{
+  "5АЭ": {
+    "n_used": 2,
+    "ar_lo": 0.75,
+    "ar_hi": 1.4,
+    "ar_lo_rotated": 0.75,
+    "ar_hi_rotated": 1.4,
+    "median_w": 10.08,
+    "median_h": 11.58,
+    "median_n": 148,
+    "median_ar": 1.15,
+    "n_min": 70,
+    "n_max": 200,
+    "_note": "Vertical 5АЭ (square). Horizontal variant -> 5АЭ_h."
+  },
+  "6АЭ": {
+    "n_used": 1,
+    "ar_lo": 1.6,
+    "ar_hi": 4.0,
+    "ar_lo_rotated": 0.25,
+    "ar_hi_rotated": 0.65,
+    "median_w": 13.08,
+    "median_h": 28.32,
+    "median_n": 88,
+    "median_ar": 2.17,
+    "n_min": 25,
+    "n_max": 130,
+    "_note": "Tall narrow icon. Rotated horizontal twin allowed via inverse window."
+  },
+  "7АЭ": {
+    "n_used": 4,
+    "ar_lo": 0.75,
+    "ar_hi": 1.3,
+    "ar_lo_rotated": 0.75,
+    "ar_hi_rotated": 1.3,
+    "median_w": 9.66,
+    "median_h": 9.6,
+    "median_n": 80,
+    "median_ar": 1.0,
+    "n_min": 70,
+    "n_max": 90,
+    "_note": "Compact square icon."
+  },
+  "5АЭ_h": {
+    "n_used": 2,
+    "ar_lo": 0.3,
+    "ar_hi": 0.6,
+    "ar_lo_rotated": 1.67,
+    "ar_hi_rotated": 3.33,
+    "median_w": 22.74,
+    "median_h": 10.38,
+    "median_n": 149,
+    "median_ar": 0.46,
+    "n_min": 70,
+    "n_max": 242,
+    "_note": "Horizontal ВЫХОД-arrow variant of 5АЭ. Counted toward 5АЭ.",
+    "_alias_for": "5АЭ"
+  }
+}

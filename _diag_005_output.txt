@@ -1,0 +1,89 @@
+PDF: 005-Планы освещения-отм. 0.000.pdf
+Size: 255842 bytes
+================================================================================
+
+[PHASE 1] parse_legend -> 19 items:
+  [ 0] symbol='1'             desc='Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K'
+  [ 1] symbol='1А'            desc='Светильник SLICK.PRS LED 50 with driver box /tempered glass/ Ex 5000K'
+  [ 2] symbol='2'             desc='Светильник ARCTIC.OPL ECO LED 1200 5000K'
+  [ 3] symbol='2А'            desc='Светильник ARCTIC.OPL ECO LED 1200 5000K'
+  [ 4] symbol='3'             desc='Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K'
+  [ 5] symbol='3А'            desc='Светильник SLICK.PRS LED 30 with driver box /tempered glass/ Ex 5000K'
+  [ 6] symbol='4'             desc='Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K'
+  [ 7] symbol='4АЭ'           desc='Светильник SLICK.PRS LED 30 with driver box /tempered glass/ 5000K'
+  [ 8] symbol='5АЭ'           desc='Светильник светодиодный аварийный CD LED 27 4000K+Emergency CONVERSION KIT POWER LED 8-40W IP20'
+  [ 9] symbol='6АЭ'           desc='Световые указатели "ВЫХОД" MERCURY LED Ex 20W DLW'
+  [10] symbol='7АЭ'           desc='Световые указатели "ВЫХОД" ATOM 6500-3 LED SP AT FP'
+  [11] symbol='(no-sym)'      desc='Кабельная трасса аварийного освещения'
+  [12] symbol='(no-sym)'      desc='Кабельная трасса рабочего освещения'
+  [13] symbol='(no-sym)'      desc='Проводка прокладываемая на лотке'
+  [14] symbol='(no-sym)'      desc='Проводка прокладываемая в трубе скрыто'
+  [15] symbol='(no-sym)'      desc='Проводка прокладываемая в трубе открыто'
+  [16] symbol='(no-sym)'      desc='Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B'
+  [17] symbol='(no-sym)'      desc='Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric'
+  [18] symbol='(no-sym)'      desc='Пост управления рабочим освещением'
+
+[PHASE 2] count_symbols ->
+  symbol '1'             -> 38
+  symbol '1А'            -> 16
+  symbol '2'             -> 4
+  symbol '2А'            -> 0
+  symbol '3'             -> 9
+  symbol '3А'            -> 4
+  symbol '4'             -> 6
+  symbol '4АЭ'           -> 4
+  symbol '5АЭ'           -> 4
+  symbol '6АЭ'           -> 6
+  symbol '7АЭ'           -> 7
+
+[PHASE 3] match_symbols (visual) -> 9 items need it:
+  [missing] [ 3] symbol='2А'            desc='Светильник ARCTIC.OPL ECO LED 1200 5000K'
+  [missing] [11] symbol='(empty)'       desc='Кабельная трасса аварийного освещения'
+  [missing] [12] symbol='(empty)'       desc='Кабельная трасса рабочего освещения'
+  [missing] [13] symbol='(empty)'       desc='Проводка прокладываемая на лотке'
+  [missing] [14] symbol='(empty)'       desc='Проводка прокладываемая в трубе скрыто'
+  [missing] [15] symbol='(empty)'       desc='Проводка прокладываемая в трубе открыто'
+  [missing] [16] symbol='(empty)'       desc='Одноклавишный выключатель Systeme Electric ОП Этюд 10А IP44 белый BA10-041B'
+  [missing] [17] symbol='(empty)'       desc='Выключатель одноклавишный ЭТЮД IP44 О/У 1-клавишный ПЕРЕКЛЮЧАТЕЛЬ Sistem Electric'
+  [missing] [18] symbol='(empty)'       desc='Пост управления рабочим освещением'
+  visual counts: {1: 17, 7: 20, 8: 0, 9: 9, 10: 9, 16: 0, 17: 0, 18: 2}
+
+[PHASE 4] detect_pictograms ->
+  'Пиктограмма Выход': 14
+
+[PHASE 5] extract_cables ->
+  cable_schedule: 11 entries
+    {'group': '?-1х18', 'panel': '', 'cross_sections': ['1х18'], 'cable_types': [], 'run_count': 1, 'total_length_m': None, 'pages': [0], 'colors': []}
+    {'group': 'ЦСАО3-Гр.1АЭ', 'panel': 'ЦСАО3', 'cross_sections': ['1х50'], 'cable_types': [], 'run_count': 2, 'total_length_m': None, 'pages': [0], 'colors': ['red']}
+    {'group': 'ЦСАО3-Гр.33АЭ', 'panel': 'ЦСАО3', 'cross_sections': ['1х3'], 'cable_types': [], 'run_count': 2, 'total_length_m': None, 'pages': [0], 'colors': ['red']}
+    {'group': 'ЦСАО3-Гр.34АЭ', 'panel': 'ЦСАО3', 'cross_sections': ['1х3', '1х20'], 'cable_types': [], 'run_count': 2, 'total_length_m': None, 'pages': [0], 'colors': ['red']}
+    {'group': 'ЦСАО3-Гр.5АЭ', 'panel': 'ЦСАО3', 'cross_sections': ['1х20', '1х50'], 'cable_types': [], 'run_count': 2, 'total_length_m': None, 'pages': [0], 'colors': ['red']}
+    {'group': 'ЩАО3-Гр.1А', 'panel': 'ЩАО3', 'cross_sections': ['1х50'], 'cable_types': [], 'run_count': 1, 'total_length_m': None, 'pages': [0], 'colors': ['red']}
+    {'group': 'ЩО-Гр.4', 'panel': 'ЩО', 'cross_sections': ['1х30'], 'cable_types': [], 'run_count': 1, 'total_length_m': None, 'pages': [0], 'colors': ['blue']}
+    {'group': 'ЩО-Гр.5', 'panel': 'ЩО', 'cross_sections': ['1х3'], 'cable_types': [], 'run_count': 1, 'total_length_m': None, 'pages': [0], 'colors': ['blue']}
+    {'group': 'ЩО3-Гр.1', 'panel': 'ЩО3', 'cross_sections': ['1х50'], 'cable_types': [], 'run_count': 1, 'total_length_m': None, 'pages': [0], 'colors': ['blue']}
+    {'group': 'ЩО3-Гр.2', 'panel': 'ЩО3', 'cross_sections': ['1х20'], 'cable_types': [], 'run_count': 2, 'total_length_m': None, 'pages': [0], 'colors': ['blue']}
+  derived_work_items: 0
+
+[FINAL] _count_equipment_in_pdf(...) result:
+Traceback (most recent call last):
+  File "C:\Cursor\TayfaProject\EquipmentCounter\_diag_005.py", line 95, in <module>
+    spec.loader.exec_module(tvcf)
+  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "C:\Cursor\TayfaProject\EquipmentCounter\test_vor_cross_format.py", line 150, in <module>
+    @dataclass
+     ^^^^^^^^^
+  File "C:\Users\Xaser\AppData\Local\Programs\Python\Python312\Lib\dataclasses.py", line 1275, in dataclass
+    return wrap(cls)
+           ^^^^^^^^^
+  File "C:\Users\Xaser\AppData\Local\Programs\Python\Python312\Lib\dataclasses.py", line 1265, in wrap
+    return _process_class(cls, init, repr, eq, order, unsafe_hash,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Xaser\AppData\Local\Programs\Python\Python312\Lib\dataclasses.py", line 983, in _process_class
+    and _is_type(type, cls, dataclasses, dataclasses.KW_ONLY,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Xaser\AppData\Local\Programs\Python\Python312\Lib\dataclasses.py", line 749, in _is_type
+    ns = sys.modules.get(cls.__module__).__dict__
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute '__dict__'. Did you mean: '__dir__'?

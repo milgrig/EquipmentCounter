@@ -1,0 +1,56 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-8.4.2, pluggy-1.6.0 -- C:\Users\Xaser\AppData\Local\Programs\Python\Python312\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Cursor\TayfaProject\EquipmentCounter
+plugins: anyio-4.9.0, Faker-40.11.0, asyncio-0.26.0, base-url-2.1.0, cov-7.0.0, django-4.12.0, mock-3.15.1, playwright-0.7.2, xdist-3.8.0
+asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 0 items / 4 errors
+
+=================================== ERRORS ====================================
+_________________ ERROR collecting test_cable_tray_parser.py __________________
+ImportError while importing test module 'C:\Cursor\TayfaProject\EquipmentCounter\test_cable_tray_parser.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\Xaser\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test_cable_tray_parser.py:12: in <module>
+    from pdf_count_cables import (
+E   ImportError: cannot import name 'CableTrayRun' from 'pdf_count_cables' (C:\Cursor\TayfaProject\EquipmentCounter\pdf_count_cables.py)
+___________________ ERROR collecting test_conduit_parser.py ___________________
+ImportError while importing test module 'C:\Cursor\TayfaProject\EquipmentCounter\test_conduit_parser.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\Xaser\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test_conduit_parser.py:8: in <module>
+    from pdf_count_cables import (
+E   ImportError: cannot import name 'ConduitRun' from 'pdf_count_cables' (C:\Cursor\TayfaProject\EquipmentCounter\pdf_count_cables.py)
+______________ ERROR collecting test_fireproof_sealant_parser.py ______________
+ImportError while importing test module 'C:\Cursor\TayfaProject\EquipmentCounter\test_fireproof_sealant_parser.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\Xaser\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test_fireproof_sealant_parser.py:8: in <module>
+    from pdf_count_cables import (
+E   ImportError: cannot import name 'FireSealantRun' from 'pdf_count_cables' (C:\Cursor\TayfaProject\EquipmentCounter\pdf_count_cables.py)
+_________________ ERROR collecting test_synonym_canonical.py __________________
+ImportError while importing test module 'C:\Cursor\TayfaProject\EquipmentCounter\test_synonym_canonical.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\Xaser\AppData\Local\Programs\Python\Python312\Lib\importlib\__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test_synonym_canonical.py:8: in <module>
+    from vor_work_mapping import SYNONYM_TABLE, canonical_name, map_items
+E   ImportError: cannot import name 'SYNONYM_TABLE' from 'vor_work_mapping' (C:\Cursor\TayfaProject\EquipmentCounter\vor_work_mapping.py)
+=========================== short test summary info ===========================
+ERROR test_cable_tray_parser.py
+ERROR test_conduit_parser.py
+ERROR test_fireproof_sealant_parser.py
+ERROR test_synonym_canonical.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 4 errors during collection !!!!!!!!!!!!!!!!!!!
+============================== 4 errors in 0.73s ==============================

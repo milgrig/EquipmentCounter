@@ -1,0 +1,41 @@
+{
+  "5АЭ": {
+    "n_instances": 3,
+    "median_w_pt": 10.2,
+    "median_h_pt": 10.56,
+    "median_aspect_h_w": 1.06,
+    "min_w_pt": 9.96,
+    "max_w_pt": 20.64,
+    "min_h_pt": 9.72,
+    "max_h_pt": 12.6,
+    "median_n": 148,
+    "proto_path": "proto_5xx.png",
+    "proto_density": 0.916
+  },
+  "6АЭ": {
+    "n_instances": 6,
+    "median_w_pt": 9.6,
+    "median_h_pt": 10.08,
+    "median_aspect_h_w": 1.03,
+    "min_w_pt": 9.6,
+    "max_w_pt": 10.2,
+    "min_h_pt": 9.6,
+    "max_h_pt": 12.6,
+    "median_n": 81,
+    "proto_path": "proto_6xx.png",
+    "proto_density": 1.0
+  },
+  "7АЭ": {
+    "n_instances": 6,
+    "median_w_pt": 10.26,
+    "median_h_pt": 9.6,
+    "median_aspect_h_w": 0.938,
+    "min_w_pt": 9.6,
+    "max_w_pt": 20.64,
+    "min_h_pt": 9.6,
+    "max_h_pt": 9.72,
+    "median_n": 81,
+    "proto_path": "proto_7xx.png",
+    "proto_density": 1.0
+  }
+}

@@ -1120,6 +1120,189 @@ def _extract_cables_raw_dxf(dxf_path: str) -> dict[str, CableItem]:
     return blocks_result
 
 
+# T-cable-tc: Extract cables from TABLECONTENT / ACAD_TABLE / MTEXT entities
+# by walking DXF group codes at the entity level. This recovers cables that
+# ODA File Converter stores as AutoCAD Tables (TABLECONTENT entities in
+# OBJECTS section, invisible to ezdxf.modelspace().query()).
+_TC_CABLE_FULL_RE = re.compile(
+    r"(ВБШвнг\(А\)-FRLS|ВБШвнг\(А\)-LS|ППГнг\(А\)-FRHF|ППГнг\(А\)-HF|"
+    r"ВБШвнг[-\s]?[А-Яа-яA-Za-z]*|ППГнг[-\s]?[А-Яа-яA-Za-z]*|"
+    r"ВВГнг[-\s]?[А-Яа-яA-Za-z]*)"
+    r"\s+(\d+)[хx×](\d+(?:[.,]\d+)?)"
+    r"(.*?)"
+    r"L\s*[=\-]\s*(\d+)",
+    re.IGNORECASE | re.DOTALL,
+)
+_TC_CLEAN_CTRL = re.compile(r"\\[pP]|\\[A-Za-z]\w*|[{}]|\\\\")
+
+
+def _tc_clean(s: str) -> str:
+    """Strip MTEXT formatting codes from a TABLECONTENT cell string."""
+    s = _TC_CLEAN_CTRL.sub(" ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _iter_dxf_entities(dxf_path: str):
+    """Low-level DXF walker: yield (entity_type, list_of_(code, value)).
+
+    Reads the file as group-code/value pairs without ezdxf. Works on any DXF
+    regardless of whether entities are in ENTITIES, BLOCKS or OBJECTS.
+    """
+    try:
+        fh = open(dxf_path, "r", encoding="utf-8", errors="replace")
+    except OSError:
+        return
+    with fh:
+        cur_type = None
+        cur_pairs: list[tuple[str, str]] = []
+        waiting_code = True
+        code = None
+        for line in fh:
+            ls = line.rstrip("\n\r")
+            if waiting_code:
+                code = ls.strip()
+                waiting_code = False
+                continue
+            val = ls
+            waiting_code = True
+            if code == "0":
+                if cur_type is not None:
+                    yield cur_type, cur_pairs
+                cur_type = val.strip()
+                cur_pairs = []
+            else:
+                cur_pairs.append((code, val))
+        if cur_type is not None:
+            yield cur_type, cur_pairs
+
+
+def _extract_cables_tablecontent(dxf_path: str) -> dict[str, "CableItem"]:
+    """T-cable-tc: Extract cables from TABLECONTENT and MTEXT entities
+    by walking DXF group codes directly.
+
+    This recovers cable journal data that ODA File Converter stores as
+    AutoCAD Tables (TABLECONTENT entities) — these are invisible to
+    ezdxf.modelspace().query() in some DXF variants.
+
+    Strategy:
+      1. For each TABLECONTENT entity, collect all cell values (group 302
+         following a CONTENT marker).
+      2. Match cells against _TC_CABLE_FULL_RE which captures:
+         brand, section (NxM), optional middle (laying method, ΔU), length.
+      3. For MTEXT entities, join codes 1+3 and apply the same regex plus
+         geometric key (insertion point x, y).
+      4. Dedup within TABLECONTENT by cell-text-hash (each journal row is
+         one cell). Dedup between TABLECONTENT and MTEXT by
+         (brand, sec, length) — same cable appearing twice in both sources
+         counts once.
+
+    Returns dict keyed by normalized cable_type.
+    """
+    result: dict[str, CableItem] = {}
+    # Global dedup key: (brand, section, length) collapses MTEXT/TC duplicates
+    seen_triples: set[tuple[str, str, int]] = set()
+    # Multi-occurrence counter: same triple may legitimately appear several
+    # times if it's a different physical cable; we allow up to the maximum
+    # seen in any single source.
+    tc_triple_count: dict[tuple[str, str, int], int] = {}
+    mt_triple_count: dict[tuple[str, str, int], int] = {}
+    tc_items: list[dict] = []
+    mt_items: list[dict] = []
+
+    def _parse_match(text: str) -> tuple[str, str, int, str] | None:
+        m = _TC_CABLE_FULL_RE.search(text)
+        if not m:
+            return None
+        brand = m.group(1).rstrip("- ").strip()
+        sec_x = m.group(2)
+        sec_y = m.group(3).replace(".", ",")
+        sec = f"{sec_x}х{sec_y}"
+        middle = m.group(4) or ""
+        try:
+            length = int(m.group(5))
+        except (ValueError, TypeError):
+            return None
+        # Laying method from middle + full text (sometimes outside regex group)
+        laying_src = middle + " " + text
+        laying = _extract_laying_method(laying_src)
+        return brand, sec, length, laying
+
+    try:
+        for ent, pairs in _iter_dxf_entities(dxf_path):
+            if ent == "TABLECONTENT":
+                # Collect cell strings: each group-302 value following a
+                # 'CONTENT' marker is a cell content
+                cells: list[str] = []
+                prev_content = False
+                for code, val in pairs:
+                    if code != "302":
+                        continue
+                    v = val.strip()
+                    if v == "CONTENT":
+                        prev_content = True
+                        continue
+                    if v == "GRIDFORMAT" or not v:
+                        prev_content = False
+                        continue
+                    if prev_content:
+                        cells.append(_tc_clean(v))
+                    prev_content = False
+                for c in cells:
+                    parsed = _parse_match(c)
+                    if parsed is None:
+                        continue
+                    brand, sec, length, laying = parsed
+                    key = (brand, sec, length)
+                    tc_triple_count[key] = tc_triple_count.get(key, 0) + 1
+                    tc_items.append({
+                        "brand": brand, "sec": sec, "length": length,
+                        "laying": laying,
+                    })
+            elif ent == "MTEXT":
+                text_parts: list[str] = []
+                for code, val in pairs:
+                    if code in ("1", "3"):
+                        text_parts.append(val)
+                text = _tc_clean("".join(text_parts))
+                parsed = _parse_match(text)
+                if parsed is None:
+                    continue
+                brand, sec, length, laying = parsed
+                key = (brand, sec, length)
+                mt_triple_count[key] = mt_triple_count.get(key, 0) + 1
+                mt_items.append({
+                    "brand": brand, "sec": sec, "length": length,
+                    "laying": laying,
+                })
+    except Exception:
+        return result
+
+    # Merge TC and MT: for each triple, take max(tc_count, mt_count).
+    # Rationale: each physical cable usually appears once in TC (journal row)
+    # AND once in MT (visual label) — so counts match; multiplicity >1 means
+    # several distinct cables share the same (brand, sec, length).
+    all_triples = set(tc_triple_count) | set(mt_triple_count)
+    for key in all_triples:
+        want = max(tc_triple_count.get(key, 0), mt_triple_count.get(key, 0))
+        # Collect source items preferring TC (more reliable laying info)
+        source = [it for it in tc_items
+                  if (it["brand"], it["sec"], it["length"]) == key]
+        if len(source) < want:
+            source += [it for it in mt_items
+                       if (it["brand"], it["sec"], it["length"]) == key
+                       and it not in source][: want - len(source)]
+        for it in source[:want]:
+            # Normalized cable_type string like existing pipeline uses
+            ct = f"{it['brand']} {it['sec']}".replace("х", "×")
+            if ct not in result:
+                result[ct] = CableItem(cable_type=ct)
+            result[ct].count += 1
+            result[ct].total_length_m += it["length"]
+            _add_laying(result[ct], it["laying"], it["length"])
+
+    return result
+
+
 def _extract_cables_mtext_multiline(
     entries: list[tuple[str, float, float]],
 ) -> dict[str, CableItem]:
@@ -1610,6 +1793,47 @@ def _extract_cables_ezdxf_structured(dxf_path: str) -> dict[str, CableItem]:
     return result
 
 
+# T-cable-reserve: Technological reserve coefficient applied on top of
+# raw length extracted from DXF text. Professional VORs typically add
+# 15–20 % to the measured cable length to cover:
+#   - drops/rises between tray and luminaire (≈ 1.5–2 m per connection)
+#   - splicing reserve at terminal boxes (≈ 0.3–0.5 m per end)
+#   - bending radius overhead on non-straight runs
+# Set to 1.0 to get raw DXF length; default 1.15 matches observed ratio
+# between raw DXF text length and etalon VOR length in ГПК-3 (9864 / 7141
+# ≈ 1.38, but much of that gap is kabels outside the journal, so 1.15 is
+# a conservative engineering default).
+CABLE_LENGTH_RESERVE_COEF = 1.15
+
+
+def extract_cables_dxf_with_reserve(
+    dxf_path: str,
+    reserve_coef: float = CABLE_LENGTH_RESERVE_COEF,
+) -> list[CableItem]:
+    """Same as extract_cables_dxf, but multiplies each cable's
+    total_length_m and length_by_laying values by *reserve_coef*
+    (default 1.15 = 15% technological reserve).
+    Counts (number of cables) are not changed.
+    """
+    items = extract_cables_dxf(dxf_path)
+    if reserve_coef == 1.0 or not items:
+        return items
+    adjusted: list[CableItem] = []
+    for it in items:
+        new_total = int(round(it.total_length_m * reserve_coef))
+        new_laying = None
+        if it.length_by_laying:
+            new_laying = {k: int(round(v * reserve_coef))
+                          for k, v in it.length_by_laying.items()}
+        adjusted.append(CableItem(
+            cable_type=it.cable_type,
+            count=it.count,
+            total_length_m=new_total,
+            length_by_laying=new_laying,
+        ))
+    return adjusted
+
+
 def extract_cables_dxf(dxf_path: str) -> list[CableItem]:
     """Extract cable data from a DXF file.
 
@@ -1623,7 +1847,15 @@ def extract_cables_dxf(dxf_path: str) -> list[CableItem]:
     Falls back to raw DXF line scan + legacy ezdxf helpers
     only when the structured method finds nothing.
     """
-    # -- PRIMARY: ezdxf structured extraction (T082) --
+    # -- T-cable-tc PRIMARY: TABLECONTENT entity walker --
+    # Reads TABLECONTENT + MTEXT by group codes, bypassing ezdxf limitations
+    # with DXFs that keep cable journal tables in OBJECTS section.
+    # Returns per-cable records (not aggregated by type max), so this is
+    # more accurate than legacy parsers.
+    cables_tc = _extract_cables_tablecontent(dxf_path)
+    tc_total = sum(c.total_length_m for c in cables_tc.values())
+
+    # -- SECONDARY: ezdxf structured extraction (T082) --
     cables_structured = _extract_cables_ezdxf_structured(dxf_path)
     struct_total = sum(c.total_length_m for c in cables_structured.values())
 
@@ -1659,18 +1891,28 @@ def extract_cables_dxf(dxf_path: str) -> list[CableItem]:
     cables_raw = _extract_cables_raw_dxf(dxf_path)
     raw_total = sum(c.total_length_m for c in cables_raw.values())
 
-    if ezdxf_total == 0 and raw_total == 0:
+    if tc_total == 0 and ezdxf_total == 0 and raw_total == 0:
         return []
 
-    # ezdxf is primary -- use it when it found data
-    if ezdxf_total > 0:
+    # T-cable-tc: TABLECONTENT is the most reliable source for cable journals
+    # (stores each journal row exactly once). Prefer it when it has data;
+    # supplement from other sources only for cable types TC missed.
+    if tc_total > 0:
+        cables = dict(cables_tc)
+        # Supplement with ezdxf for cable types TC didn't find
+        for ct, item in cables_ezdxf.items():
+            if ct not in cables:
+                cables[ct] = item
+        # Supplement with raw for anything still missing
+        for ct, item in cables_raw.items():
+            if ct not in cables:
+                cables[ct] = item
+    elif ezdxf_total > 0:
         cables = cables_ezdxf
-        # Supplement with raw results for cable types ezdxf missed
         for ct, item in cables_raw.items():
             if ct not in cables:
                 cables[ct] = item
     else:
-        # ezdxf found nothing -- use raw scan as fallback
         cables = cables_raw
 
     return sorted(cables.values(), key=lambda c: -c.total_length_m)
