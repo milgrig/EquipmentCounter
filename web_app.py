@@ -927,6 +927,231 @@ def extract_luminaire_heights(pdf_path: str) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# T058 / B051: Reverse label -> legend channel
+# ---------------------------------------------------------------------------
+# T057 recon established that on-drawing engineer labels (e.g. PU6, PU7
+# for "Post upravleniya"; SHO3-Gr.15 for working-lighting groups) are
+# stored as pdfplumber chars with explicit non-default non_stroking_color
+# (blue (0,0,1) for working circuits, red (1,0,0) for emergency).  These
+# labels never reach the equipment count because:
+#   - Phase 2 (count_symbols) only looks for the legend symbol token.
+#   - Phase 3 (match_symbols) needs a distinct glyph in the legend.
+#   - Phase 5 (extract_cables) only catches cable schedule entries.
+# This helper extracts those colored labels, groups char-level data into
+# words, classifies each word into a recognised label family (PU\d+,
+# VKL, POST, etc.), then fuzzy-matches the label text against the
+# descriptions of legend rows that NO producer stage has covered yet.
+# When a match scores above threshold, all labels in that group are
+# attributed to the matched legend index.
+
+_REVERSE_BLUE_RGB = (0.0, 0.0, 1.0)
+_REVERSE_RED_RGB = (1.0, 0.0, 0.0)
+_REVERSE_COLOR_TOL = 0.05  # tuples are exact in this corpus, give tiny slack
+# Tight regex for short labels that map back to legend equipment.
+# - PU\d+  : control post (Cyrillic Pe-U + digit)
+# - VKL\d* : switch ("VKL" = vyklyuchatel in Cyrillic)
+# - POST   : standalone POST keyword
+# - PULT\w*: pult control
+# - DV\d+  : motion sensor / DataVid family
+_REVERSE_EQUIP_LABEL_RE = re_mod.compile(
+    r"^("
+    r"\u041f\u0423\d+"       # PU<n>
+    r"|\u0412\u041a\u041b\d*"  # VKL[<n>]
+    r"|\u041f\u041e\u0421\u0422"  # POST
+    r"|\u041f\u0423\u041b\u042c\w*"  # PULT...
+    r"|\u0414\u0412\d+"      # DV<n>
+    r")$"
+)
+# Threshold for fuzzy match between label/keyword and legend description.
+# Tuned from T057 recon: "PU" vs "Post upravleniya rabochim osveshcheniem"
+# token_set_ratio is ~38; we use a keyword-tag lookup table instead so the
+# threshold here is the secondary fallback for plain-text labels.
+_REVERSE_FUZZY_THRESHOLD = 65
+
+# Label -> legend-description keyword hint table.  Each label family is
+# tied to a set of Cyrillic keywords that MUST appear in the legend
+# description for the match to be considered.  This prevents PU<n>
+# matching any legend that happens to fuzzy-score high.
+_REVERSE_LABEL_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "PU":   ("\u043f\u043e\u0441\u0442", "\u0443\u043f\u0440\u0430\u0432\u043b"),   # post + upravlen
+    "VKL":  ("\u0432\u044b\u043a\u043b\u044e\u0447\u0430\u0442\u0435\u043b",),       # vyklyuchatel
+    "POST": ("\u043f\u043e\u0441\u0442",),                                            # post
+    "PULT": ("\u043f\u0443\u043b\u044c\u0442",),                                      # pult
+    "DV":   ("\u0434\u0430\u0442\u0447\u0438\u043a",),                                # datchik (sensor)
+}
+
+
+def _reverse_label_family(text: str) -> str | None:
+    """Map a label string like 'PU7' to its family key ('PU', 'VKL', ...)."""
+    if not text:
+        return None
+    # Strip trailing digits to get family stem
+    stem = re_mod.sub(r"\d+$", "", text)
+    stem_upper = stem.upper()
+    # Cyrillic -> Latin equivalent mapping for stems we care about
+    cyr_to_lat = {
+        "\u041f\u0423": "PU",
+        "\u0412\u041a\u041b": "VKL",
+        "\u041f\u041e\u0421\u0422": "POST",
+        "\u041f\u0423\u041b\u042c": "PULT",
+        "\u0414\u0412": "DV",
+    }
+    return cyr_to_lat.get(stem_upper) or (stem_upper if stem_upper in _REVERSE_LABEL_KEYWORDS else None)
+
+
+def _reverse_extract_colored_words(pdf_path: str, page_index: int) -> list[dict]:
+    """Read pdfplumber chars on the given page and return word-level groups
+    that have a non-default non_stroking_color (blue or red).
+
+    Output dict shape: {text, x0, y0, x1, y1, color, family}.
+    """
+    out: list[dict] = []
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            if page_index >= len(pdf.pages):
+                return out
+            page = pdf.pages[page_index]
+            chars = page.chars or []
+    except Exception:
+        return out
+
+    def _is_target_color(c) -> bool:
+        col = c.get("non_stroking_color")
+        if col is None:
+            return False
+        # pdfplumber returns either a tuple of length 1 (gray), 3 (RGB)
+        # or 4 (CMYK).  We only care about RGB blue/red.
+        if not isinstance(col, (tuple, list)) or len(col) != 3:
+            return False
+        cb = tuple(round(float(v), 4) for v in col)
+        for target in (_REVERSE_BLUE_RGB, _REVERSE_RED_RGB):
+            if all(abs(cb[i] - target[i]) <= _REVERSE_COLOR_TOL for i in range(3)):
+                return True
+        return False
+
+    colored = [c for c in chars if _is_target_color(c)]
+    if not colored:
+        return out
+
+    # Group chars to words: y-snap line clustering then x-gap word splitting
+    from collections import defaultdict
+    y_snap = 1.5
+    gap_factor = 0.55
+    lines: dict[float, list[dict]] = defaultdict(list)
+    for c in colored:
+        ykey = round(float(c.get("y0", 0)) / y_snap) * y_snap
+        lines[ykey].append(c)
+
+    for _, line_chars in lines.items():
+        line_chars.sort(key=lambda x: float(x.get("x0", 0)))
+        cur: list[dict] = []
+
+        def _flush(buf: list[dict]):
+            if not buf:
+                return
+            text = "".join(str(cc.get("text", "")) for cc in buf)
+            bx0 = min(float(cc.get("x0", 0)) for cc in buf)
+            bx1 = max(float(cc.get("x1", 0)) for cc in buf)
+            by0 = min(float(cc.get("y0", 0)) for cc in buf)
+            by1 = max(float(cc.get("y1", 0)) for cc in buf)
+            col = buf[0].get("non_stroking_color")
+            out.append({
+                "text": text,
+                "x0": bx0, "y0": by0, "x1": bx1, "y1": by1,
+                "color": tuple(round(float(v), 4) for v in col) if col else None,
+                "family": _reverse_label_family(text),
+            })
+
+        for c in line_chars:
+            if cur:
+                last_x1 = float(cur[-1].get("x1", 0))
+                size = float(c.get("size", 6) or 6)
+                gap_thresh = size * gap_factor
+                if (float(c.get("x0", 0)) - last_x1) > gap_thresh:
+                    _flush(cur)
+                    cur = []
+            cur.append(c)
+        _flush(cur)
+
+    return out
+
+
+def _reverse_match_labels_to_legend(
+    words: list[dict],
+    legend_items,
+    covered_idx: set[int],
+) -> dict[int, list[dict]]:
+    """For each colored word that classifies as an equipment label,
+    find the best uncovered legend index whose description contains the
+    label-family's keyword set.  Returns idx -> list of label dicts.
+    """
+    result: dict[int, list[dict]] = {}
+    if not words or not legend_items:
+        return result
+
+    # Try rapidfuzz, fall back to difflib if not installed
+    try:
+        from rapidfuzz import fuzz as _fuzz
+        def _score(a: str, b: str) -> float:
+            return _fuzz.token_set_ratio(a, b)
+    except Exception:
+        import difflib
+        def _score(a: str, b: str) -> float:
+            return difflib.SequenceMatcher(None, a, b).ratio() * 100.0
+
+    for word in words:
+        text = (word.get("text") or "").strip()
+        family = word.get("family")
+        if not text or not family:
+            continue
+        # Tight regex guard: only match exact equip-label forms,
+        # excluding e.g. legend footnote 'PUE p.1.1.29' substrings.
+        if not _REVERSE_EQUIP_LABEL_RE.match(text):
+            continue
+        keywords = _REVERSE_LABEL_KEYWORDS.get(family, ())
+        if not keywords:
+            continue
+
+        # Primary gate: ALL keywords for this family must appear in the
+        # legend description (Cyrillic substring check).  When that holds
+        # we accept the smallest matching idx; the fuzzy score below is
+        # used only to disambiguate when MULTIPLE uncovered legend rows
+        # satisfy the keyword test (e.g. several variants of "switch"
+        # rows for a VKL\d+ label).
+        candidates: list[tuple[int, float]] = []
+        for idx, item in enumerate(legend_items):
+            if idx in covered_idx:
+                continue
+            desc = (item.description or "").strip()
+            if not desc:
+                continue
+            desc_lower = desc.lower()
+            if not all(kw in desc_lower for kw in keywords):
+                continue
+            # Secondary fuzzy score on the legend description against
+            # itself + keyword block (deterministic tie-breaker).
+            kw_blob = " ".join(keywords)
+            score = _score(kw_blob, desc_lower)
+            candidates.append((idx, score))
+
+        if candidates:
+            # Pick the highest-scoring candidate; ties broken by lowest idx.
+            candidates.sort(key=lambda t: (-t[1], t[0]))
+            best_idx, best_score = candidates[0]
+            result.setdefault(best_idx, []).append({
+                "text": text,
+                "x0": word.get("x0"),
+                "y0": word.get("y0"),
+                "x1": word.get("x1"),
+                "y1": word.get("y1"),
+                "family": family,
+                "score": round(best_score, 1),
+            })
+
+    return result
+
+
 def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
     """Run legend extraction + counting methods on a single PDF.
 
@@ -1172,6 +1397,45 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
                              lw_key, length_m, segments)
         except Exception as exc:
             log.warning("Geometric measurement failed for %s: %s", pdf_path, exc)
+
+    # Step 6a (T058 / B051): reverse label -> legend channel.
+    # Extract colored on-drawing labels (blue PU<n>, VKL, POST etc.) via
+    # pdfplumber chars and match each label family to the descriptions of
+    # legend rows that are still UNCOVERED after the earlier stages.
+    # Marks the matched legend idx as covered so the [UNMATCHED-LEGEND]
+    # audit below does NOT also flag them.  See T057 recon for the
+    # color/encoding evidence on 007-Plans osvescheniya PDF.
+    if has_legend:
+        try:
+            colored_words = _reverse_extract_colored_words(
+                pdf_path, legend_result.page_index,
+            )
+            label_groups = _reverse_match_labels_to_legend(
+                colored_words, legend_result.items, covered_legend_idx,
+            )
+            for idx, labels in label_groups.items():
+                item = legend_result.items[idx]
+                qty = len(labels)
+                items.append({
+                    "symbol": (item.symbol or ""),
+                    "name": item.description or "",
+                    "count": qty,
+                    "count_ae": 0,
+                    "total": qty,
+                    "unit": "шт",
+                    "category": "reverse_label_match",
+                    "source": "reverse_label_match",
+                })
+                covered_legend_idx.add(idx)
+                log.info(
+                    "reverse_label_match idx=%d desc=%r qty=%d family=%s",
+                    idx, (item.description or "")[:40], qty,
+                    labels[0].get("family", ""),
+                )
+        except Exception as exc:
+            log.warning(
+                "Reverse label channel failed for %s: %s", pdf_path, exc,
+            )
 
     # Step 6b (T054 / KB-015): emit warning rows for legend items that
     # no producer stage covered.  The [UNMATCHED-LEGEND] name prefix
