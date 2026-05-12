@@ -37,6 +37,7 @@ from pdf_legend_parser import parse_legend, LegendResult
 from pdf_count_text import count_symbols
 from pdf_count_cables import extract_cables
 from pdf_count_geometry import measure_cables
+from cable_length import measure_cable_lengths_raster
 from pdf_count_visual import match_symbols, detect_pictograms, _extract_symbol_images, build_equipment_cluster_bboxes
 from vor_work_mapping import map_items as vor_map_items
 from legend_validator import validate_legend_symbols
@@ -1437,7 +1438,62 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
                 "Reverse label channel failed for %s: %s", pdf_path, exc,
             )
 
-    # Step 6b (T054 / KB-015): emit warning rows for legend items that
+    # Step 6b (T068 / S016-cable-length): raster polyline detection and
+    # length engine.  The vector pipeline (Step 6 measure_cables, only
+    # ran on section 'ЭГ' above) misses cable trasses rendered as
+    # embedded raster fills, which is the case on most GPK3 lighting
+    # sheets and was the single biggest accuracy gap (519 m generated
+    # vs ~14 000 m reference on 3-zahvatka).
+    #
+    # The raster engine renders each plan page at 300 DPI, builds an
+    # HSV mask per cable-trace legend category (idx 10..14 on 007-style
+    # legends: emergency / working cable trasses + 3 provodka classes),
+    # skeletonises and sums pixel runs, then divides by the per-page
+    # px-per-metre scale derived from titleblock axis pairs.  See
+    # cable_length.measure_cable_lengths_raster.
+    #
+    # Items emitted carry source='cable_length_raster' so downstream
+    # VOR mapping can attribute them to the correct height bucket via
+    # T065/T060 rules; we deliberately do NOT mark covered_legend_idx
+    # for these because the UNMATCHED audit below should still flag
+    # the symbol-less legend rows that lost their visual template match
+    # under KB-015.
+    if has_legend:
+        try:
+            cl_pages = [legend_result.page_index] if legend_result is not None else None
+            cl_rep = measure_cable_lengths_raster(
+                pdf_path, pages=cl_pages, legend_result=legend_result,
+            )
+            for cl_item in cl_rep.items:
+                items.append({
+                    "symbol": cl_item.get("symbol", ""),
+                    "name": cl_item.get("name", ""),
+                    "count": 0,
+                    "count_ae": 0,
+                    "total": cl_item.get("total", 0.0),
+                    "unit": cl_item.get("unit", "\u043c"),
+                    "category": "cable_length_raster",
+                    "source": "cable_length_raster",
+                })
+            if cl_rep.total_length_m > 0:
+                log.info(
+                    "cable_length_raster: %.1f m across %d entries on %s",
+                    cl_rep.total_length_m, len(cl_rep.entries), pdf_path,
+                )
+            # When the raster engine matched a legend idx for a category
+            # that produced a non-trivial length (>=0.5 m), mark that
+            # idx as covered so the UNMATCHED audit does not double-emit
+            # the same row as a [UNMATCHED-LEGEND] warning.
+            for e in cl_rep.entries:
+                if e.legend_idx >= 0 and e.length_m >= 0.5:
+                    covered_legend_idx.add(e.legend_idx)
+        except Exception as exc:
+            log.warning(
+                "Raster cable-length engine failed for %s: %s",
+                pdf_path, exc,
+            )
+
+    # Step 6c (T054 / KB-015): emit warning rows for legend items that
     # no producer stage covered.  The [UNMATCHED-LEGEND] name prefix
     # surfaces the gap to the user so symbol-less switches, posts, and
     # cable trasses (B048 reproducer on 007-Plans osvescheniya) appear
