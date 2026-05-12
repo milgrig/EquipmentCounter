@@ -39,6 +39,7 @@ from pdf_count_cables import extract_cables
 from pdf_count_geometry import measure_cables
 from cable_length import measure_cable_lengths_raster
 import height_bucketer
+import route_classifier
 from pdf_count_visual import match_symbols, detect_pictograms, _extract_symbol_images, build_equipment_cluster_bboxes
 from vor_work_mapping import map_items as vor_map_items
 from legend_validator import validate_legend_symbols
@@ -1561,6 +1562,17 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
         height_bucketer.attribute_items(items, pdf_path)
     except Exception as exc:
         log.warning("height-bucket attribution failed for %s: %s", pdf_path, exc)
+
+    # Step 9 (T070 / S016-route-classify): tag every cable-trace item
+    # with route in {tray, pipe_hidden, pipe_open, unknown} and every
+    # luminaire item with mount in {wall, shpilka, anker, unknown}.
+    # Decision rules live in route_classifier; the call is idempotent
+    # so pre-tagged items (from a future per-symbol pipeline) are
+    # preserved.
+    try:
+        route_classifier.attribute_items(items)
+    except Exception as exc:
+        log.warning("route-classify attribution failed for %s: %s", pdf_path, exc)
 
     return items
 
