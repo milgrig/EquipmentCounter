@@ -956,6 +956,12 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
     has_legend = bool(legend_result.items)
 
     items: list[dict] = []
+    # T054 / KB-015: track which legend indices reached output so we can
+    # emit an [UNMATCHED-LEGEND] warning row for any item that no
+    # producer stage covered.  Without this audit, symbol-less legend
+    # rows (switches, posts, cable trasses) are silently dropped — the
+    # exact failure mode reported as B048 on 007-Plans osvescheniya PDF.
+    covered_legend_idx: set[int] = set()
 
     # Step 2-4: legend-based equipment counting (skip if no legend found)
     if has_legend:
@@ -1066,6 +1072,7 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
                 "count_ae": 0,
                 "total": count,
             })
+            covered_legend_idx.add(idx)
 
     # Step 4b: detect pictograms — text labels like "ВЫХОД" on the drawing
     # that have no legend entry and no visual template (T149).
@@ -1165,6 +1172,56 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
                              lw_key, length_m, segments)
         except Exception as exc:
             log.warning("Geometric measurement failed for %s: %s", pdf_path, exc)
+
+    # Step 6b (T054 / KB-015): emit warning rows for legend items that
+    # no producer stage covered.  The [UNMATCHED-LEGEND] name prefix
+    # surfaces the gap to the user so symbol-less switches, posts, and
+    # cable trasses (B048 reproducer on 007-Plans osvescheniya) appear
+    # in the VOR even when count_text + match_visual found nothing.
+    #
+    # Quantity policy:
+    #   * line patterns (cable trasse / provodka) — qty=0 because count
+    #     is meaningless for these (length is the real metric, deferred
+    #     to follow-up B049 cable polyline detection).
+    #   * everything else (switches, posts, control devices) — qty=1
+    #     so the VOR row at least registers that ONE legend mention
+    #     existed; the user can refine count manually.
+    #
+    # Conservative guard: skip the audit on legends where ZERO producer
+    # stages matched anything, because such "legends" are usually
+    # title-block or notes-table false positives and would otherwise
+    # flood the output with spurious rows.
+    if has_legend and covered_legend_idx:
+        _line_categories = {
+            "кабельная трасса", "проводка", "линия связи",
+            "кабельная", "трасса", "wire", "cable", "trasse",
+        }
+        for idx, item in enumerate(legend_result.items):
+            if idx in covered_legend_idx:
+                continue
+            desc = (item.description or "").strip()
+            if not desc:
+                continue
+            cat = (item.category or "").strip().lower()
+            desc_lower = desc.lower()
+            is_line = (
+                cat in _line_categories
+                or "трасс" in desc_lower
+                or "прокладыв" in desc_lower
+                or "провод" in desc_lower
+                or "кабельн" in desc_lower
+            )
+            warn_count = 0 if is_line else 1
+            items.append({
+                "symbol": (item.symbol or ""),
+                "name": f"[UNMATCHED-LEGEND] {desc}",
+                "count": warn_count,
+                "count_ae": 0,
+                "total": warn_count,
+                "unit": "шт",
+                "category": "legend_unmatched",
+                "source": "legend_coverage_audit",
+            })
 
     # Step 7: apply VOR work-name mapping
     items = vor_map_items(items)

@@ -93,6 +93,15 @@ DEFAULT_THRESHOLD = 0.75     # minimum match confidence
 SCALES = [1.0]                        # single scale (T142: 3→1 cuts 3× match calls)
 ROTATIONS = [0, 90]                   # 0° + 90° (symbols may be placed vertically)
 
+# T054 / KB-015: extended scale set used for legend items that have no
+# symbol-text marker.  These items (switches, posts, cable trasses on
+# 007-Plans osvescheniya) tend to be drawn on the plan at roughly 50–70%
+# of the legend-icon size, so the default SCALES=[1.0] misses them
+# entirely.  This wider sweep restores them at the cost of a few extra
+# template calls per symbol-less item (typically 3–7 per legend).
+NO_SYMBOL_SCALES = [0.5, 0.6, 0.7, 0.85, 1.0]
+NO_SYMBOL_ROTATIONS = [0, 90, 180, 270]
+
 # Pyramid (coarse-to-fine) matching (T142)
 PYRAMID_DOWNSAMPLE = 0.5    # coarse pass at 50% resolution
 PYRAMID_COARSE_THRESH = 0.55 # lower threshold for coarse pass (catch all candidates)
@@ -2017,8 +2026,26 @@ def match_symbols(
                 candidate_thresh, len(raw_detections),
             )
         else:
+            # T054 / KB-015: legend items with no symbol marker (switches,
+            # posts, control devices on 007-Plans osvescheniya) are often
+            # drawn at smaller scale than the legend icon. Use a wider
+            # scale + rotation sweep for these items so we can find their
+            # drawing-area instances.  Default callers still get the
+            # single-scale fast path.
+            item_scales = scales
+            item_rotations = rotations
+            if not sym_text:
+                # Merge defaults with the wider sweep (preserve any caller
+                # override that already includes extra scales).
+                merged_scales = sorted({float(s) for s in scales}
+                                       | {float(s) for s in NO_SYMBOL_SCALES})
+                merged_rotations = sorted({int(r) for r in rotations}
+                                          | {int(r) for r in NO_SYMBOL_ROTATIONS})
+                item_scales = merged_scales
+                item_rotations = merged_rotations
             raw_detections = _match_template_multi(
-                match_target, template, adj_threshold, scales, rotations, dpi_ratio,
+                match_target, template, adj_threshold,
+                item_scales, item_rotations, dpi_ratio,
                 page_gray_coarse=page_gray_coarse,
             )
 
