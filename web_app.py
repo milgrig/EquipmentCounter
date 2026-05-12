@@ -38,6 +38,7 @@ from pdf_count_text import count_symbols
 from pdf_count_cables import extract_cables
 from pdf_count_geometry import measure_cables
 from cable_length import measure_cable_lengths_raster
+import height_bucketer
 from pdf_count_visual import match_symbols, detect_pictograms, _extract_symbol_images, build_equipment_cluster_bboxes
 from vor_work_mapping import map_items as vor_map_items
 from legend_validator import validate_legend_symbols
@@ -1545,6 +1546,21 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
 
     # Step 7: apply VOR work-name mapping
     items = vor_map_items(items)
+
+    # Step 8 (T069 / S016-height-bucket): tag every item with its
+    # height_bucket key derived from the PDF filename's "\u043e\u0442\u043c."
+    # otmetka.  Per T065 recon Q1, the reference VOR groups every
+    # installation row into one of 4 buckets ("\u0434\u043e 5 \u043c.",
+    # "\u043e\u0442 5 \u0434\u043e 13 \u043c.", "\u043e\u0442 13 \u0434\u043e 20 \u043c.",
+    # "\u043e\u0442 20 \u0434\u043e 35 \u043c.") by the floor elevation
+    # encoded in the PDF title block.  When the filename carries no
+    # otmetka marker (e.g. 001 general-data sheets, 003/004 panel
+    # schematics) the bucket falls back to "unknown" so downstream
+    # vor_composer can still group those rows separately.
+    try:
+        height_bucketer.attribute_items(items, pdf_path)
+    except Exception as exc:
+        log.warning("height-bucket attribution failed for %s: %s", pdf_path, exc)
 
     return items
 
