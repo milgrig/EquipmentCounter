@@ -292,24 +292,34 @@ def render_vor_docx(
         for it in items:
             item_no += 1
             name = str(it.get("name", "")).strip()
+            # T078 / S019-minimal-renderer: strip any "[UNMATCHED-LEGEND]"
+            # diagnostic prefix from the work-name before writing to col 2.
+            # The reference docx (T065_recon.md section 0) has none of these
+            # warnings; they belong in logs/audit only, not in deliverable
+            # column 2.  Pattern from web_app:1540 ("[UNMATCHED-LEGEND] %s").
+            name = _strip_unmatched_legend_prefix(name)
             unit = str(it.get("unit", "шт")).strip()
             total = it.get("total", 0)
-            formula = str(it.get("formula", "")).strip()
             drawing_refs = str(it.get("drawing_refs", "")).strip()
-            extra = str(it.get("extra_info", "")).strip()
 
-            # Очистить «Монтаж » префикс если есть, но оставить как есть для соответствия
             # Привести ссылку на чертежи к шифру проекта
             ref_text = _format_drawing_ref(drawing_refs, drawing_prefix)
 
+            # T078: per T065_recon.md section 0, the human-authored
+            # reference docx has columns 5 (Formula) and 7 (Additional
+            # info) EMPTY in 130/130 data rows.  Emit "" for both columns
+            # to match the reference layout; intentionally ignore
+            # it.get("formula") and it.get("extra_info") here.  Section
+            # header rows are emitted above with all non-name columns
+            # already empty -- no change needed there.
             cells_text = [
                 str(item_no),
                 name,
                 unit,
                 _fmt_qty(total),
-                formula if formula and formula != _fmt_qty(total) else "",
+                "",  # T078: column 5 (Formula) empty for all data rows
                 ref_text,
-                extra,
+                "",  # T078: column 7 (Additional info) empty for all data rows
             ]
             for ci, text in enumerate(cells_text):
                 cell = tbl.rows[row_idx].cells[ci]
@@ -340,6 +350,25 @@ def _fmt_qty(v) -> str:
     if abs(f - round(f)) < 1e-6:
         return str(int(round(f)))
     return f"{f:.1f}".replace(".", ",")
+
+
+# T078: pattern for the diagnostic warning prefix produced by web_app
+# legend-coverage audit (web_app.py:1540).  We strip it before writing
+# col 2 so the deliverable docx never contains the audit string.  Pattern
+# is anchored at start and tolerates one or more whitespace chars after
+# the closing bracket.
+_UNMATCHED_LEGEND_RE = re.compile(r"^\s*\[UNMATCHED-LEGEND\]\s*", re.IGNORECASE)
+
+
+def _strip_unmatched_legend_prefix(name: str) -> str:
+    """Remove "[UNMATCHED-LEGEND] " prefix from a work-name if present.
+
+    Returns the cleaned name; leaves any non-prefixed name unchanged.
+    Idempotent over reruns (since the regex is anchored at start).
+    """
+    if not name:
+        return name
+    return _UNMATCHED_LEGEND_RE.sub("", name, count=1)
 
 
 _LIST_NUM_RE = re.compile(r"л\.?\s*[\d.,\-–\s]+", re.IGNORECASE)
