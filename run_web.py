@@ -24,41 +24,37 @@ from vor_elevation_grouper import regroup_aggregate_by_elevation
 
 
 def _build_docx_bytes_etalon(aggregated, rel_folder: str) -> bytes:
-    """Patched: пере-агрегируем формулу по отметкам, затем рендерим ДБТ-формат."""
-    import re as _re
+    """Patched: пере-агрегируем формулу по отметкам, затем рендерим минимальный ДБТ-формат.
 
+    Шапка содержит только строки, в которых мы уверены (по образцу ВОР_ЭО.docx):
+      • "Ведомость объемов работ"
+      • "Основание_<раздел>"  (раздел определяется по имени папки: ЭО/ЭМ/ЭГ)
+      • "Дата составления …г."
+    Шифр проекта, номер захватки, имена объекта/стройки/исполнителей не
+    извлекаются автоматически и не подставляются. drawing_prefix не передаётся
+    (по умолчанию пуст) — в колонке "Ссылка на чертежи" остаются только номера
+    листов вида "л.5-11".
+    """
     # 1. Пере-группировка формулы по строительным отметкам
     aggregated = regroup_aggregate_by_elevation(aggregated, labeled=False)
 
-    # 2. Угадываем номер захватки и литеру раздела из rel_folder
+    # 2. Определяем только наименование раздела (если можем)
     folder_lower = (rel_folder or "").lower()
-    m = _re.search(r"(\d+)[-\s_]*я?\s*захватк", folder_lower)
-    zachvatka = m.group(1) if m else "3"
-
     if "эо" in folder_lower or "освещ" in folder_lower:
-        razdel, razdel_full = "ЭО", "Электроосвещение"
+        razdel_full = "Электроосвещение"
     elif "эм" in folder_lower:
-        razdel, razdel_full = "ЭМ", "Электрооборудование"
+        razdel_full = "Электрооборудование"
     elif "эг" in folder_lower:
-        razdel, razdel_full = "ЭГ", "Заземление"
+        razdel_full = "Заземление"
     else:
-        razdel, razdel_full = "ЭО", "Электроосвещение"
+        razdel_full = ""
 
-    if "гпк" in folder_lower or "03_гпк" in folder_lower:
-        prefix = f"1Д-24-3-{zachvatka}-{razdel}"
-        section_basis = (f"Основание_{razdel_full}, {zachvatka} захватка; "
-                         f"{prefix} изм.2")
-        drawing_prefix = f"{prefix} (поз.3). {zachvatka}-я захватка"
-    else:
-        prefix = f"{zachvatka}-{razdel}"
-        section_basis = f"Основание_{razdel_full}, {zachvatka} захватка; {prefix}"
-        drawing_prefix = f"{prefix}. {zachvatka}-я захватка"
+    section_basis = f"Основание_{razdel_full}" if razdel_full else ""
 
     return _render_etalon(
         aggregated,
         rel_folder=rel_folder,
         section_basis=section_basis,
-        drawing_prefix=drawing_prefix,
     )
 
 

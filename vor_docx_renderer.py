@@ -44,7 +44,7 @@ COL_HEADERS = [
     "№\nп/п",
     "Наименование вида работ",
     "Ед.\nизм.",
-    "РД",
+    "Объем работ",
     "Формула расчета объемов работ и расхода материалов",
     "Ссылка на чертежи, спецификации",
     "Дополнительная информация",
@@ -208,15 +208,10 @@ def render_vor_docx(
     aggregated: list[dict],
     *,
     rel_folder: str = "",
-    project_name: str = ("«Комплекс по глубокой переработке зерна для производства "
-                         "аминокислот, расположенный по адресу: Ростовская область, "
-                         "г Волгодонск, улица 2-я Заводская, 3»"),
-    object_name: str = "«Главный производственный корпус, поз. 3 по ГП»",
-    section_basis: str = "Основание_Электроосвещение, 3 захватка; 1Д-24-3-3-ЭО изм.2",
-    composer_name: str = "Кочерган",
-    checker_name: str = "Гончаров",
-    drawing_prefix: str = "1Д-24-3-3-ЭО (поз.3). 3-я захватка",
+    section_basis: str = "",
+    drawing_prefix: str = "",
     issue_date: str | None = None,
+    **_ignored,
 ) -> bytes:
     """Сформировать ВОР в формате эталона ДБТ. Возвращает байты .docx."""
     doc = Document()
@@ -252,15 +247,10 @@ def render_vor_docx(
         rFonts.set(qn('w:cs'), FONT_NAME)
         return p
 
-    # 2. Преамбула
-    _add_par(project_name, align=WD_ALIGN_PARAGRAPH.CENTER)
-    _add_par("(наименование стройки)", align=WD_ALIGN_PARAGRAPH.CENTER)
-    _add_par(object_name, align=WD_ALIGN_PARAGRAPH.CENTER)
-    _add_par("(наименование объекта капитального строительства)",
-             align=WD_ALIGN_PARAGRAPH.CENTER)
+    # 2. Преамбула (минимальная, по образцу ВОР_ЭО.docx)
     _add_par("Ведомость объемов работ", align=WD_ALIGN_PARAGRAPH.CENTER, bold=True)
-    _add_par(section_basis)
-    _add_par("(наименование раздела (подраздела) проектной документации)")
+    if section_basis:
+        _add_par(section_basis)
     _add_par(f"Дата составления {issue_date}г.")
     _add_par("")
 
@@ -332,12 +322,7 @@ def render_vor_docx(
 
     _set_col_widths(tbl, COL_WIDTHS_CM)
 
-    # 4. Подписи
-    doc.add_paragraph("")
-    _add_par(f"Составил______________________ {composer_name}")
-    _add_par("                              (должность, подпись (инициалы, фамилия))")
-    _add_par(f"Проверил______________________ {checker_name}")
-    _add_par("                               (должность, подпись (инициалы, фамилия))")
+    # 4. Подписи (удалены: данные исполнителей не известны автогенератору)
 
     buf = io.BytesIO()
     doc.save(buf)
@@ -374,7 +359,7 @@ def _format_drawing_ref(raw: str, prefix: str) -> str:
             nums.append(tok)
     # Также пустить через регулярку «л.NN»
     if not nums:
-        return f"{prefix}"
+        return prefix
     # Сжать в диапазоны: 5,6,7,8 -> 5-8
     nums_int = sorted({int(n) for n in nums})
     ranges: list[str] = []
@@ -388,4 +373,7 @@ def _format_drawing_ref(raw: str, prefix: str) -> str:
         else:
             ranges.append(str(nums_int[i]))
         i = j + 1
-    return f"{prefix}, л.{','.join(ranges)}"
+    sheet_part = f"л.{','.join(ranges)}"
+    if prefix:
+        return f"{prefix}, {sheet_part}"
+    return sheet_part
