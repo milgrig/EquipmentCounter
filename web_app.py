@@ -596,9 +596,19 @@ def _aggregate_equipment(results: dict[str, list[dict]]) -> list[dict]:
     Uses 'work_name' (VOR work description) for aggregation if available,
     falling back to 'name'. Preserves 'equipment_name' (original equipment
     name from the PDF legend) for the 'Доп. информация' column.
+
+    T081 (S019-wire-attrs): preserves six attribute fields populated by
+    Steps 8-10 (height_bucketer / route_classifier / thickness_extractor)
+    so the downstream vor_compose.compose_vor_table can split rows by
+    installation context.  KB-008: agg key is extended from name only to
+    (name, height_bucket, route, mount) so that the same legend name
+    appearing on different floor elevations or routes is NOT silently
+    merged into one row.  Scalar fields (cross_section / section_mm2 /
+    diameter_mm) are projected as the first non-empty value seen because
+    they describe the cable kind, not the installation context.
     """
     import re
-    agg: dict[str, dict] = {}  # normalized_key -> {...}
+    agg: dict[tuple, dict] = {}  # (key, bucket, route, mount) -> {...}
 
     for filename, items in results.items():
         drawing_ref = filename.replace(".pdf", "")
@@ -609,11 +619,21 @@ def _aggregate_equipment(results: dict[str, list[dict]]) -> list[dict]:
             display_name = work_name or raw_name
             if not display_name:
                 continue
-            key = re.sub(r"\s+", " ", display_name).strip().lower()
+            key_name = re.sub(r"\s+", " ", display_name).strip().lower()
             total = item.get("total", item.get("count", 0) + item.get("count_ae", 0))
             unit = item.get("unit", "шт")
             if total <= 0:
                 continue
+            # T081: extract 6 attribute fields populated by Steps 8-10.
+            height_bucket = item.get("height_bucket") or None
+            route = item.get("route") or None
+            mount = item.get("mount") or None
+            cross_section = item.get("cross_section") or None
+            section_mm2 = item.get("section_mm2")
+            diameter_mm = item.get("diameter_mm")
+            # KB-008: agg key includes attribute context so same-name-
+            # different-bucket/route/mount rows are not merged.
+            key = (key_name, height_bucket, route, mount)
             if key not in agg:
                 # equipment_name is the original name from PDF legend
                 equip_name = item.get("equipment_name", raw_name)
@@ -621,6 +641,13 @@ def _aggregate_equipment(results: dict[str, list[dict]]) -> list[dict]:
                     "name": display_name, "unit": unit, "total": 0,
                     "per_file": {}, "files": [],
                     "equipment_names": set(),
+                    # T081: preserved attribute context
+                    "height_bucket": height_bucket,
+                    "route": route,
+                    "mount": mount,
+                    "cross_section": cross_section,
+                    "section_mm2": section_mm2,
+                    "diameter_mm": diameter_mm,
                 }
                 if equip_name:
                     agg[key]["equipment_names"].add(equip_name)
@@ -628,6 +655,13 @@ def _aggregate_equipment(results: dict[str, list[dict]]) -> list[dict]:
                 equip_name = item.get("equipment_name", raw_name)
                 if equip_name:
                     agg[key]["equipment_names"].add(equip_name)
+                # Scalar projection: take first non-empty value seen.
+                if not agg[key].get("cross_section") and cross_section:
+                    agg[key]["cross_section"] = cross_section
+                if agg[key].get("section_mm2") in (None, 0) and section_mm2:
+                    agg[key]["section_mm2"] = section_mm2
+                if agg[key].get("diameter_mm") in (None, 0) and diameter_mm:
+                    agg[key]["diameter_mm"] = diameter_mm
             agg[key]["total"] += total
             agg[key]["per_file"][drawing_ref] = agg[key]["per_file"].get(drawing_ref, 0) + total
             if drawing_ref not in agg[key]["files"]:
@@ -645,6 +679,15 @@ def _aggregate_equipment(results: dict[str, list[dict]]) -> list[dict]:
             "total": info["total"], "formula": formula,
             "drawing_refs": ", ".join(info["files"]),
             "extra_info": extra_info,
+            # T081: project preserved attributes to output rows so
+            # vor_compose.compose_vor_table and downstream renderers
+            # can group/split by installation context.
+            "height_bucket": info.get("height_bucket"),
+            "route": info.get("route"),
+            "mount": info.get("mount"),
+            "cross_section": info.get("cross_section"),
+            "section_mm2": info.get("section_mm2"),
+            "diameter_mm": info.get("diameter_mm"),
         })
     return result
 
