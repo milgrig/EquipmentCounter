@@ -127,6 +127,37 @@ def _is_tray(item: dict) -> bool:
     return (item.get("category") or "").lower() in _TRAY_CATS
 
 
+# T085: exit-sign-specific categories.  These are formally luminaires
+# (they live in _LUMINAIRE_CATS for sheet-ref purposes) but the
+# reference VOR enumerates them as separate rows PER MODEL ("MERCURY
+# LED Ex 20W DLW", "ATOM 6500-3 LED SP AT FP", "Pictogramma Vykhod")
+# rather than collapsing them under a per-mount installation header.
+# We treat any item whose category is one of these -- OR whose
+# work_name carries an exit-sign marker -- as model-keyed regardless
+# of mount/bucket alignment, so _row_name never erases the model.
+_EXIT_SIGN_CATS = {"luminaire_exit", "exit_indicator", "pictogram"}
+_EXIT_SIGN_NAME_RE = re.compile(
+    r"(MERCURY|ATOM|SIRAH|\u041f\u0438\u043a\u0442\u043e\u0433\u0440\u0430\u043c\u043c|"
+    r"\u0421\u0432\u0435\u0442\u043e\u0432[\u044b\u043e]\u0435?\s+"
+    r"\u0443\u043a\u0430\u0437\u0430\u0442\u0435\u043b)",
+    re.IGNORECASE,
+)
+
+
+def _is_exit_sign(item: dict) -> bool:
+    """True when an item is an exit/evacuation indicator that must be
+    split by model in the VOR (T085).  Detection priority:
+      1. category in {luminaire_exit, exit_indicator, pictogram}
+      2. work_name / name matches MERCURY|ATOM|SIRAH|Пиктограмм|
+         Световые указатели (Russian "evacuation light pointer").
+    """
+    cat = (item.get("category") or "").lower()
+    if cat in _EXIT_SIGN_CATS:
+        return True
+    text = (item.get("work_name") or item.get("name") or "")
+    return bool(_EXIT_SIGN_NAME_RE.search(text))
+
+
 # ---------------------------------------------------------------------------
 # Row-key construction
 # ---------------------------------------------------------------------------
@@ -232,6 +263,19 @@ def _row_name(item: dict) -> str:
         route = (item.get("route") or "").strip()
         if bucket in _BUCKET_TEXT and route in _ROUTE_TEXT:
             return _cable_aggregate_name(route, bucket)
+    # T085: exit signs must keep model in name; never collapse to a
+    # bare "Montazh ... na vysote ..." header even when mount + bucket
+    # are both known.  This applies BEFORE the generic luminaire branch
+    # because exit-sign categories overlap with _LUMINAIRE_CATS.
+    if _is_exit_sign(item):
+        base = (item.get("work_name") or item.get("name") or "").strip()
+        if not base:
+            base = "(unnamed exit sign)"
+        base = _strip_existing_bucket(base)
+        bucket = (item.get("height_bucket") or "").strip()
+        if bucket and bucket != "unknown" and bucket in _BUCKET_TEXT:
+            base = base + " " + _BUCKET_TEXT[bucket]
+        return base
     if _is_luminaire(item):
         mount = (item.get("mount") or "").strip()
         bucket = (item.get("height_bucket") or "").strip()
