@@ -1,0 +1,8 @@
+=== СО-СО_01.pdf pages=1
+  p0 -> _render_so01_p00.png 2151x1521
+=== СО-СО_02.pdf pages=1
+  p0 -> _render_so02_p00.png 2151x1521
+=== СО-СО_03.pdf pages=1
+  p0 -> _render_so03_p00.png 2151x1521
+=== СО-СО_04.pdf pages=1
+  p0 -> _render_so04_p00.png 2151x1521
