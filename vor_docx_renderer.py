@@ -109,6 +109,137 @@ SECTION_RULES: list[tuple[str, list[re.Pattern]]] = [
 ]
 SECTION_OTHER = "Прочие работы"
 
+# ────────────────────────────────────────────────────────────────────────────
+# T087 — Группировка светильников по высотным интервалам
+# ────────────────────────────────────────────────────────────────────────────
+# Канонический порядок и подписи для bucket-ов высот.
+# Bucket-ключи совпадают со схемой height_bucketer.attribute_items
+# (`<5m`, `5-13m`, `13-20m`, `20-35m`, `unknown`). Подписи берутся из
+# эталонного ВОР ДБТ: «Монтаж светильников на шпильках к перекрытию
+# на высоте до 5 метров» и т.д.
+HEIGHT_BUCKET_ORDER: list[str] = ["<5m", "5-13m", "13-20m", "20-35m"]
+HEIGHT_BUCKET_HEADER_FMT = (
+    "Монтаж светильников на шпильках к перекрытию на высоте {phrase}"
+)
+HEIGHT_BUCKET_PHRASES: dict[str, str] = {
+    "<5m": "до 5 метров",
+    "5-13m": "от 5 до 13 метров",
+    "13-20m": "от 13 до 20 метров",
+    "20-35m": "от 20 до 35 метров",
+}
+HEIGHT_BUCKET_UNKNOWN = "unknown"
+
+# Раздел, для которого включается под-группировка по высотам.
+LUMINAIRE_SECTION_NAME = "Светотехническое оборудование"
+
+
+def _elevation_to_bucket(elev_str: str) -> str:
+    """Преобразовать «0.000» / «+4.200» / «+18.600» в bucket-ключ."""
+    if not elev_str:
+        return HEIGHT_BUCKET_UNKNOWN
+    try:
+        v = float(str(elev_str).replace(",", ".").lstrip("+"))
+    except (ValueError, AttributeError):
+        return HEIGHT_BUCKET_UNKNOWN
+    if v < 5.0:
+        return "<5m"
+    if v < 13.0:
+        return "5-13m"
+    if v < 20.0:
+        return "13-20m"
+    if v < 35.0:
+        return "20-35m"
+    return HEIGHT_BUCKET_UNKNOWN
+
+
+def _derive_height_bucket_from_elevations(per_elev: dict | None) -> str:
+    """Доминирующий bucket для строки, у которой формула разложена по отметкам.
+
+    per_elev: {"0.000": 14, "+4.200": 6, ...}. Если значения присутствуют в
+    нескольких bucket-ах — выбираем bucket с максимальным суммарным total.
+    """
+    if not per_elev or not isinstance(per_elev, dict):
+        return HEIGHT_BUCKET_UNKNOWN
+    bucket_sums: dict[str, float] = {}
+    for elev, qty in per_elev.items():
+        if elev == "__other__":
+            continue
+        try:
+            v = float(qty)
+        except (TypeError, ValueError):
+            continue
+        if v <= 0:
+            continue
+        bkt = _elevation_to_bucket(elev)
+        bucket_sums[bkt] = bucket_sums.get(bkt, 0.0) + v
+    if not bucket_sums:
+        return HEIGHT_BUCKET_UNKNOWN
+    # max by sum; tie-break by canonical order (lowest bucket wins).
+    best = max(
+        bucket_sums.items(),
+        key=lambda kv: (
+            kv[1],
+            -(HEIGHT_BUCKET_ORDER.index(kv[0])
+              if kv[0] in HEIGHT_BUCKET_ORDER else 99),
+        ),
+    )
+    return best[0]
+
+
+def _resolve_height_bucket(item: dict) -> str:
+    """Найти bucket для строки ВОР.
+
+    Приоритеты (forward-compat с будущим vor_compose):
+      1. item["_height_bucket"]      — если уже выставлено composer-ом.
+      2. item["height_bucket"]       — если осталось от сырых элементов.
+      3. derive_from_elevations(item["per_elevation"])  — из формулы по отметкам.
+      4. "unknown".
+    """
+    for key in ("_height_bucket", "height_bucket"):
+        v = item.get(key)
+        if v and isinstance(v, str) and v.strip():
+            return v.strip()
+    return _derive_height_bucket_from_elevations(item.get("per_elevation"))
+
+
+def _group_luminaires_by_height(
+    rows: list[dict],
+) -> list[tuple[str | None, list[dict]]]:
+    """Разбить список строк раздела на под-группы по bucket-у высоты.
+
+    Возвращает [(bucket_or_None, rows), ...] в каноническом порядке:
+      <5m → 5-13m → 13-20m → 20-35m → unknown(None).
+    Не светильники (строки, у которых имя не начинается со «Светильник»
+    или «Монтаж светильник» и т.п.) идут в bucket=None (без под-заголовка).
+    """
+    lum_pat = re.compile(
+        r"(?:^|\b)(?:монтаж\s+)?светил|светильник|световой\s+указат|"
+        r"эвакуац|\bвыход\b",
+        re.IGNORECASE,
+    )
+    buckets: dict[str, list[dict]] = {b: [] for b in HEIGHT_BUCKET_ORDER}
+    unknown_lum: list[dict] = []
+    non_lum: list[dict] = []
+    for r in rows:
+        nm = str(r.get("name") or "")
+        if not lum_pat.search(nm):
+            non_lum.append(r)
+            continue
+        b = _resolve_height_bucket(r)
+        if b in buckets:
+            buckets[b].append(r)
+        else:
+            unknown_lum.append(r)
+    out: list[tuple[str | None, list[dict]]] = []
+    for b in HEIGHT_BUCKET_ORDER:
+        if buckets[b]:
+            out.append((b, buckets[b]))
+    if unknown_lum:
+        out.append((HEIGHT_BUCKET_UNKNOWN, unknown_lum))
+    if non_lum:
+        out.append((None, non_lum))
+    return out
+
 
 def _classify_section(name: str) -> str:
     """Определить раздел ВОР по наименованию работы."""
@@ -266,10 +397,31 @@ def render_vor_docx(
 
     # 3. Таблица
     grouped = group_by_sections(aggregated)
-    total_data_rows = sum(len(rows) for _, rows in grouped)
+
+    # T087: для раздела «Светотехническое оборудование» дополнительно
+    # разбиваем строки на под-группы по высотным интервалам и добавляем
+    # bold-параграф (строку-разделитель) перед каждой под-группой.
+    # Поэтому plan-строки таблицы считаем с учётом sub-headers.
+    luminaire_subgroups: dict[int, list[tuple[str | None, list[dict]]]] = {}
     total_section_rows = len(grouped)
+    total_data_rows = 0
+    total_sub_header_rows = 0
+    for gi, (section_name, items) in enumerate(grouped):
+        if section_name == LUMINAIRE_SECTION_NAME:
+            subgroups = _group_luminaires_by_height(items)
+            luminaire_subgroups[gi] = subgroups
+            for bucket, rows in subgroups:
+                # sub-header только для именованных bucket-ов
+                if bucket in HEIGHT_BUCKET_PHRASES:
+                    total_sub_header_rows += 1
+                total_data_rows += len(rows)
+        else:
+            total_data_rows += len(items)
+
     # +1 шапка, +1 нумерация колонок
-    total_rows = 2 + total_section_rows + total_data_rows
+    total_rows = (
+        2 + total_section_rows + total_sub_header_rows + total_data_rows
+    )
 
     tbl = doc.add_table(rows=total_rows, cols=len(COL_HEADERS))
     tbl.style = "Table Grid"
@@ -288,47 +440,62 @@ def render_vor_docx(
     row_idx = 2
     item_no = 0  # сквозная нумерация по эталону
 
-    for section_name, items in grouped:
-        # строка-разделитель раздела (bold во 2-й колонке, остальные пустые)
+    def _write_section_row(text: str) -> None:
+        """Записать строку-разделитель (bold во 2-й колонке)."""
+        nonlocal row_idx
         for ci in range(len(COL_HEADERS)):
             cell = tbl.rows[row_idx].cells[ci]
             if ci == 1:
-                _set_cell_text(cell, section_name, bold=True)
+                _set_cell_text(cell, text, bold=True)
             else:
                 _set_cell_text(cell, "")
             _set_cell_borders(cell)
         row_idx += 1
 
-        for it in items:
-            item_no += 1
-            name = str(it.get("name", "")).strip()
-            unit = str(it.get("unit", "шт")).strip()
-            total = it.get("total", 0)
-            formula = str(it.get("formula", "")).strip()
-            drawing_refs = str(it.get("drawing_refs", "")).strip()
-            extra = str(it.get("extra_info", "")).strip()
+    def _write_data_row(it: dict) -> None:
+        """Записать строку данных ВОР."""
+        nonlocal row_idx, item_no
+        item_no += 1
+        name = str(it.get("name", "")).strip()
+        unit = str(it.get("unit", "шт")).strip()
+        total = it.get("total", 0)
+        formula = str(it.get("formula", "")).strip()
+        drawing_refs = str(it.get("drawing_refs", "")).strip()
+        extra = str(it.get("extra_info", "")).strip()
+        ref_text = _format_drawing_ref(drawing_refs, drawing_prefix)
+        cells_text = [
+            str(item_no),
+            name,
+            unit,
+            _fmt_qty(total),
+            formula if formula and formula != _fmt_qty(total) else "",
+            ref_text,
+            extra,
+        ]
+        for ci, text in enumerate(cells_text):
+            cell = tbl.rows[row_idx].cells[ci]
+            align = None
+            if ci in (0, 2, 3):
+                align = WD_ALIGN_PARAGRAPH.CENTER
+            _set_cell_text(cell, text, align=align)
+            _set_cell_borders(cell)
+        row_idx += 1
 
-            # Очистить «Монтаж » префикс если есть, но оставить как есть для соответствия
-            # Привести ссылку на чертежи к шифру проекта
-            ref_text = _format_drawing_ref(drawing_refs, drawing_prefix)
-
-            cells_text = [
-                str(item_no),
-                name,
-                unit,
-                _fmt_qty(total),
-                formula if formula and formula != _fmt_qty(total) else "",
-                ref_text,
-                extra,
-            ]
-            for ci, text in enumerate(cells_text):
-                cell = tbl.rows[row_idx].cells[ci]
-                align = None
-                if ci in (0, 2, 3):
-                    align = WD_ALIGN_PARAGRAPH.CENTER
-                _set_cell_text(cell, text, align=align)
-                _set_cell_borders(cell)
-            row_idx += 1
+    for gi, (section_name, items) in enumerate(grouped):
+        # Section header row.
+        _write_section_row(section_name)
+        if gi in luminaire_subgroups:
+            # T087: emit под-разделы по высоте.
+            for bucket, rows in luminaire_subgroups[gi]:
+                if bucket in HEIGHT_BUCKET_PHRASES:
+                    phrase = HEIGHT_BUCKET_PHRASES[bucket]
+                    sub_header = HEIGHT_BUCKET_HEADER_FMT.format(phrase=phrase)
+                    _write_section_row(sub_header)
+                for it in rows:
+                    _write_data_row(it)
+        else:
+            for it in items:
+                _write_data_row(it)
 
     _set_col_widths(tbl, COL_WIDTHS_CM)
 
