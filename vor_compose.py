@@ -127,6 +127,37 @@ def _is_tray(item: dict) -> bool:
     return (item.get("category") or "").lower() in _TRAY_CATS
 
 
+# T085: exit-sign-specific categories.  These are formally luminaires
+# (they live in _LUMINAIRE_CATS for sheet-ref purposes) but the
+# reference VOR enumerates them as separate rows PER MODEL ("MERCURY
+# LED Ex 20W DLW", "ATOM 6500-3 LED SP AT FP", "Pictogramma Vykhod")
+# rather than collapsing them under a per-mount installation header.
+# We treat any item whose category is one of these -- OR whose
+# work_name carries an exit-sign marker -- as model-keyed regardless
+# of mount/bucket alignment, so _row_name never erases the model.
+_EXIT_SIGN_CATS = {"luminaire_exit", "exit_indicator", "pictogram"}
+_EXIT_SIGN_NAME_RE = re.compile(
+    r"(MERCURY|ATOM|SIRAH|\u041f\u0438\u043a\u0442\u043e\u0433\u0440\u0430\u043c\u043c|"
+    r"\u0421\u0432\u0435\u0442\u043e\u0432[\u044b\u043e]\u0435?\s+"
+    r"\u0443\u043a\u0430\u0437\u0430\u0442\u0435\u043b)",
+    re.IGNORECASE,
+)
+
+
+def _is_exit_sign(item: dict) -> bool:
+    """True when an item is an exit/evacuation indicator that must be
+    split by model in the VOR (T085).  Detection priority:
+      1. category in {luminaire_exit, exit_indicator, pictogram}
+      2. work_name / name matches MERCURY|ATOM|SIRAH|Пиктограмм|
+         Световые указатели (Russian "evacuation light pointer").
+    """
+    cat = (item.get("category") or "").lower()
+    if cat in _EXIT_SIGN_CATS:
+        return True
+    text = (item.get("work_name") or item.get("name") or "")
+    return bool(_EXIT_SIGN_NAME_RE.search(text))
+
+
 # ---------------------------------------------------------------------------
 # Row-key construction
 # ---------------------------------------------------------------------------
@@ -232,6 +263,19 @@ def _row_name(item: dict) -> str:
         route = (item.get("route") or "").strip()
         if bucket in _BUCKET_TEXT and route in _ROUTE_TEXT:
             return _cable_aggregate_name(route, bucket)
+    # T085: exit signs must keep model in name; never collapse to a
+    # bare "Montazh ... na vysote ..." header even when mount + bucket
+    # are both known.  This applies BEFORE the generic luminaire branch
+    # because exit-sign categories overlap with _LUMINAIRE_CATS.
+    if _is_exit_sign(item):
+        base = (item.get("work_name") or item.get("name") or "").strip()
+        if not base:
+            base = "(unnamed exit sign)"
+        base = _strip_existing_bucket(base)
+        bucket = (item.get("height_bucket") or "").strip()
+        if bucket and bucket != "unknown" and bucket in _BUCKET_TEXT:
+            base = base + " " + _BUCKET_TEXT[bucket]
+        return base
     if _is_luminaire(item):
         mount = (item.get("mount") or "").strip()
         bucket = (item.get("height_bucket") or "").strip()
@@ -342,6 +386,95 @@ def _detect_duplicate_floor_plans(pdf_names: list[str]) -> set[str]:
     return skip
 
 
+# T086: drawing-family winner-pick for CABLE / TRAY / CONDUIT items.
+#
+# Background: a single building elevation appears on up to three
+# parallel drawing families in the source corpus:
+#
+#   * "Plany osveshcheniya"  (005-Plany osveshchenia-otm. ...)
+#         shows light fixtures + their feeding routes
+#   * "Plan privyazki"       (012-Plan privyazki na otm. ...)
+#         shows physical anchoring of those same routes
+#   * "Lotki"                (019-Lotki na otm. ...)
+#         shows the cable tray that physically contains them
+#
+# Each of the three lists the same physical cable raceway runs ("Kabel'naya
+# trassa rabochego/avarijnogo osveshcheniya") with overlapping but slightly
+# different metre counts.  Pre-T086 the composer summed all three views,
+# producing ~17.3 km of cable across all elevations vs the spec's ~10.2
+# km -- a +70% overcount that boss reported as "extra ~6500 m".
+#
+# Winner-pick rule (per .tayfa/common/discussions/T086_findings.md):
+#
+#   Lotki > Osveshcheniya > Privyazki
+#
+# For each elevation, the highest-priority family present "owns" the
+# cable / tray / conduit qty.  Items in lower-priority families at the
+# same elevation are skipped from cable-pass aggregation.  Items whose
+# elevation cannot be parsed from the filename (e.g. summary sheets)
+# pass through unchanged.
+_CABLE_FAMILY_PRIORITY = ("lotki", "osveshcheniya", "privyazki")
+_LOTKI_TOKEN = "\u043b\u043e\u0442\u043a"           # "lotk"
+_PRIVYAZK_TOKEN = "\u043f\u0440\u0438\u0432\u044f\u0437\u043a"        # "privyazk"
+_PRIVYAZK_TYPO = "\u043f\u0440\u0438\u044f\u0432\u044f\u0437\u043a"   # "priyavyaz" typo
+_OSVESH_TOKEN = "\u043e\u0441\u0432\u0435\u0449\u0435\u043d\u0438"    # "osveshcheni"
+
+
+def _pdf_drawing_family(pdf_name: str) -> str | None:
+    """Classify a PDF filename into a cable-drawing family.
+
+    Returns one of "lotki" / "osveshcheniya" / "privyazki" / None.
+    The order of checks matters because "Lotki" PDFs do NOT contain
+    "osveshcheni" or "privyazk" substrings, while the inverse is true.
+    """
+    lower = (pdf_name or "").lower()
+    if _LOTKI_TOKEN in lower:
+        return "lotki"
+    if _PRIVYAZK_TOKEN in lower or _PRIVYAZK_TYPO in lower:
+        return "privyazki"
+    if _OSVESH_TOKEN in lower:
+        return "osveshcheniya"
+    return None
+
+
+def _detect_duplicate_cable_plans(pdf_names: list[str]) -> set[str]:
+    """Find PDFs whose cable layer is superseded by a higher-priority
+    drawing at the same elevation.
+
+    For each floor mark we keep the highest-priority family present
+    (Lotki > Osveshcheniya > Privyazki) and skip cable items from the
+    lower-priority copies.  Returns the set of pdf_name strings to
+    suppress for cable / tray / conduit row aggregation only -- piece
+    counts continue to use _detect_duplicate_floor_plans rules.
+    """
+    by_mark: dict[str, dict[str, str]] = {}
+    for nm in pdf_names:
+        mark = _floor_mark(nm)
+        if not mark:
+            continue
+        fam = _pdf_drawing_family(nm)
+        if fam is None:
+            continue
+        # Keep the first PDF seen in each (mark, family) slot.  Multiple
+        # PDFs of the same family at the same elevation are unusual but
+        # safe to leave unfiltered -- the row-key dedup downstream will
+        # collapse identical rows.
+        by_mark.setdefault(mark, {}).setdefault(fam, nm)
+    skip: set[str] = set()
+    for mark, group in by_mark.items():
+        winner_fam: str | None = None
+        for fam in _CABLE_FAMILY_PRIORITY:
+            if fam in group:
+                winner_fam = fam
+                break
+        if winner_fam is None:
+            continue
+        for fam, pdf in group.items():
+            if fam != winner_fam:
+                skip.add(pdf)
+    return skip
+
+
 def compose_vor_table(items_per_pdf: dict[str, list[dict]]) -> list[dict]:
     """Compose the VOR_table from a {pdf_label: items_list} map.
 
@@ -373,9 +506,17 @@ def compose_vor_table(items_per_pdf: dict[str, list[dict]]) -> list[dict]:
     # include parallel layers ("Plany osveshcheniya" + "Plan privyazki"
     # at the same +N.NNN mark) that each show all fixtures.  When two
     # PDFs cover the same floor, prefer the "privyazka" plan as the
-    # authoritative piece-count source.  Cables stay summed across all
-    # PDFs because each cable run only appears on one plan.
+    # authoritative piece-count source.
     skip_pdfs_for_pieces = _detect_duplicate_floor_plans(
+        list(items_per_pdf.keys())
+    )
+    # T086: drawing-family winner-pick for cable / tray / conduit
+    # items.  Lotki > Osveshcheniya > Privyazki at each elevation
+    # (see _detect_duplicate_cable_plans for rationale).  The pre-T086
+    # composer summed all three views and produced ~17 km cable across
+    # all elevations vs the ~10 km spec target.  Piece-count items
+    # continue to follow the original floor-plan rule above.
+    skip_pdfs_for_cables = _detect_duplicate_cable_plans(
         list(items_per_pdf.keys())
     )
 
@@ -383,14 +524,23 @@ def compose_vor_table(items_per_pdf: dict[str, list[dict]]) -> list[dict]:
         if not items:
             continue
         is_duplicate_pieces = pdf_label in skip_pdfs_for_pieces
+        is_duplicate_cables = pdf_label in skip_pdfs_for_cables
         for item in items:
             qty = _qty(item)
             if qty <= 0:
                 continue
             # Skip piece-counted items from duplicate floor-plan PDFs.
-            # Cables / trays / conduits still pass through because
-            # those run-length items only appear on one plan.
+            # Cables / trays / conduits get their OWN family-priority
+            # filter below; they don't reuse the piece-count rule.
             if is_duplicate_pieces and not (
+                _is_cable(item) or _is_tray(item) or _is_conduit(item)
+            ):
+                continue
+            # T086: skip cable / tray / conduit items from lower-priority
+            # drawing-family PDFs at the same elevation.  Piece items at
+            # the same PDF still flow through (they hit the piece-rule
+            # above, not this one).
+            if is_duplicate_cables and (
                 _is_cable(item) or _is_tray(item) or _is_conduit(item)
             ):
                 continue

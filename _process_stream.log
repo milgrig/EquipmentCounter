@@ -1,0 +1,36 @@
+event: start
+data: {"total": 32, "folder": "ДБТ разделы для ИИ/03_ГПК_/3-я захватка/02_PDF"}
+
+event: progress
+data: {"current": 1, "total": 32, "filename": "001-Общие данные начало.pdf"}
+
+event: file_done
+data: {"filename": "001-Общие данные начало.pdf", "items": 2, "status": "ok"}
+
+event: progress
+data: {"current": 2, "total": 32, "filename": "002-Общие данные окончание.pdf"}
+
+event: file_done
+data: {"filename": "002-Общие данные окончание.pdf", "items": 2, "status": "ok"}
+
+event: progress
+data: {"current": 3, "total": 32, "filename": "003 - Схемы ЩО, ЩАО-ЩО-3.pdf"}
+
+event: file_done
+data: {"filename": "003 - Схемы ЩО, ЩАО-ЩО-3.pdf", "items": 3, "status": "ok"}
+
+event: progress
+data: {"current": 4, "total": 32, "filename": "004 - Схемы ЩО, ЩАО-ЩАО-3.pdf"}
+
+event: file_done
+data: {"filename": "004 - Схемы ЩО, ЩАО-ЩАО-3.pdf", "items": 1, "status": "ok"}
+
+event: progress
+data: {"current": 5, "total": 32, "filename": "004.1- Схемы ЩО, ЩАО-ЦСАО.pdf"}
+
+event: file_done
+data: {"filename": "004.1- Схемы ЩО, ЩАО-ЦСАО.pdf", "items": 5, "status": "ok"}
+
+event: progress
+data: {"current": 6, "total": 32, "filename": "005-Планы освещения-отм. 0.000.pdf"}
+

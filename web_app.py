@@ -610,12 +610,39 @@ def _aggregate_equipment(results: dict[str, list[dict]]) -> list[dict]:
     import re
     agg: dict[tuple, dict] = {}  # (key, bucket, route, mount) -> {...}
 
+    # T088: strip [UNMATCHED-LEGEND] prefix BEFORE aggregation so that
+    # matched and unmatched variants of the same luminaire model merge
+    # into one row instead of producing two split rows per model.
+    # Idempotent + case-insensitive; mirrors the strip already applied at
+    # render time (T078) but applied earlier so the aggregation key
+    # collapses correctly.
+    _UNMATCHED_LEGEND_RE = re.compile(r"\[UNMATCHED-LEGEND\]\s*", re.IGNORECASE)
+    # T088: also collapse "Монтаж светильника Светильник X"
+    # → "Монтаж светильника X".  This pattern arises because matched
+    # items have work_name="Монтаж светильника <X>" while [UNMATCHED]
+    # items fall back to raw_name="Светильник <X>"; after stripping the
+    # [UNMATCHED-LEGEND] tag the work-name prefix gets re-prepended
+    # downstream and produces the doubled "Монтаж светильника Светильник".
+    # Collapsing here lets the matched and unmatched paths produce the
+    # same aggregation key.
+    _DOUBLED_LUM_RE = re.compile(
+        r"^(Монтаж\s+светильника)\s+Светильник\s+",
+        re.IGNORECASE,
+    )
+
+    def _strip_unmatched(s: str) -> str:
+        if not s:
+            return s
+        out = _UNMATCHED_LEGEND_RE.sub("", s).strip()
+        out = _DOUBLED_LUM_RE.sub(r"\1 ", out).strip()
+        return out
+
     for filename, items in results.items():
         drawing_ref = filename.replace(".pdf", "")
         for item in items:
             # Prefer work_name for VOR display; fall back to name
-            work_name = item.get("work_name", "").strip()
-            raw_name = item.get("name", "").strip()
+            work_name = _strip_unmatched(item.get("work_name", "").strip())
+            raw_name = _strip_unmatched(item.get("name", "").strip())
             display_name = work_name or raw_name
             if not display_name:
                 continue
@@ -636,7 +663,9 @@ def _aggregate_equipment(results: dict[str, list[dict]]) -> list[dict]:
             key = (key_name, height_bucket, route, mount)
             if key not in agg:
                 # equipment_name is the original name from PDF legend
-                equip_name = item.get("equipment_name", raw_name)
+                equip_name = _strip_unmatched(
+                    item.get("equipment_name", raw_name)
+                )
                 agg[key] = {
                     "name": display_name, "unit": unit, "total": 0,
                     "per_file": {}, "files": [],
@@ -652,7 +681,9 @@ def _aggregate_equipment(results: dict[str, list[dict]]) -> list[dict]:
                 if equip_name:
                     agg[key]["equipment_names"].add(equip_name)
             else:
-                equip_name = item.get("equipment_name", raw_name)
+                equip_name = _strip_unmatched(
+                    item.get("equipment_name", raw_name)
+                )
                 if equip_name:
                     agg[key]["equipment_names"].add(equip_name)
                 # Scalar projection: take first non-empty value seen.
