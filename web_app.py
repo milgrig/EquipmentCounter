@@ -37,6 +37,10 @@ from pdf_legend_parser import parse_legend, LegendResult
 from pdf_count_text import count_symbols
 from pdf_count_cables import extract_cables
 from pdf_count_geometry import measure_cables
+from cable_length import measure_cable_lengths_raster
+import height_bucketer
+import route_classifier
+import thickness_extractor
 from pdf_count_visual import match_symbols, detect_pictograms, _extract_symbol_images, build_equipment_cluster_bboxes
 from vor_work_mapping import map_items as vor_map_items
 from legend_validator import validate_legend_symbols
@@ -592,9 +596,19 @@ def _aggregate_equipment(results: dict[str, list[dict]]) -> list[dict]:
     Uses 'work_name' (VOR work description) for aggregation if available,
     falling back to 'name'. Preserves 'equipment_name' (original equipment
     name from the PDF legend) for the 'Доп. информация' column.
+
+    T081 (S019-wire-attrs): preserves six attribute fields populated by
+    Steps 8-10 (height_bucketer / route_classifier / thickness_extractor)
+    so the downstream vor_compose.compose_vor_table can split rows by
+    installation context.  KB-008: agg key is extended from name only to
+    (name, height_bucket, route, mount) so that the same legend name
+    appearing on different floor elevations or routes is NOT silently
+    merged into one row.  Scalar fields (cross_section / section_mm2 /
+    diameter_mm) are projected as the first non-empty value seen because
+    they describe the cable kind, not the installation context.
     """
     import re
-    agg: dict[str, dict] = {}  # normalized_key -> {...}
+    agg: dict[tuple, dict] = {}  # (key, bucket, route, mount) -> {...}
 
     for filename, items in results.items():
         drawing_ref = filename.replace(".pdf", "")
@@ -605,11 +619,21 @@ def _aggregate_equipment(results: dict[str, list[dict]]) -> list[dict]:
             display_name = work_name or raw_name
             if not display_name:
                 continue
-            key = re.sub(r"\s+", " ", display_name).strip().lower()
+            key_name = re.sub(r"\s+", " ", display_name).strip().lower()
             total = item.get("total", item.get("count", 0) + item.get("count_ae", 0))
             unit = item.get("unit", "шт")
             if total <= 0:
                 continue
+            # T081: extract 6 attribute fields populated by Steps 8-10.
+            height_bucket = item.get("height_bucket") or None
+            route = item.get("route") or None
+            mount = item.get("mount") or None
+            cross_section = item.get("cross_section") or None
+            section_mm2 = item.get("section_mm2")
+            diameter_mm = item.get("diameter_mm")
+            # KB-008: agg key includes attribute context so same-name-
+            # different-bucket/route/mount rows are not merged.
+            key = (key_name, height_bucket, route, mount)
             if key not in agg:
                 # equipment_name is the original name from PDF legend
                 equip_name = item.get("equipment_name", raw_name)
@@ -617,6 +641,13 @@ def _aggregate_equipment(results: dict[str, list[dict]]) -> list[dict]:
                     "name": display_name, "unit": unit, "total": 0,
                     "per_file": {}, "files": [],
                     "equipment_names": set(),
+                    # T081: preserved attribute context
+                    "height_bucket": height_bucket,
+                    "route": route,
+                    "mount": mount,
+                    "cross_section": cross_section,
+                    "section_mm2": section_mm2,
+                    "diameter_mm": diameter_mm,
                 }
                 if equip_name:
                     agg[key]["equipment_names"].add(equip_name)
@@ -624,6 +655,13 @@ def _aggregate_equipment(results: dict[str, list[dict]]) -> list[dict]:
                 equip_name = item.get("equipment_name", raw_name)
                 if equip_name:
                     agg[key]["equipment_names"].add(equip_name)
+                # Scalar projection: take first non-empty value seen.
+                if not agg[key].get("cross_section") and cross_section:
+                    agg[key]["cross_section"] = cross_section
+                if agg[key].get("section_mm2") in (None, 0) and section_mm2:
+                    agg[key]["section_mm2"] = section_mm2
+                if agg[key].get("diameter_mm") in (None, 0) and diameter_mm:
+                    agg[key]["diameter_mm"] = diameter_mm
             agg[key]["total"] += total
             agg[key]["per_file"][drawing_ref] = agg[key]["per_file"].get(drawing_ref, 0) + total
             if drawing_ref not in agg[key]["files"]:
@@ -641,6 +679,15 @@ def _aggregate_equipment(results: dict[str, list[dict]]) -> list[dict]:
             "total": info["total"], "formula": formula,
             "drawing_refs": ", ".join(info["files"]),
             "extra_info": extra_info,
+            # T081: project preserved attributes to output rows so
+            # vor_compose.compose_vor_table and downstream renderers
+            # can group/split by installation context.
+            "height_bucket": info.get("height_bucket"),
+            "route": info.get("route"),
+            "mount": info.get("mount"),
+            "cross_section": info.get("cross_section"),
+            "section_mm2": info.get("section_mm2"),
+            "diameter_mm": info.get("diameter_mm"),
         })
     return result
 
@@ -927,6 +974,231 @@ def extract_luminaire_heights(pdf_path: str) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# T058 / B051: Reverse label -> legend channel
+# ---------------------------------------------------------------------------
+# T057 recon established that on-drawing engineer labels (e.g. PU6, PU7
+# for "Post upravleniya"; SHO3-Gr.15 for working-lighting groups) are
+# stored as pdfplumber chars with explicit non-default non_stroking_color
+# (blue (0,0,1) for working circuits, red (1,0,0) for emergency).  These
+# labels never reach the equipment count because:
+#   - Phase 2 (count_symbols) only looks for the legend symbol token.
+#   - Phase 3 (match_symbols) needs a distinct glyph in the legend.
+#   - Phase 5 (extract_cables) only catches cable schedule entries.
+# This helper extracts those colored labels, groups char-level data into
+# words, classifies each word into a recognised label family (PU\d+,
+# VKL, POST, etc.), then fuzzy-matches the label text against the
+# descriptions of legend rows that NO producer stage has covered yet.
+# When a match scores above threshold, all labels in that group are
+# attributed to the matched legend index.
+
+_REVERSE_BLUE_RGB = (0.0, 0.0, 1.0)
+_REVERSE_RED_RGB = (1.0, 0.0, 0.0)
+_REVERSE_COLOR_TOL = 0.05  # tuples are exact in this corpus, give tiny slack
+# Tight regex for short labels that map back to legend equipment.
+# - PU\d+  : control post (Cyrillic Pe-U + digit)
+# - VKL\d* : switch ("VKL" = vyklyuchatel in Cyrillic)
+# - POST   : standalone POST keyword
+# - PULT\w*: pult control
+# - DV\d+  : motion sensor / DataVid family
+_REVERSE_EQUIP_LABEL_RE = re_mod.compile(
+    r"^("
+    r"\u041f\u0423\d+"       # PU<n>
+    r"|\u0412\u041a\u041b\d*"  # VKL[<n>]
+    r"|\u041f\u041e\u0421\u0422"  # POST
+    r"|\u041f\u0423\u041b\u042c\w*"  # PULT...
+    r"|\u0414\u0412\d+"      # DV<n>
+    r")$"
+)
+# Threshold for fuzzy match between label/keyword and legend description.
+# Tuned from T057 recon: "PU" vs "Post upravleniya rabochim osveshcheniem"
+# token_set_ratio is ~38; we use a keyword-tag lookup table instead so the
+# threshold here is the secondary fallback for plain-text labels.
+_REVERSE_FUZZY_THRESHOLD = 65
+
+# Label -> legend-description keyword hint table.  Each label family is
+# tied to a set of Cyrillic keywords that MUST appear in the legend
+# description for the match to be considered.  This prevents PU<n>
+# matching any legend that happens to fuzzy-score high.
+_REVERSE_LABEL_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "PU":   ("\u043f\u043e\u0441\u0442", "\u0443\u043f\u0440\u0430\u0432\u043b"),   # post + upravlen
+    "VKL":  ("\u0432\u044b\u043a\u043b\u044e\u0447\u0430\u0442\u0435\u043b",),       # vyklyuchatel
+    "POST": ("\u043f\u043e\u0441\u0442",),                                            # post
+    "PULT": ("\u043f\u0443\u043b\u044c\u0442",),                                      # pult
+    "DV":   ("\u0434\u0430\u0442\u0447\u0438\u043a",),                                # datchik (sensor)
+}
+
+
+def _reverse_label_family(text: str) -> str | None:
+    """Map a label string like 'PU7' to its family key ('PU', 'VKL', ...)."""
+    if not text:
+        return None
+    # Strip trailing digits to get family stem
+    stem = re_mod.sub(r"\d+$", "", text)
+    stem_upper = stem.upper()
+    # Cyrillic -> Latin equivalent mapping for stems we care about
+    cyr_to_lat = {
+        "\u041f\u0423": "PU",
+        "\u0412\u041a\u041b": "VKL",
+        "\u041f\u041e\u0421\u0422": "POST",
+        "\u041f\u0423\u041b\u042c": "PULT",
+        "\u0414\u0412": "DV",
+    }
+    return cyr_to_lat.get(stem_upper) or (stem_upper if stem_upper in _REVERSE_LABEL_KEYWORDS else None)
+
+
+def _reverse_extract_colored_words(pdf_path: str, page_index: int) -> list[dict]:
+    """Read pdfplumber chars on the given page and return word-level groups
+    that have a non-default non_stroking_color (blue or red).
+
+    Output dict shape: {text, x0, y0, x1, y1, color, family}.
+    """
+    out: list[dict] = []
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            if page_index >= len(pdf.pages):
+                return out
+            page = pdf.pages[page_index]
+            chars = page.chars or []
+    except Exception:
+        return out
+
+    def _is_target_color(c) -> bool:
+        col = c.get("non_stroking_color")
+        if col is None:
+            return False
+        # pdfplumber returns either a tuple of length 1 (gray), 3 (RGB)
+        # or 4 (CMYK).  We only care about RGB blue/red.
+        if not isinstance(col, (tuple, list)) or len(col) != 3:
+            return False
+        cb = tuple(round(float(v), 4) for v in col)
+        for target in (_REVERSE_BLUE_RGB, _REVERSE_RED_RGB):
+            if all(abs(cb[i] - target[i]) <= _REVERSE_COLOR_TOL for i in range(3)):
+                return True
+        return False
+
+    colored = [c for c in chars if _is_target_color(c)]
+    if not colored:
+        return out
+
+    # Group chars to words: y-snap line clustering then x-gap word splitting
+    from collections import defaultdict
+    y_snap = 1.5
+    gap_factor = 0.55
+    lines: dict[float, list[dict]] = defaultdict(list)
+    for c in colored:
+        ykey = round(float(c.get("y0", 0)) / y_snap) * y_snap
+        lines[ykey].append(c)
+
+    for _, line_chars in lines.items():
+        line_chars.sort(key=lambda x: float(x.get("x0", 0)))
+        cur: list[dict] = []
+
+        def _flush(buf: list[dict]):
+            if not buf:
+                return
+            text = "".join(str(cc.get("text", "")) for cc in buf)
+            bx0 = min(float(cc.get("x0", 0)) for cc in buf)
+            bx1 = max(float(cc.get("x1", 0)) for cc in buf)
+            by0 = min(float(cc.get("y0", 0)) for cc in buf)
+            by1 = max(float(cc.get("y1", 0)) for cc in buf)
+            col = buf[0].get("non_stroking_color")
+            out.append({
+                "text": text,
+                "x0": bx0, "y0": by0, "x1": bx1, "y1": by1,
+                "color": tuple(round(float(v), 4) for v in col) if col else None,
+                "family": _reverse_label_family(text),
+            })
+
+        for c in line_chars:
+            if cur:
+                last_x1 = float(cur[-1].get("x1", 0))
+                size = float(c.get("size", 6) or 6)
+                gap_thresh = size * gap_factor
+                if (float(c.get("x0", 0)) - last_x1) > gap_thresh:
+                    _flush(cur)
+                    cur = []
+            cur.append(c)
+        _flush(cur)
+
+    return out
+
+
+def _reverse_match_labels_to_legend(
+    words: list[dict],
+    legend_items,
+    covered_idx: set[int],
+) -> dict[int, list[dict]]:
+    """For each colored word that classifies as an equipment label,
+    find the best uncovered legend index whose description contains the
+    label-family's keyword set.  Returns idx -> list of label dicts.
+    """
+    result: dict[int, list[dict]] = {}
+    if not words or not legend_items:
+        return result
+
+    # Try rapidfuzz, fall back to difflib if not installed
+    try:
+        from rapidfuzz import fuzz as _fuzz
+        def _score(a: str, b: str) -> float:
+            return _fuzz.token_set_ratio(a, b)
+    except Exception:
+        import difflib
+        def _score(a: str, b: str) -> float:
+            return difflib.SequenceMatcher(None, a, b).ratio() * 100.0
+
+    for word in words:
+        text = (word.get("text") or "").strip()
+        family = word.get("family")
+        if not text or not family:
+            continue
+        # Tight regex guard: only match exact equip-label forms,
+        # excluding e.g. legend footnote 'PUE p.1.1.29' substrings.
+        if not _REVERSE_EQUIP_LABEL_RE.match(text):
+            continue
+        keywords = _REVERSE_LABEL_KEYWORDS.get(family, ())
+        if not keywords:
+            continue
+
+        # Primary gate: ALL keywords for this family must appear in the
+        # legend description (Cyrillic substring check).  When that holds
+        # we accept the smallest matching idx; the fuzzy score below is
+        # used only to disambiguate when MULTIPLE uncovered legend rows
+        # satisfy the keyword test (e.g. several variants of "switch"
+        # rows for a VKL\d+ label).
+        candidates: list[tuple[int, float]] = []
+        for idx, item in enumerate(legend_items):
+            if idx in covered_idx:
+                continue
+            desc = (item.description or "").strip()
+            if not desc:
+                continue
+            desc_lower = desc.lower()
+            if not all(kw in desc_lower for kw in keywords):
+                continue
+            # Secondary fuzzy score on the legend description against
+            # itself + keyword block (deterministic tie-breaker).
+            kw_blob = " ".join(keywords)
+            score = _score(kw_blob, desc_lower)
+            candidates.append((idx, score))
+
+        if candidates:
+            # Pick the highest-scoring candidate; ties broken by lowest idx.
+            candidates.sort(key=lambda t: (-t[1], t[0]))
+            best_idx, best_score = candidates[0]
+            result.setdefault(best_idx, []).append({
+                "text": text,
+                "x0": word.get("x0"),
+                "y0": word.get("y0"),
+                "x1": word.get("x1"),
+                "y1": word.get("y1"),
+                "family": family,
+                "score": round(best_score, 1),
+            })
+
+    return result
+
+
 def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
     """Run legend extraction + counting methods on a single PDF.
 
@@ -956,6 +1228,12 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
     has_legend = bool(legend_result.items)
 
     items: list[dict] = []
+    # T054 / KB-015: track which legend indices reached output so we can
+    # emit an [UNMATCHED-LEGEND] warning row for any item that no
+    # producer stage covered.  Without this audit, symbol-less legend
+    # rows (switches, posts, cable trasses) are silently dropped — the
+    # exact failure mode reported as B048 on 007-Plans osvescheniya PDF.
+    covered_legend_idx: set[int] = set()
 
     # Step 2-4: legend-based equipment counting (skip if no legend found)
     if has_legend:
@@ -1066,6 +1344,7 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
                 "count_ae": 0,
                 "total": count,
             })
+            covered_legend_idx.add(idx)
 
     # Step 4b: detect pictograms — text labels like "ВЫХОД" on the drawing
     # that have no legend entry and no visual template (T149).
@@ -1166,8 +1445,188 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
         except Exception as exc:
             log.warning("Geometric measurement failed for %s: %s", pdf_path, exc)
 
+    # Step 6a (T058 / B051): reverse label -> legend channel.
+    # Extract colored on-drawing labels (blue PU<n>, VKL, POST etc.) via
+    # pdfplumber chars and match each label family to the descriptions of
+    # legend rows that are still UNCOVERED after the earlier stages.
+    # Marks the matched legend idx as covered so the [UNMATCHED-LEGEND]
+    # audit below does NOT also flag them.  See T057 recon for the
+    # color/encoding evidence on 007-Plans osvescheniya PDF.
+    if has_legend:
+        try:
+            colored_words = _reverse_extract_colored_words(
+                pdf_path, legend_result.page_index,
+            )
+            label_groups = _reverse_match_labels_to_legend(
+                colored_words, legend_result.items, covered_legend_idx,
+            )
+            for idx, labels in label_groups.items():
+                item = legend_result.items[idx]
+                qty = len(labels)
+                items.append({
+                    "symbol": (item.symbol or ""),
+                    "name": item.description or "",
+                    "count": qty,
+                    "count_ae": 0,
+                    "total": qty,
+                    "unit": "шт",
+                    "category": "reverse_label_match",
+                    "source": "reverse_label_match",
+                })
+                covered_legend_idx.add(idx)
+                log.info(
+                    "reverse_label_match idx=%d desc=%r qty=%d family=%s",
+                    idx, (item.description or "")[:40], qty,
+                    labels[0].get("family", ""),
+                )
+        except Exception as exc:
+            log.warning(
+                "Reverse label channel failed for %s: %s", pdf_path, exc,
+            )
+
+    # Step 6b (T068 / S016-cable-length): raster polyline detection and
+    # length engine.  The vector pipeline (Step 6 measure_cables, only
+    # ran on section 'ЭГ' above) misses cable trasses rendered as
+    # embedded raster fills, which is the case on most GPK3 lighting
+    # sheets and was the single biggest accuracy gap (519 m generated
+    # vs ~14 000 m reference on 3-zahvatka).
+    #
+    # The raster engine renders each plan page at 300 DPI, builds an
+    # HSV mask per cable-trace legend category (idx 10..14 on 007-style
+    # legends: emergency / working cable trasses + 3 provodka classes),
+    # skeletonises and sums pixel runs, then divides by the per-page
+    # px-per-metre scale derived from titleblock axis pairs.  See
+    # cable_length.measure_cable_lengths_raster.
+    #
+    # Items emitted carry source='cable_length_raster' so downstream
+    # VOR mapping can attribute them to the correct height bucket via
+    # T065/T060 rules; we deliberately do NOT mark covered_legend_idx
+    # for these because the UNMATCHED audit below should still flag
+    # the symbol-less legend rows that lost their visual template match
+    # under KB-015.
+    if has_legend:
+        try:
+            cl_pages = [legend_result.page_index] if legend_result is not None else None
+            cl_rep = measure_cable_lengths_raster(
+                pdf_path, pages=cl_pages, legend_result=legend_result,
+            )
+            for cl_item in cl_rep.items:
+                items.append({
+                    "symbol": cl_item.get("symbol", ""),
+                    "name": cl_item.get("name", ""),
+                    "count": 0,
+                    "count_ae": 0,
+                    "total": cl_item.get("total", 0.0),
+                    "unit": cl_item.get("unit", "\u043c"),
+                    "category": "cable_length_raster",
+                    "source": "cable_length_raster",
+                })
+            if cl_rep.total_length_m > 0:
+                log.info(
+                    "cable_length_raster: %.1f m across %d entries on %s",
+                    cl_rep.total_length_m, len(cl_rep.entries), pdf_path,
+                )
+            # When the raster engine matched a legend idx for a category
+            # that produced a non-trivial length (>=0.5 m), mark that
+            # idx as covered so the UNMATCHED audit does not double-emit
+            # the same row as a [UNMATCHED-LEGEND] warning.
+            for e in cl_rep.entries:
+                if e.legend_idx >= 0 and e.length_m >= 0.5:
+                    covered_legend_idx.add(e.legend_idx)
+        except Exception as exc:
+            log.warning(
+                "Raster cable-length engine failed for %s: %s",
+                pdf_path, exc,
+            )
+
+    # Step 6c (T054 / KB-015): emit warning rows for legend items that
+    # no producer stage covered.  The [UNMATCHED-LEGEND] name prefix
+    # surfaces the gap to the user so symbol-less switches, posts, and
+    # cable trasses (B048 reproducer on 007-Plans osvescheniya) appear
+    # in the VOR even when count_text + match_visual found nothing.
+    #
+    # Quantity policy:
+    #   * line patterns (cable trasse / provodka) — qty=0 because count
+    #     is meaningless for these (length is the real metric, deferred
+    #     to follow-up B049 cable polyline detection).
+    #   * everything else (switches, posts, control devices) — qty=1
+    #     so the VOR row at least registers that ONE legend mention
+    #     existed; the user can refine count manually.
+    #
+    # Conservative guard: skip the audit on legends where ZERO producer
+    # stages matched anything, because such "legends" are usually
+    # title-block or notes-table false positives and would otherwise
+    # flood the output with spurious rows.
+    if has_legend and covered_legend_idx:
+        _line_categories = {
+            "кабельная трасса", "проводка", "линия связи",
+            "кабельная", "трасса", "wire", "cable", "trasse",
+        }
+        for idx, item in enumerate(legend_result.items):
+            if idx in covered_legend_idx:
+                continue
+            desc = (item.description or "").strip()
+            if not desc:
+                continue
+            cat = (item.category or "").strip().lower()
+            desc_lower = desc.lower()
+            is_line = (
+                cat in _line_categories
+                or "трасс" in desc_lower
+                or "прокладыв" in desc_lower
+                or "провод" in desc_lower
+                or "кабельн" in desc_lower
+            )
+            warn_count = 0 if is_line else 1
+            items.append({
+                "symbol": (item.symbol or ""),
+                "name": f"[UNMATCHED-LEGEND] {desc}",
+                "count": warn_count,
+                "count_ae": 0,
+                "total": warn_count,
+                "unit": "шт",
+                "category": "legend_unmatched",
+                "source": "legend_coverage_audit",
+            })
+
     # Step 7: apply VOR work-name mapping
     items = vor_map_items(items)
+
+    # Step 8 (T069 / S016-height-bucket): tag every item with its
+    # height_bucket key derived from the PDF filename's "\u043e\u0442\u043c."
+    # otmetka.  Per T065 recon Q1, the reference VOR groups every
+    # installation row into one of 4 buckets ("\u0434\u043e 5 \u043c.",
+    # "\u043e\u0442 5 \u0434\u043e 13 \u043c.", "\u043e\u0442 13 \u0434\u043e 20 \u043c.",
+    # "\u043e\u0442 20 \u0434\u043e 35 \u043c.") by the floor elevation
+    # encoded in the PDF title block.  When the filename carries no
+    # otmetka marker (e.g. 001 general-data sheets, 003/004 panel
+    # schematics) the bucket falls back to "unknown" so downstream
+    # vor_composer can still group those rows separately.
+    try:
+        height_bucketer.attribute_items(items, pdf_path)
+    except Exception as exc:
+        log.warning("height-bucket attribution failed for %s: %s", pdf_path, exc)
+
+    # Step 9 (T070 / S016-route-classify): tag every cable-trace item
+    # with route in {tray, pipe_hidden, pipe_open, unknown} and every
+    # luminaire item with mount in {wall, shpilka, anker, unknown}.
+    # Decision rules live in route_classifier; the call is idempotent
+    # so pre-tagged items (from a future per-symbol pipeline) are
+    # preserved.
+    try:
+        route_classifier.attribute_items(items)
+    except Exception as exc:
+        log.warning("route-classify attribution failed for %s: %s", pdf_path, exc)
+
+    # Step 10 (T072 / S016-thickness): extract dimensional metadata --
+    # cable cross_section (e.g. "3\u04451,5"), gofra diameter_mm, lotok
+    # width_mm x height_mm.  Reuses the cross-section regex hardened
+    # against KB-007 (Cyrillic \u0445 / Latin x / Unicode MULT \u00d7).
+    # Idempotent over reruns; pre-set fields are preserved.
+    try:
+        thickness_extractor.attribute_items(items)
+    except Exception as exc:
+        log.warning("thickness attribution failed for %s: %s", pdf_path, exc)
 
     return items
 
@@ -2284,6 +2743,61 @@ async def api_count_all(file_id: str):
         }
     except Exception as e:
         errors["visual"] = str(e)
+
+    # Method E: Reverse label-to-legend channel (T060/B051)
+    # Per-file path mirror of the channel added by T058 in
+    # _count_equipment_in_pdf.  Picks up on-drawing colored engineer labels
+    # (e.g. blue PU6/PU7 for "Post upravleniya") that none of the
+    # text/visual stages covered, and attributes them to uncovered legend
+    # rows.  Without this, UI "Zapusk" button never surfaces symbol-less
+    # legend items even though _count_equipment_in_pdf does.
+    try:
+        t1 = time.time()
+        # Build covered_legend_idx from visual counts only.  This is
+        # intentionally a SIMPLER set than what _count_equipment_in_pdf
+        # builds at L1225-1300, because per-file results carry visual
+        # counts by symbol_index but not the visual/text reconciliation
+        # logic.  Reverse channel only fires for legend rows nothing else
+        # covered, so over-conservative covered_idx (only visual hits)
+        # produces at most one extra reverse_label row per family which
+        # is acceptable.
+        covered_legend_idx_pf: set[int] = set()
+        vis_counts_obj = results.get("visual", {}).get("counts") or {}
+        if isinstance(vis_counts_obj, dict):
+            for k, v in vis_counts_obj.items():
+                try:
+                    if int(v) > 0:
+                        covered_legend_idx_pf.add(int(k))
+                except (TypeError, ValueError):
+                    continue
+        # Run extraction + match
+        colored_words = await asyncio.to_thread(
+            _reverse_extract_colored_words, str(pdf_path), legend_page,
+        )
+        label_groups = await asyncio.to_thread(
+            _reverse_match_labels_to_legend,
+            colored_words, legend.items, covered_legend_idx_pf,
+        )
+        reverse_items = []
+        for idx, labels in label_groups.items():
+            try:
+                desc = legend.items[idx].description or ""
+            except (IndexError, AttributeError):
+                desc = f"legend[{idx}]"
+            reverse_items.append({
+                "legend_index": idx,
+                "name": desc,
+                "count": len(labels),
+                "source": "reverse_label_match",
+                "labels": labels,
+            })
+        results["reverse"] = {
+            "items": reverse_items,
+            "blue_words_total": len(colored_words),
+            "elapsed_s": round(time.time() - t1, 2),
+        }
+    except Exception as e:
+        errors["reverse"] = str(e)
 
     total_elapsed = round(time.time() - t0, 2)
 

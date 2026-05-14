@@ -44,7 +44,7 @@ COL_HEADERS = [
     "№\nп/п",
     "Наименование вида работ",
     "Ед.\nизм.",
-    "РД",
+    "Объем работ",
     "Формула расчета объемов работ и расхода материалов",
     "Ссылка на чертежи, спецификации",
     "Дополнительная информация",
@@ -208,15 +208,10 @@ def render_vor_docx(
     aggregated: list[dict],
     *,
     rel_folder: str = "",
-    project_name: str = ("«Комплекс по глубокой переработке зерна для производства "
-                         "аминокислот, расположенный по адресу: Ростовская область, "
-                         "г Волгодонск, улица 2-я Заводская, 3»"),
-    object_name: str = "«Главный производственный корпус, поз. 3 по ГП»",
-    section_basis: str = "Основание_Электроосвещение, 3 захватка; 1Д-24-3-3-ЭО изм.2",
-    composer_name: str = "Кочерган",
-    checker_name: str = "Гончаров",
-    drawing_prefix: str = "1Д-24-3-3-ЭО (поз.3). 3-я захватка",
+    section_basis: str = "",
+    drawing_prefix: str = "",
     issue_date: str | None = None,
+    **_ignored,
 ) -> bytes:
     """Сформировать ВОР в формате эталона ДБТ. Возвращает байты .docx."""
     doc = Document()
@@ -252,15 +247,10 @@ def render_vor_docx(
         rFonts.set(qn('w:cs'), FONT_NAME)
         return p
 
-    # 2. Преамбула
-    _add_par(project_name, align=WD_ALIGN_PARAGRAPH.CENTER)
-    _add_par("(наименование стройки)", align=WD_ALIGN_PARAGRAPH.CENTER)
-    _add_par(object_name, align=WD_ALIGN_PARAGRAPH.CENTER)
-    _add_par("(наименование объекта капитального строительства)",
-             align=WD_ALIGN_PARAGRAPH.CENTER)
+    # 2. Преамбула (минимальная, по образцу ВОР_ЭО.docx)
     _add_par("Ведомость объемов работ", align=WD_ALIGN_PARAGRAPH.CENTER, bold=True)
-    _add_par(section_basis)
-    _add_par("(наименование раздела (подраздела) проектной документации)")
+    if section_basis:
+        _add_par(section_basis)
     _add_par(f"Дата составления {issue_date}г.")
     _add_par("")
 
@@ -302,24 +292,34 @@ def render_vor_docx(
         for it in items:
             item_no += 1
             name = str(it.get("name", "")).strip()
+            # T078 / S019-minimal-renderer: strip any "[UNMATCHED-LEGEND]"
+            # diagnostic prefix from the work-name before writing to col 2.
+            # The reference docx (T065_recon.md section 0) has none of these
+            # warnings; they belong in logs/audit only, not in deliverable
+            # column 2.  Pattern from web_app:1540 ("[UNMATCHED-LEGEND] %s").
+            name = _strip_unmatched_legend_prefix(name)
             unit = str(it.get("unit", "шт")).strip()
             total = it.get("total", 0)
-            formula = str(it.get("formula", "")).strip()
             drawing_refs = str(it.get("drawing_refs", "")).strip()
-            extra = str(it.get("extra_info", "")).strip()
 
-            # Очистить «Монтаж » префикс если есть, но оставить как есть для соответствия
             # Привести ссылку на чертежи к шифру проекта
             ref_text = _format_drawing_ref(drawing_refs, drawing_prefix)
 
+            # T078: per T065_recon.md section 0, the human-authored
+            # reference docx has columns 5 (Formula) and 7 (Additional
+            # info) EMPTY in 130/130 data rows.  Emit "" for both columns
+            # to match the reference layout; intentionally ignore
+            # it.get("formula") and it.get("extra_info") here.  Section
+            # header rows are emitted above with all non-name columns
+            # already empty -- no change needed there.
             cells_text = [
                 str(item_no),
                 name,
                 unit,
                 _fmt_qty(total),
-                formula if formula and formula != _fmt_qty(total) else "",
+                "",  # T078: column 5 (Formula) empty for all data rows
                 ref_text,
-                extra,
+                "",  # T078: column 7 (Additional info) empty for all data rows
             ]
             for ci, text in enumerate(cells_text):
                 cell = tbl.rows[row_idx].cells[ci]
@@ -332,12 +332,7 @@ def render_vor_docx(
 
     _set_col_widths(tbl, COL_WIDTHS_CM)
 
-    # 4. Подписи
-    doc.add_paragraph("")
-    _add_par(f"Составил______________________ {composer_name}")
-    _add_par("                              (должность, подпись (инициалы, фамилия))")
-    _add_par(f"Проверил______________________ {checker_name}")
-    _add_par("                               (должность, подпись (инициалы, фамилия))")
+    # 4. Подписи (удалены: данные исполнителей не известны автогенератору)
 
     buf = io.BytesIO()
     doc.save(buf)
@@ -357,6 +352,25 @@ def _fmt_qty(v) -> str:
     return f"{f:.1f}".replace(".", ",")
 
 
+# T078: pattern for the diagnostic warning prefix produced by web_app
+# legend-coverage audit (web_app.py:1540).  We strip it before writing
+# col 2 so the deliverable docx never contains the audit string.  Pattern
+# is anchored at start and tolerates one or more whitespace chars after
+# the closing bracket.
+_UNMATCHED_LEGEND_RE = re.compile(r"^\s*\[UNMATCHED-LEGEND\]\s*", re.IGNORECASE)
+
+
+def _strip_unmatched_legend_prefix(name: str) -> str:
+    """Remove "[UNMATCHED-LEGEND] " prefix from a work-name if present.
+
+    Returns the cleaned name; leaves any non-prefixed name unchanged.
+    Idempotent over reruns (since the regex is anchored at start).
+    """
+    if not name:
+        return name
+    return _UNMATCHED_LEGEND_RE.sub("", name, count=1)
+
+
 _LIST_NUM_RE = re.compile(r"л\.?\s*[\d.,\-–\s]+", re.IGNORECASE)
 
 
@@ -374,7 +388,7 @@ def _format_drawing_ref(raw: str, prefix: str) -> str:
             nums.append(tok)
     # Также пустить через регулярку «л.NN»
     if not nums:
-        return f"{prefix}"
+        return prefix
     # Сжать в диапазоны: 5,6,7,8 -> 5-8
     nums_int = sorted({int(n) for n in nums})
     ranges: list[str] = []
@@ -388,4 +402,7 @@ def _format_drawing_ref(raw: str, prefix: str) -> str:
         else:
             ranges.append(str(nums_int[i]))
         i = j + 1
-    return f"{prefix}, л.{','.join(ranges)}"
+    sheet_part = f"л.{','.join(ranges)}"
+    if prefix:
+        return f"{prefix}, {sheet_part}"
+    return sheet_part
