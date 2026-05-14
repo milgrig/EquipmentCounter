@@ -93,6 +93,15 @@ DEFAULT_THRESHOLD = 0.75     # minimum match confidence
 SCALES = [1.0]                        # single scale (T142: 3→1 cuts 3× match calls)
 ROTATIONS = [0, 90]                   # 0° + 90° (symbols may be placed vertically)
 
+# T054 / KB-015: extended scale set used for legend items that have no
+# symbol-text marker.  These items (switches, posts, cable trasses on
+# 007-Plans osvescheniya) tend to be drawn on the plan at roughly 50–70%
+# of the legend-icon size, so the default SCALES=[1.0] misses them
+# entirely.  This wider sweep restores them at the cost of a few extra
+# template calls per symbol-less item (typically 3–7 per legend).
+NO_SYMBOL_SCALES = [0.5, 0.6, 0.7, 0.85, 1.0]
+NO_SYMBOL_ROTATIONS = [0, 90, 180, 270]
+
 # Pyramid (coarse-to-fine) matching (T142)
 PYRAMID_DOWNSAMPLE = 0.5    # coarse pass at 50% resolution
 PYRAMID_COARSE_THRESH = 0.55 # lower threshold for coarse pass (catch all candidates)
@@ -959,6 +968,31 @@ def _extract_symbol_images(
             # Too few non-white pixels → empty cell
             results.append((item_idx, item, None))
             continue
+
+        # T054 / KB-015: For legend rows with no symbol marker text
+        # (item.symbol == ""), the cell may be much taller than the actual
+        # icon (e.g. a small switch pictogram inside a 60-pt tall row).
+        # Tight-crop the template to the non-white bounding box so the
+        # foreground/background ratio is high enough for cv2.matchTemplate
+        # (TM_CCOEFF_NORMED) to register peaks above the
+        # content-density-adjusted threshold (0.85–0.88).
+        sym_text = (item.symbol or "").strip()
+        if not sym_text:
+            ys, xs = np.where(gray < 240)
+            if ys.size > 0:
+                y0, y1 = int(ys.min()), int(ys.max()) + 1
+                x0, x1 = int(xs.min()), int(xs.max()) + 1
+                # Apply small padding (in raster px, scaled by DPI)
+                pad_px = max(2, int(2 * zoom))
+                y0 = max(0, y0 - pad_px)
+                x0 = max(0, x0 - pad_px)
+                y1 = min(img.shape[0], y1 + pad_px)
+                x1 = min(img.shape[1], x1 + pad_px)
+                cropped = img[y0:y1, x0:x1]
+                # Guard against degenerate crops
+                if (cropped.shape[0] >= MIN_SYMBOL_SIZE_PX and
+                        cropped.shape[1] >= MIN_SYMBOL_SIZE_PX):
+                    img = cropped
 
         results.append((item_idx, item, img))
 
@@ -1992,8 +2026,26 @@ def match_symbols(
                 candidate_thresh, len(raw_detections),
             )
         else:
+            # T054 / KB-015: legend items with no symbol marker (switches,
+            # posts, control devices on 007-Plans osvescheniya) are often
+            # drawn at smaller scale than the legend icon. Use a wider
+            # scale + rotation sweep for these items so we can find their
+            # drawing-area instances.  Default callers still get the
+            # single-scale fast path.
+            item_scales = scales
+            item_rotations = rotations
+            if not sym_text:
+                # Merge defaults with the wider sweep (preserve any caller
+                # override that already includes extra scales).
+                merged_scales = sorted({float(s) for s in scales}
+                                       | {float(s) for s in NO_SYMBOL_SCALES})
+                merged_rotations = sorted({int(r) for r in rotations}
+                                          | {int(r) for r in NO_SYMBOL_ROTATIONS})
+                item_scales = merged_scales
+                item_rotations = merged_rotations
             raw_detections = _match_template_multi(
-                match_target, template, adj_threshold, scales, rotations, dpi_ratio,
+                match_target, template, adj_threshold,
+                item_scales, item_rotations, dpi_ratio,
                 page_gray_coarse=page_gray_coarse,
             )
 
