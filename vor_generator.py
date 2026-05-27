@@ -1447,7 +1447,8 @@ def _normalize_brand_for_vor(brand: str) -> str:
     # Reference pattern: ППГнг-(А)-HF, ППГнг-(А)-FRHF
     # Spec often omits the dash: ППГнг(А)-HF → ППГнг-(А)-HF
     s = re.sub(r'(ППГнг)\(', r'\1-(', s)
-    # T083: etalon gpk3 uses latin (A) in ППГнг(A)-* — keep cyrillic (А) for VOR
+    # T083: spec/etalon may use latin (A); VOR keys use cyrillic (А)
+    s = re.sub(r'\(A\)', '(А)', s, flags=re.IGNORECASE)
     return s
 
 
@@ -1592,6 +1593,22 @@ def _cable_section_category(cable_type: str) -> str:
     return f"суммарное сечение до {_SECTION_THRESHOLDS[-1]} мм2"
 
 
+# gpk3 etalon shortens height labels in gofra work rows (T083).
+_GORF_HEIGHT_LABELS: dict[str, str] = {
+    "до 5 метров": "до 5 м",
+    "от 5 до 13 метров": "от 5 до 13м",
+    "от 13 до 20 метров": "от 13 до 20 м",
+    "от 20 до 35 метров": "от 20 до 35 м",
+}
+
+
+def _cable_work_height_label(hcat: str, lay_method: str) -> str:
+    """Height phrase for cable laying work rows (etalon tray vs gofra)."""
+    if "гофре" in lay_method.lower():
+        return _GORF_HEIGHT_LABELS.get(hcat, hcat.replace("метров", "м"))
+    return hcat
+
+
 def _format_cable_material_desc(cable_type: str, is_wire: bool = False) -> str:
     """Format cable/wire type as a material description for VOR rows.
 
@@ -1607,7 +1624,16 @@ def _format_cable_material_desc(cable_type: str, is_wire: bool = False) -> str:
         brand = _normalize_brand_for_vor(_extract_brand_family(ct))
         if re.match(r"^(?:ВБШвнг|ППГнг)", brand, re.IGNORECASE):
             cross = _extract_cross_section_token(ct)
-            return f"Кабель силовой с медными жилами {brand} {cross}"
+            # gpk3 etalon: ППГнг(A)-HF (latin A, no dash); ВБШвнг(А)-LS (cyrillic А)
+            if brand.startswith("ППГнг"):
+                display_brand = re.sub(
+                    r"ППГнг-\(A\)", "ППГнг(A)", brand.replace("(А)", "(A)"),
+                )
+            else:
+                display_brand = brand
+            return (
+                f"Кабель силовой с медными жилами {display_brand} {cross}"
+            )
     # T072: Insert 'сечением' before the cross-section (NxS pattern)
     # and normalize × to х (cyrillic) for consistency with references
     m = re.match(
@@ -3085,21 +3111,16 @@ def generate_vor_docx(
                 mat.unit, mat.total, ref=drawing_ref,
             )
 
-    # ── Section 4: Cables & Wires (grouped by brand family) ──
-    # T072: Per-brand cable sections with height breakdown and
-    # normalized descriptions matching standard VOR format.
+    # ── Section 4: Cables & Wires ──
+    # T083: single «Кабельная продукция» section; work rows aggregated
+    # across brands; material rows once per brand×cross-section.
     if cables:
         # T056: Separate wires (Провод) from cables (Кабель)
         actual_cables = [c for c in cables if not _is_wire_type(c.cable_type)]
         wire_items = [c for c in cables if _is_wire_type(c.cable_type)]
 
-        # ── Cables sub-section (per-brand with height breakdown) ──
         if actual_cables:
-            # Group cables by brand family
-            _cable_groups: dict[str, list[CableItem]] = {}
-            for c in actual_cables:
-                brand = _extract_brand_family(c.cable_type)
-                _cable_groups.setdefault(brand, []).append(c)
+            _add_section_header(table, "Кабельная продукция")
 
             # Compute height proportions for distributing cable lengths
             _height_props: dict[str, float] = {}
@@ -3111,107 +3132,103 @@ def generate_vor_docx(
             if not _height_props:
                 _height_props = {"до 5 метров": 1.0}
 
-            for brand, group in _cable_groups.items():
-                norm_brand = _normalize_brand_for_vor(brand)
-                _add_section_header(table, f"Кабель {norm_brand}")
+            # T077/T085: laying work rows grouped by
+            # (height × laying_method × sub-category), all brands combined.
+            for hcat in HEIGHT_CATEGORIES:
+                prop = _height_props.get(hcat, 0)
+                if prop <= 0:
+                    continue
 
-                # T077/T085: Cable laying rows grouped by
-                # (height × laying_method × sub-category).
-                for hcat in HEIGHT_CATEGORIES:
-                    prop = _height_props.get(hcat, 0)
-                    if prop <= 0:
+                _cable_lay_entries: list[tuple[CableItem, str, int]] = []
+                for c in actual_cables:
+                    cable_h_len = round(c.total_length_m * prop)
+                    if cable_h_len <= 0:
+                        continue
+                    laying_rows: list[tuple[str, int]] = []
+                    if c.length_by_laying:
+                        for lay_method, lay_len in c.length_by_laying.items():
+                            lay_h_len = round(lay_len * prop)
+                            if lay_h_len > 0:
+                                laying_rows.append((lay_method, lay_h_len))
+                    if not laying_rows:
+                        laying_rows = [("в лотке", cable_h_len)]
+                    for lay_method, lay_len in laying_rows:
+                        _cable_lay_entries.append((c, lay_method, lay_len))
+
+                if not _cable_lay_entries:
+                    continue
+
+                _heavy: list[tuple[CableItem, str, int, str]] = []
+                _underground: list[tuple[CableItem, int]] = []
+                _grouped: dict[str, list[tuple[CableItem, int]]] = {}
+
+                for c, lay_method, lay_len in _cable_lay_entries:
+                    lay_lower = lay_method.lower()
+                    h_label = _cable_work_height_label(hcat, lay_method)
+
+                    if "в трубе" in lay_lower or "в земле" in lay_lower or "в траншее" in lay_lower:
+                        _underground.append((c, lay_len))
                         continue
 
-                    _cable_lay_entries: list[tuple[CableItem, str, int]] = []
-                    for c in group:
-                        cable_h_len = round(c.total_length_m * prop)
-                        if cable_h_len <= 0:
-                            continue
-                        laying_rows: list[tuple[str, int]] = []
-                        if c.length_by_laying:
-                            for lay_method, lay_len in c.length_by_laying.items():
-                                lay_h_len = round(lay_len * prop)
-                                if lay_h_len > 0:
-                                    laying_rows.append((lay_method, lay_h_len))
-                        if not laying_rows:
-                            laying_rows = [("в лотке", cable_h_len)]
-                        for lay_method, lay_len in laying_rows:
-                            _cable_lay_entries.append((c, lay_method, lay_len))
-
-                    if not _cable_lay_entries:
-                        continue
-
-                    _heavy: list[tuple[CableItem, str, int, str]] = []
-                    _underground: list[tuple[CableItem, int]] = []
-                    _grouped: dict[str, list[tuple[CableItem, int]]] = {}
-
-                    for c, lay_method, lay_len in _cable_lay_entries:
-                        lay_lower = lay_method.lower()
-
-                        if "в трубе" in lay_lower or "в земле" in lay_lower or "в траншее" in lay_lower:
-                            _underground.append((c, lay_len))
-                            continue
-
-                        if "лотке" in lay_lower or "лотк" in lay_lower:
-                            mass_cat = _cable_mass_category(c.cable_type)
-                            if mass_cat and mass_cat != "массой до 1 кг":
-                                work_desc = (
-                                    f"Прокладка кабеля ({mass_cat}) {lay_method} "
-                                    f"на высоте {hcat}"
-                                )
-                                _heavy.append((c, lay_method, lay_len, work_desc))
-                            else:
-                                work_desc = (
-                                    f"Прокладка кабеля {lay_method} "
-                                    f"на высоте {hcat}:"
-                                )
-                                _grouped.setdefault(work_desc, []).append((c, lay_len))
-                        elif "гофре" in lay_lower or "кабель-канал" in lay_lower:
-                            sect_cat = _cable_section_category(c.cable_type)
-                            if sect_cat:
-                                work_desc = (
-                                    f"Прокладка кабеля {lay_method} "
-                                    f"на высоте {hcat} ({sect_cat}):"
-                                )
-                            else:
-                                work_desc = (
-                                    f"Прокладка кабеля {lay_method} "
-                                    f"на высоте {hcat}:"
-                                )
-                            _grouped.setdefault(work_desc, []).append((c, lay_len))
+                    if "лотке" in lay_lower or "лотк" in lay_lower:
+                        mass_cat = _cable_mass_category(c.cable_type)
+                        if mass_cat and mass_cat != "массой до 1 кг":
+                            work_desc = (
+                                f"Прокладка кабеля ({mass_cat}) {lay_method} "
+                                f"на высоте {h_label}"
+                            )
+                            _heavy.append((c, lay_method, lay_len, work_desc))
                         else:
                             work_desc = (
                                 f"Прокладка кабеля {lay_method} "
-                                f"на высоте {hcat}:"
+                                f"на высоте {h_label}:"
                             )
                             _grouped.setdefault(work_desc, []).append((c, lay_len))
-
-                    for c, _lm, lay_len, work_desc in _heavy:
-                        item_num += 1
-                        _add_work_row(
-                            table, item_num, work_desc,
-                            "м", lay_len, ref=drawing_ref,
+                    elif "гофре" in lay_lower or "кабель-канал" in lay_lower:
+                        sect_cat = _cable_section_category(c.cable_type)
+                        if sect_cat:
+                            work_desc = (
+                                f"Прокладка кабеля {lay_method} "
+                                f"на высоте {h_label} ({sect_cat}):"
+                            )
+                        else:
+                            work_desc = (
+                                f"Прокладка кабеля {lay_method} "
+                                f"на высоте {h_label}:"
+                            )
+                        _grouped.setdefault(work_desc, []).append((c, lay_len))
+                    else:
+                        work_desc = (
+                            f"Прокладка кабеля {lay_method} "
+                            f"на высоте {h_label}:"
                         )
+                        _grouped.setdefault(work_desc, []).append((c, lay_len))
 
-                    for work_desc, entries in _grouped.items():
-                        total_len = sum(ln for _, ln in entries)
-                        item_num += 1
-                        _add_work_row(
-                            table, item_num, work_desc,
-                            "м", total_len, ref=drawing_ref,
-                        )
+                for c, _lm, lay_len, work_desc in _heavy:
+                    item_num += 1
+                    _add_work_row(
+                        table, item_num, work_desc,
+                        "м", lay_len, ref=drawing_ref,
+                    )
 
-                    for c, lay_len in _underground:
-                        item_num += 1
-                        _add_work_row(
-                            table, item_num, "Прокладка кабеля в земле",
-                            "м", lay_len, ref=drawing_ref,
-                        )
+                for work_desc, entries in _grouped.items():
+                    total_len = sum(ln for _, ln in entries)
+                    item_num += 1
+                    _add_work_row(
+                        table, item_num, work_desc,
+                        "м", total_len, ref=drawing_ref,
+                    )
 
-                # T083: material qty = full brand×section total (not per height split)
-                _emit_brand_cable_material_totals(
-                    table, group, ref=drawing_ref,
-                )
+                for c, lay_len in _underground:
+                    item_num += 1
+                    _add_work_row(
+                        table, item_num, "Прокладка кабеля в земле",
+                        "м", lay_len, ref=drawing_ref,
+                    )
+
+            _emit_brand_cable_material_totals(
+                table, actual_cables, ref=drawing_ref,
+            )
 
         if wire_items:
             _add_section_header(table, "Провод")
@@ -3556,7 +3573,10 @@ def generate_vor_docx(
             if any(k in dl for k in ("полоса", "проводник", "пруток")):
                 return f"Прокладка {desc[0].lower()}{desc[1:]}"
             if any(k in dl for k in ("антикоррози", "гидроизоля", "лента")):
-                return f"Защита болтовых соединений системы заземления {desc[0].lower()}{desc[1:]}"
+                return (
+                    f"Защита болтовых соединений системы заземления "
+                    f"{desc[0].lower()}{desc[1:]}"
+                )
             if any(k in dl for k in ("спрей", "окраска", "свартон")):
                 return f"Окраска {desc[0].lower()}{desc[1:]}"
             if any(k in dl for k in ("точка заземления",)):
@@ -3569,8 +3589,6 @@ def generate_vor_docx(
 
         # T068: Earthwork rows (excavation/backfill) — derived from
         # electrode count when vertical electrodes exist.
-        # Formula: ~0.5 m³ per electrode × 1.5m depth ≈ 1.2 m³/electrode.
-        # Adjust to reference patterns: ref uses ~3.2 m³/electrode avg.
         if _g_electrode_count > 0:
             _earthwork_m3 = round(_g_electrode_count * 3.2, 1)
             # Format with comma for Russian locale

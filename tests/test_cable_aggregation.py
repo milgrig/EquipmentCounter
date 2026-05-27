@@ -9,11 +9,11 @@ from equipment_counter import CableItem
 from vor_generator import (
     _aggregate_cable_qty_by_brand_cross,
     _cable_brand_cross_key,
-    _normalize_brand_for_vor,
+    _format_cable_material_desc,
 )
 
 
-def test_t058_aggregates_brand_and_cross_section() -> None:
+def test_t058_test2_mini_aggregates_brand_and_section() -> None:
     cables = [
         CableItem(
             cable_type="ППГнг(А)-HF 3×1.5",
@@ -31,12 +31,27 @@ def test_t058_aggregates_brand_and_cross_section() -> None:
     totals = _aggregate_cable_qty_by_brand_cross(cables)
     assert len(totals) == 1
     key = ("ППГнг-(А)-HF", "3х1,5")
-    assert key in totals
     assert totals[key] == 150
 
 
-def test_t058_canonical_key_normalizes_ppg_brand() -> None:
+def test_t083_brand_cross_key_normalizes_ppgng_dash() -> None:
     a = _cable_brand_cross_key("ППГнг(А)-HF 3×2,5")
-    b = _cable_brand_cross_key("ППГнг-(А)-HF 3х2,5")
+    b = _cable_brand_cross_key("ППГнг-(А)-HF 3x2,5")
     assert a == b
-    assert _normalize_brand_for_vor(a[0]) == "ППГнг-(А)-HF"
+    assert a[0] == "ППГнг-(А)-HF"
+    assert a[1] == "3х2,5"
+
+
+def test_t083_material_desc_power_cable_etalon_style() -> None:
+    desc = _format_cable_material_desc("ВБШвнг(А)-LS 3×1,5")
+    assert desc == "Кабель силовой с медными жилами ВБШвнг(А)-LS 3х1,5"
+
+
+def test_t083_merge_same_brand_cross_different_type_strings() -> None:
+    cables = [
+        CableItem("ВБШвнг(А)-LS 3х1,5", 1, 1000),
+        CableItem("ВБШвнг(А)-LS 3x1.5", 1, 317),
+    ]
+    totals = _aggregate_cable_qty_by_brand_cross(cables)
+    assert len(totals) == 1
+    assert totals[("ВБШвнг(А)-LS", "3х1,5")] == 1317
