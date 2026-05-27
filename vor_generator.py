@@ -1447,7 +1447,54 @@ def _normalize_brand_for_vor(brand: str) -> str:
     # Reference pattern: ППГнг-(А)-HF, ППГнг-(А)-FRHF
     # Spec often omits the dash: ППГнг(А)-HF → ППГнг-(А)-HF
     s = re.sub(r'(ППГнг)\(', r'\1-(', s)
+    # T083: etalon gpk3 uses latin (A) in ППГнг(A)-* — keep cyrillic (А) for VOR
     return s
+
+
+def _extract_cross_section_token(cable_type: str) -> str:
+    """Return normalized cross-section token like '3х1,5'."""
+    m = _CABLE_SECTION_RE.search(cable_type or "")
+    if not m:
+        return "?"
+    sec_raw = m.group(2).replace(".", ",")
+    if "," in sec_raw:
+        sec_raw = sec_raw.rstrip("0").rstrip(",")
+    return f"{m.group(1)}х{sec_raw}"
+
+
+def _cable_brand_cross_key(cable_type: str) -> tuple[str, str]:
+    """Canonical aggregation key: (brand family, cross-section)."""
+    return (
+        _normalize_brand_for_vor(_extract_brand_family(cable_type)),
+        _extract_cross_section_token(cable_type),
+    )
+
+
+def _aggregate_cable_qty_by_brand_cross(
+    cables: list[CableItem],
+) -> OrderedDict[tuple[str, str], int]:
+    """Sum cable metres per brand×cross-section (T083 / Lever 1)."""
+    totals: OrderedDict[tuple[str, str], int] = OrderedDict()
+    for cable in cables:
+        key = _cable_brand_cross_key(cable.cable_type)
+        totals[key] = totals.get(key, 0) + int(round(cable.total_length_m))
+    return totals
+
+
+def _emit_brand_cable_material_totals(
+    table,
+    group: list[CableItem],
+    *,
+    ref: str = "",
+) -> None:
+    """T083: one material row per brand×section using full cable totals."""
+    for (brand_key, cross), qty_m in _aggregate_cable_qty_by_brand_cross(
+        group,
+    ).items():
+        if qty_m <= 0:
+            continue
+        desc = _format_cable_material_desc(f"{brand_key} {cross}")
+        _add_material_row(table, desc, "м", qty_m, ref=ref)
 
 
 def _parse_cable_section(cable_type: str) -> tuple[int, float] | None:
@@ -1551,8 +1598,16 @@ def _format_cable_material_desc(cable_type: str, is_wire: bool = False) -> str:
     Reference VOR format uses 'сечением' before the cross-section:
         'ППГнг(А)-HF 3×1.5'  -> 'Кабель ППГнг-(А)-HF сечением 3х1,5'
         'ПуВВнг 1×6'         -> 'Провод ПуВВнг сечением 1х6' (is_wire=True)
+
+    gpk3 etalon power cables:
+        'ВБШвнг(А)-LS 3×1.5' -> 'Кабель силовой с медными жилами ВБШвнг(А)-LS 3х1,5'
     """
     ct = cable_type.strip()
+    if not is_wire:
+        brand = _normalize_brand_for_vor(_extract_brand_family(ct))
+        if re.match(r"^(?:ВБШвнг|ППГнг)", brand, re.IGNORECASE):
+            cross = _extract_cross_section_token(ct)
+            return f"Кабель силовой с медными жилами {brand} {cross}"
     # T072: Insert 'сечением' before the cross-section (NxS pattern)
     # and normalize × to х (cyrillic) for consistency with references
     m = re.match(
@@ -2218,7 +2273,7 @@ def aggregate_by_height(
         #
         # Convert spec cables → CableItem so they flow through the
         # normal rendering pipeline (Прокладка + material rows).
-        _new_cables: dict[str, CableItem] = {}
+        _new_cables: dict[tuple[str, str], CableItem] = {}
         _unconverted: list[SpecGroupedItem] = []
         _valid_count = 0
         _invalid_count = 0
@@ -2241,11 +2296,13 @@ def aggregate_by_height(
                     _unconverted.append(sc)
                     continue
                 _valid_count += 1
-                if ct in _new_cables:
-                    _new_cables[ct].count += 1
-                    _new_cables[ct].total_length_m += _length_m
+                # T083: merge spec rows by brand×cross-section, not raw cable_type
+                _agg_key = _cable_brand_cross_key(ct)
+                if _agg_key in _new_cables:
+                    _new_cables[_agg_key].count += 1
+                    _new_cables[_agg_key].total_length_m += _length_m
                 else:
-                    _new_cables[ct] = CableItem(
+                    _new_cables[_agg_key] = CableItem(
                         cable_type=ct, count=1,
                         total_length_m=_length_m,
                     )
@@ -3135,11 +3192,6 @@ def generate_vor_docx(
                             table, item_num, work_desc,
                             "м", lay_len, ref=drawing_ref,
                         )
-                        desc = _format_cable_material_desc(c.cable_type)
-                        _add_material_row(
-                            table, desc,
-                            "м", lay_len, ref=drawing_ref,
-                        )
 
                     for work_desc, entries in _grouped.items():
                         total_len = sum(ln for _, ln in entries)
@@ -3148,12 +3200,6 @@ def generate_vor_docx(
                             table, item_num, work_desc,
                             "м", total_len, ref=drawing_ref,
                         )
-                        for c, lay_len in entries:
-                            desc = _format_cable_material_desc(c.cable_type)
-                            _add_material_row(
-                                table, desc,
-                                "м", lay_len, ref=drawing_ref,
-                            )
 
                     for c, lay_len in _underground:
                         item_num += 1
@@ -3161,11 +3207,11 @@ def generate_vor_docx(
                             table, item_num, "Прокладка кабеля в земле",
                             "м", lay_len, ref=drawing_ref,
                         )
-                        desc = _format_cable_material_desc(c.cable_type)
-                        _add_material_row(
-                            table, desc,
-                            "м", lay_len, ref=drawing_ref,
-                        )
+
+                # T083: material qty = full brand×section total (not per height split)
+                _emit_brand_cable_material_totals(
+                    table, group, ref=drawing_ref,
+                )
 
         if wire_items:
             _add_section_header(table, "Провод")
