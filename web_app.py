@@ -309,8 +309,9 @@ async def index(request: Request):
     """Render the main page with file list."""
     files = _scan_pdfs()
     return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "files": files, "total": len(files)},
+        request=request,
+        name="index.html",
+        context={"request": request, "files": files, "total": len(files)},
     )
 
 
@@ -339,8 +340,9 @@ async def viewer(request: Request, file_id: str):
         # File is in UPLOADS_DIR
         rel = "_uploads/" + str(pdf_path.relative_to(UPLOADS_DIR)).replace("\\", "/")
     return templates.TemplateResponse(
-        "viewer.html",
-        {
+        request=request,
+        name="viewer.html",
+        context={
             "request": request,
             "file_id": file_id,
             "filename": pdf_path.name,

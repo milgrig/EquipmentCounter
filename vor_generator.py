@@ -2901,6 +2901,9 @@ def aggregate_by_height(
         "tray_lengths": tray_lengths,
         "tray_items": tray_items,
         "cable_lengths_by_height": cable_lengths_by_height,
+        "pnr_schema_line_count": pnr_schema_line_count,
+        "spec_cables_collapsed": spec_cables_collapsed,
+        "lighting_groups_count": lighting_groups_count,
     }
 
 
@@ -2993,6 +2996,9 @@ def generate_vor_docx(
     tray_lengths: dict[str, int] | None = None,
     tray_items: list[SpecGroupedItem] | None = None,
     cable_lengths_by_height: dict[str, int] | None = None,
+    pnr_schema_line_count: int = 0,
+    spec_cables_collapsed: bool = False,
+    lighting_groups_count: int = 0,
 ) -> str:
     """Generate a VOR .docx file from aggregated data."""
     doc = Document()
