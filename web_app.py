@@ -19,12 +19,13 @@ import json as json_mod
 import math
 import os
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import fitz  # PyMuPDF
 import pdfplumber
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -52,6 +53,10 @@ from legend_validator import validate_legend_symbols
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "Data"
 WEB_DIR = BASE_DIR / "web"
+VOR_DIR = BASE_DIR / "vor_output"   # saved VOR xlsx files
+VOR_DIR.mkdir(exist_ok=True)
+UPLOADS_DIR = BASE_DIR / "uploads"  # uploaded projects via web interface
+UPLOADS_DIR.mkdir(exist_ok=True)
 
 # ---------------------------------------------------------------------------
 # FastAPI app
@@ -69,6 +74,46 @@ templates = Jinja2Templates(directory=str(WEB_DIR / "templates"))
 
 
 # ---------------------------------------------------------------------------
+# Cache: store VOR results after SSE processing so Excel export is instant
+# ---------------------------------------------------------------------------
+_vor_results_cache: dict[str, dict[str, list[dict]]] = {}  # folder_id → {filename: items}
+_vor_xlsx_cache: dict[str, bytes] = {}  # folder_id → ready xlsx bytes
+
+
+def _vor_folder_for(rel_folder: str) -> Path:
+    """Return (and create) the vor_output sub-folder for a given project folder."""
+    safe = rel_folder.replace("/", "_").replace("\\", "_")
+    safe = "".join(c if c.isalnum() or c in "._- " else "_" for c in safe) or "root"
+    p = VOR_DIR / safe
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _save_vor_xlsx(xlsx_bytes: bytes, rel_folder: str) -> Path:
+    """Save VOR Excel to disk with timestamp. Returns the saved file path."""
+    dest_dir = _vor_folder_for(rel_folder)
+    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    fname = f"VOR_{ts}.xlsx"
+    path = dest_dir / fname
+    path.write_bytes(xlsx_bytes)
+    return path
+
+
+def _list_vor_files(rel_folder: str) -> list[dict]:
+    """List all saved VOR xlsx files for a folder, newest first."""
+    dest_dir = _vor_folder_for(rel_folder)
+    files = sorted(dest_dir.glob("VOR_*.xlsx"), key=lambda p: p.stat().st_mtime, reverse=True)
+    result = []
+    for f in files:
+        stat = f.stat()
+        result.append({
+            "filename": f.name,
+            "size_kb": round(stat.st_size / 1024, 1),
+            "created": datetime.fromtimestamp(stat.st_mtime).strftime("%d.%m.%Y %H:%M"),
+        })
+    return result
+
+# ---------------------------------------------------------------------------
 # Helpers: folder operations
 # ---------------------------------------------------------------------------
 
@@ -78,8 +123,12 @@ def _folder_id(rel_folder: str) -> str:
 
 
 def _id_to_folder(folder_id: str) -> Optional[str]:
-    """Resolve folder ID back to relative folder path."""
+    """Resolve folder ID back to relative folder path.
+
+    Scans both DATA_DIR and UPLOADS_DIR (with '_uploads/' prefix).
+    """
     seen: set[str] = set()
+    # Scan DATA_DIR
     for pdf_path in DATA_DIR.rglob("*.pdf"):
         rel = str(pdf_path.relative_to(DATA_DIR)).replace("\\", "/")
         parts = rel.rsplit("/", 1)
@@ -88,12 +137,28 @@ def _id_to_folder(folder_id: str) -> Optional[str]:
             seen.add(folder)
             if _folder_id(folder) == folder_id:
                 return folder
+    # Scan UPLOADS_DIR
+    if UPLOADS_DIR.exists():
+        for pdf_path in UPLOADS_DIR.rglob("*.pdf"):
+            rel = str(pdf_path.relative_to(UPLOADS_DIR)).replace("\\", "/")
+            parts = rel.rsplit("/", 1)
+            sub = parts[0] if len(parts) > 1 else ""
+            folder = "_uploads/" + sub if sub else "_uploads"
+            if folder not in seen:
+                seen.add(folder)
+                if _folder_id(folder) == folder_id:
+                    return folder
     return None
 
 
 def _folder_files(rel_folder: str) -> list[Path]:
-    """Return all PDF files in a specific folder under DATA_DIR."""
-    folder_path = DATA_DIR / rel_folder
+    """Return all PDF files in a specific folder under DATA_DIR or UPLOADS_DIR."""
+    if rel_folder.startswith("_uploads/"):
+        folder_path = UPLOADS_DIR / rel_folder[len("_uploads/"):]
+    elif rel_folder == "_uploads":
+        folder_path = UPLOADS_DIR
+    else:
+        folder_path = DATA_DIR / rel_folder
     if not folder_path.is_dir():
         return []
     return sorted(folder_path.glob("*.pdf"))
@@ -112,11 +177,20 @@ def _file_id(rel_path: str) -> str:
 
 
 def _id_to_path(file_id: str) -> Optional[Path]:
-    """Resolve file ID back to an absolute path by scanning all PDFs."""
+    """Resolve file ID back to an absolute path by scanning all PDFs.
+
+    Searches both DATA_DIR and UPLOADS_DIR.
+    """
     for pdf_path in DATA_DIR.rglob("*.pdf"):
         rel = str(pdf_path.relative_to(DATA_DIR))
         if _file_id(rel) == file_id:
             return pdf_path
+    # Search uploads
+    if UPLOADS_DIR.exists():
+        for pdf_path in UPLOADS_DIR.rglob("*.pdf"):
+            rel = "_uploads/" + str(pdf_path.relative_to(UPLOADS_DIR)).replace("\\", "/")
+            if _file_id(rel) == file_id:
+                return pdf_path
     return None
 
 
@@ -163,36 +237,65 @@ def _detect_section_type(folder_path: str) -> str:
 
 
 def _scan_pdfs() -> list[dict]:
-    """Recursively scan Data/ for PDF files and return metadata."""
-    if not DATA_DIR.exists():
-        return []
-
+    """Recursively scan Data/ and uploads/ for PDF files and return metadata."""
     results = []
-    for pdf_path in sorted(DATA_DIR.rglob("*.pdf")):
-        try:
-            stat = pdf_path.stat()
-        except OSError:
-            continue
 
-        rel = str(pdf_path.relative_to(DATA_DIR))
-        fid = _file_id(rel)
+    # Scan DATA_DIR
+    if DATA_DIR.exists():
+        for pdf_path in sorted(DATA_DIR.rglob("*.pdf")):
+            try:
+                stat = pdf_path.stat()
+            except OSError:
+                continue
 
-        # Compute folder group
-        rel_posix = rel.replace("\\", "/")
-        parts = rel_posix.rsplit("/", 1)
-        folder = parts[0] if len(parts) > 1 else ""
+            rel = str(pdf_path.relative_to(DATA_DIR))
+            fid = _file_id(rel)
 
-        results.append({
-            "id": fid,
-            "filename": pdf_path.name,
-            "path": rel,
-            "folder": folder,
-            "size_kb": round(stat.st_size / 1024, 1),
-            "modified": time.strftime(
-                "%Y-%m-%d %H:%M", time.localtime(stat.st_mtime)
-            ),
-            "type_guess": _guess_type(rel),
-        })
+            # Compute folder group
+            rel_posix = rel.replace("\\", "/")
+            parts = rel_posix.rsplit("/", 1)
+            folder = parts[0] if len(parts) > 1 else ""
+
+            results.append({
+                "id": fid,
+                "filename": pdf_path.name,
+                "path": rel,
+                "folder": folder,
+                "size_kb": round(stat.st_size / 1024, 1),
+                "modified": time.strftime(
+                    "%Y-%m-%d %H:%M", time.localtime(stat.st_mtime)
+                ),
+                "type_guess": _guess_type(rel),
+            })
+
+    # Scan UPLOADS_DIR
+    if UPLOADS_DIR.exists():
+        for pdf_path in sorted(UPLOADS_DIR.rglob("*.pdf")):
+            try:
+                stat = pdf_path.stat()
+            except OSError:
+                continue
+
+            rel_upload = str(pdf_path.relative_to(UPLOADS_DIR)).replace("\\", "/")
+            rel = "_uploads/" + rel_upload
+            fid = _file_id(rel)
+
+            # Compute folder group (with _uploads/ prefix)
+            parts = rel.rsplit("/", 1)
+            folder = parts[0] if len(parts) > 1 else "_uploads"
+
+            results.append({
+                "id": fid,
+                "filename": pdf_path.name,
+                "path": rel,
+                "folder": folder,
+                "size_kb": round(stat.st_size / 1024, 1),
+                "modified": time.strftime(
+                    "%Y-%m-%d %H:%M", time.localtime(stat.st_mtime)
+                ),
+                "type_guess": _guess_type(rel),
+                "is_upload": True,
+            })
 
     return results
 
@@ -230,7 +333,11 @@ async def viewer(request: Request, file_id: str):
     except Exception:
         page_count = 1
 
-    rel = str(pdf_path.relative_to(DATA_DIR))
+    try:
+        rel = str(pdf_path.relative_to(DATA_DIR))
+    except ValueError:
+        # File is in UPLOADS_DIR
+        rel = "_uploads/" + str(pdf_path.relative_to(UPLOADS_DIR)).replace("\\", "/")
     return templates.TemplateResponse(
         "viewer.html",
         {
@@ -584,6 +691,61 @@ async def api_folders():
         info["types"] = sorted(info["types"])
         result.append(info)
     return JSONResponse(content=result)
+
+
+# ---------------------------------------------------------------------------
+# 6c. POST /api/upload — upload PDF files to create a new project
+# ---------------------------------------------------------------------------
+
+@app.post("/api/upload")
+async def api_upload(
+    request: Request,
+    files: list[UploadFile] = File(...),
+):
+    """Upload PDFs and create a new project folder in uploads/.
+
+    Accepts multipart form with 'files' (PDF blobs) and optional 'paths'
+    (relative paths preserving folder structure, e.g. "MyProject/02_PDF/plan.pdf").
+    """
+    # Parse optional 'paths' list from the same multipart form
+    form = await request.form()
+    raw_paths = form.getlist("paths")
+
+    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    dest = UPLOADS_DIR / ts
+    dest.mkdir(parents=True, exist_ok=True)
+
+    saved = 0
+    for i, f in enumerate(files):
+        if not f.filename or not f.filename.lower().endswith(".pdf"):
+            continue
+
+        # Use relative path from frontend if available, else just filename
+        rel_path = raw_paths[i] if i < len(raw_paths) and raw_paths[i] else f.filename
+        # Sanitize: resolve to pure posix, strip leading slashes / ".."
+        rel_path = rel_path.replace("\\", "/")
+        parts = [p for p in rel_path.split("/") if p and p != ".."]
+        if not parts:
+            continue
+        safe_path = Path(*parts)
+
+        target = dest / safe_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        content = await f.read()
+        target.write_bytes(content)
+        saved += 1
+
+    if saved == 0:
+        import shutil
+        shutil.rmtree(dest, ignore_errors=True)
+        raise HTTPException(400, "Нет PDF файлов")
+
+    rel = "_uploads/" + ts
+    return JSONResponse({
+        "folder_id": _folder_id(rel),
+        "folder_name": ts,
+        "files_count": saved,
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -1663,12 +1825,57 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# 6c. Convert pipeline VorSection objects → flat aggregated list for UI
+# ---------------------------------------------------------------------------
+
+def _sections_to_aggregated(sections) -> list[dict]:
+    """Convert list of VorSection into flat list of dicts for the UI table."""
+    result = []
+    row_num = 1
+    for section in sections:
+        # Section header row
+        result.append({
+            "row": row_num,
+            "name": section.title,
+            "unit": "",
+            "total": "",
+            "formula": "",
+            "drawing_refs": "",
+            "extra_info": "",
+            "is_section_header": True,
+        })
+        row_num += 1
+        for row_data in section.rows:
+            result.append({
+                "row": row_num,
+                "name": row_data["name"],
+                "unit": row_data["unit"],
+                "total": row_data["qty"],
+                "formula": str(row_data["qty"]) if row_data.get("qty", 0) > 0 else "",
+                "drawing_refs": row_data.get("drawing_ref", ""),
+                "extra_info": "",
+                "is_section_header": False,
+                "is_material": row_data.get("is_material", False),
+            })
+            row_num += 1
+    return result
+
+
+# ---------------------------------------------------------------------------
 # 6c. GET /api/folder/{folder_id}/process — SSE batch processing
 # ---------------------------------------------------------------------------
 
 @app.get("/api/folder/{folder_id}/process")
 async def api_folder_process(folder_id: str):
-    """Process all PDFs in a folder via SSE stream with progress."""
+    """Process all PDFs in a folder via SSE stream with progress.
+
+    Uses the full VOR pipeline (pdf_vor_pipeline.py) which:
+    - Parses specs (СО), plans, schemas, binding plans
+    - Builds height distribution ratios
+    - Generates proper VOR sections with materials
+    """
+    from pdf_vor_pipeline import generate_vor_from_pdfs, export_vor_xlsx, generate_vor_aggregated
+
     rel_folder = _id_to_folder(folder_id)
     if rel_folder is None:
         raise HTTPException(status_code=404, detail="Folder not found")
@@ -1676,61 +1883,75 @@ async def api_folder_process(folder_id: str):
     if not pdf_files:
         raise HTTPException(status_code=404, detail="No PDFs in folder")
 
+    if rel_folder.startswith("_uploads/"):
+        folder_path = UPLOADS_DIR / rel_folder[len("_uploads/"):]
+    elif rel_folder == "_uploads":
+        folder_path = UPLOADS_DIR
+    else:
+        folder_path = DATA_DIR / rel_folder
+
     async def event_stream():
-        all_results: dict[str, list[dict]] = {}
-        errors: list[dict] = []
         total = len(pdf_files)
         yield f"event: start\ndata: {json_mod.dumps({'total': total, 'folder': rel_folder}, ensure_ascii=False)}\n\n"
 
-        for i, pdf_path in enumerate(pdf_files):
-            filename = pdf_path.name
-            yield f"event: progress\ndata: {json_mod.dumps({'current': i + 1, 'total': total, 'filename': filename}, ensure_ascii=False)}\n\n"
-            try:
-                file_result = await asyncio.to_thread(
-                    _count_equipment_in_pdf, str(pdf_path)
-                )
-                all_results[filename] = file_result
-                yield f"event: file_done\ndata: {json_mod.dumps({'filename': filename, 'items': len(file_result), 'status': 'ok'}, ensure_ascii=False)}\n\n"
-            except Exception as e:
-                errors.append({"filename": filename, "error": str(e)})
-                yield f"event: file_done\ndata: {json_mod.dumps({'filename': filename, 'items': 0, 'status': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
+        # Collect log messages from pipeline to stream as SSE events
+        log_messages: list[str] = []
+        step_count = 0
 
-        aggregated = _aggregate_equipment(all_results)
-        yield f"event: done\ndata: {json_mod.dumps({'aggregated': aggregated, 'files_processed': len(all_results), 'errors': errors, 'total_files': total}, ensure_ascii=False)}\n\n"
+        def pipeline_log(msg: str):
+            nonlocal step_count
+            log_messages.append(msg)
+            step_count += 1
+
+        # Run full VOR pipeline in a thread (CPU-bound) — single pass
+        try:
+            sections = await asyncio.to_thread(
+                generate_vor_from_pdfs, str(folder_path), pipeline_log
+            )
+        except Exception as e:
+            yield f"event: file_done\ndata: {json_mod.dumps({'filename': 'pipeline', 'items': 0, 'status': 'error', 'error': str(e), 'current': 1, 'total': 1}, ensure_ascii=False)}\n\n"
+            yield f"event: done\ndata: {json_mod.dumps({'aggregated': [], 'files_processed': 0, 'errors': [{'filename': 'pipeline', 'error': str(e)}], 'total_files': total}, ensure_ascii=False)}\n\n"
+            return
+
+        # Send log messages as progress events
+        for i, msg in enumerate(log_messages):
+            if msg.strip():
+                yield f"event: file_done\ndata: {json_mod.dumps({'filename': msg.strip()[:120], 'items': 0, 'status': 'ok', 'current': i + 1, 'total': len(log_messages)}, ensure_ascii=False)}\n\n"
+
+        # Build aggregated list from sections (for UI table)
+        aggregated = _sections_to_aggregated(sections)
+
+        # Save Excel to disk using pipeline's own export (proper formatting)
+        saved_filename = ""
+        try:
+            dest_dir = _vor_folder_for(rel_folder)
+            ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            xlsx_path = dest_dir / f"VOR_{ts}.xlsx"
+            export_vor_xlsx(sections, str(xlsx_path))
+            saved_filename = xlsx_path.name
+        except Exception:
+            # Fallback: build simple xlsx
+            try:
+                xlsx_bytes = _build_vor_xlsx(aggregated, rel_folder)
+                saved_path = _save_vor_xlsx(xlsx_bytes, rel_folder)
+                saved_filename = saved_path.name
+            except Exception:
+                pass
+
+        yield f"event: done\ndata: {json_mod.dumps({'aggregated': aggregated, 'files_processed': total, 'errors': [], 'total_files': total, 'xlsx_file': saved_filename}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ---------------------------------------------------------------------------
-# 6d. GET /api/folder/{folder_id}/export_xlsx — Excel VOR export
+# 6d. Helper: build VOR xlsx bytes from aggregated data
 # ---------------------------------------------------------------------------
 
-@app.get("/api/folder/{folder_id}/export_xlsx")
-async def api_folder_export_xlsx(folder_id: str):
-    """Generate and download VOR Excel file for a folder."""
+def _build_vor_xlsx(aggregated: list[dict], rel_folder: str) -> bytes:
+    """Build VOR Excel workbook and return raw bytes."""
     import openpyxl
     from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
-
-    rel_folder = _id_to_folder(folder_id)
-    if rel_folder is None:
-        raise HTTPException(status_code=404, detail="Folder not found")
-    pdf_files = _folder_files(rel_folder)
-    if not pdf_files:
-        raise HTTPException(status_code=404, detail="No PDFs in folder")
-
-    # Process all files using counting methods for actual quantities
-    all_results: dict[str, list[dict]] = {}
-    for pdf_path in pdf_files:
-        try:
-            file_result = await asyncio.to_thread(
-                _count_equipment_in_pdf, str(pdf_path)
-            )
-            all_results[pdf_path.name] = file_result
-        except Exception:
-            continue
-
-    aggregated = _aggregate_equipment(all_results)
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -1765,14 +1986,45 @@ async def api_folder_export_xlsx(folder_id: str):
 
     buf = io.BytesIO()
     wb.save(buf)
-    buf.seek(0)
+    return buf.getvalue()
 
-    folder_name = rel_folder.rsplit("/", 1)[-1] if "/" in rel_folder else rel_folder
-    safe_name = "".join(c if c.isalnum() or c in "._- " else "_" for c in folder_name)
 
-    return Response(content=buf.getvalue(),
+# ---------------------------------------------------------------------------
+# 6d. VOR file management: list saved files + download
+# ---------------------------------------------------------------------------
+
+@app.get("/api/folder/{folder_id}/vor_files")
+async def api_folder_vor_files(folder_id: str):
+    """List all saved VOR xlsx files for a folder."""
+    rel_folder = _id_to_folder(folder_id)
+    if rel_folder is None:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    return JSONResponse({"files": _list_vor_files(rel_folder)})
+
+
+@app.get("/api/folder/{folder_id}/vor_download/{filename}")
+async def api_folder_vor_download(folder_id: str, filename: str):
+    """Download a specific saved VOR xlsx file from disk."""
+    from urllib.parse import quote
+
+    rel_folder = _id_to_folder(folder_id)
+    if rel_folder is None:
+        raise HTTPException(status_code=404, detail="Folder not found")
+
+    # Sanitize filename — only allow VOR_*.xlsx pattern
+    if not filename.startswith("VOR_") or not filename.endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    file_path = _vor_folder_for(rel_folder) / filename
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Файл не найден")
+
+    xlsx_bytes = file_path.read_bytes()
+    encoded_name = quote(filename)
+
+    return Response(content=xlsx_bytes,
                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                   headers={"Content-Disposition": f'attachment; filename="VOR_{safe_name}.xlsx"'})
+                   headers={"Content-Disposition": f"attachment; filename=\"{filename}\"; filename*=UTF-8''{encoded_name}"})
 
 
 # ---------------------------------------------------------------------------
@@ -3119,4 +3371,4 @@ async def api_count_stream(file_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("web_app:app", host="0.0.0.0", port=8050, reload=True)
+    uvicorn.run("web_app:app", host="0.0.0.0", port=8051, reload=False)

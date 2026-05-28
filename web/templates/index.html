@@ -28,6 +28,33 @@
             </div>
         </div>
 
+        <!-- Upload Zone -->
+        <div class="upload-zone" id="upload-zone">
+            <div class="upload-zone-inner" id="upload-drop-area">
+                <div class="upload-icon">&#128194;</div>
+                <div class="upload-text">
+                    Перетащите папку или PDF файлы сюда
+                </div>
+                <div class="upload-buttons">
+                    <label class="btn btn-primary upload-btn">
+                        &#128193; Выбрать папку
+                        <input type="file" id="upload-folder-input" webkitdirectory hidden>
+                    </label>
+                    <label class="btn upload-btn">
+                        &#128196; Выбрать файлы
+                        <input type="file" id="upload-input" multiple accept=".pdf" hidden>
+                    </label>
+                </div>
+                <div class="upload-hint">PDF файлы проекта (спецификации, планы, схемы)</div>
+            </div>
+            <div class="upload-progress hidden" id="upload-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="upload-fill"></div>
+                </div>
+                <span id="upload-status">Загрузка...</span>
+            </div>
+        </div>
+
         <!-- File Table grouped by folder -->
         <div class="table-wrap">
             <table class="file-table" id="file-table">
@@ -51,7 +78,7 @@
                                     <span class="folder-icon">&#128193;</span>
                                     <span class="folder-name">{{ f.folder if f.folder else '(корневая папка)' }}</span>
                                     <span class="folder-count"></span>
-                                    <button class="btn btn-sm btn-vor" onclick="event.stopPropagation(); startVor('{{ folder_id(f.folder) }}', '{{ f.folder }}')" title="Генерация ВОР">&#9997; ВОР</button>
+                                    <button class="btn btn-sm btn-vor" onclick="event.stopPropagation(); openVor('{{ folder_id(f.folder) }}', '{{ f.folder }}')" title="Генерация ВОР">&#9997; ВОР</button>
                                 </td>
                             </tr>
                         {% endif %}
@@ -76,31 +103,51 @@
         <div class="vor-modal hidden" id="vor-modal">
             <div class="vor-modal-content">
                 <div class="vor-modal-header">
-                    <h2>&#128203; Генерация ВОР</h2>
+                    <h2>&#128203; ВОР</h2>
                     <span class="vor-folder-name" id="vor-folder-name"></span>
                     <button class="btn btn-sm" onclick="document.getElementById('vor-modal').classList.add('hidden')">&#10005;</button>
                 </div>
-                <div class="vor-progress" id="vor-progress">
-                    <div class="progress-bar"><div class="progress-fill" id="vor-fill"></div></div>
-                    <span id="vor-ptext">Подготовка...</span>
+
+                <!-- Saved VOR files list -->
+                <div id="vor-saved-section">
+                    <div id="vor-saved-list"></div>
+                    <div class="vor-actions" id="vor-create-actions">
+                        <button class="btn btn-primary" id="btn-create-vor">&#9997; Создать ВОР</button>
+                    </div>
                 </div>
-                <div class="vor-log" id="vor-log"></div>
-                <div class="vor-results hidden" id="vor-results">
-                    <table class="vor-table">
-                        <thead>
-                            <tr>
-                                <th>№</th>
-                                <th>Наименование вида работ</th>
-                                <th>Ед. изм.</th>
-                                <th>Объем</th>
-                                <th>Формула</th>
-                                <th>Ссылка на чертежи</th>
-                            </tr>
-                        </thead>
-                        <tbody id="vor-tbody"></tbody>
-                    </table>
-                    <div class="vor-actions">
-                        <button class="btn btn-primary" id="btn-vor-xlsx">&#128190; Скачать Excel</button>
+
+                <!-- Processing progress (hidden until processing starts) -->
+                <div class="vor-processing hidden" id="vor-processing">
+                    <div class="vor-progress" id="vor-progress">
+                        <div class="progress-bar"><div class="progress-fill" id="vor-fill"></div></div>
+                        <span id="vor-ptext">Подготовка...</span>
+                    </div>
+                    <div class="vor-log" id="vor-log"></div>
+
+                    <!-- Found items (per-file detail) -->
+                    <div class="vor-found hidden" id="vor-found">
+                        <div class="vor-found-header" id="vor-found-toggle">
+                            <span class="vor-found-arrow">&#9660;</span>
+                            <strong>&#128270; Найденные элементы</strong>
+                            <span class="vor-found-count" id="vor-found-count"></span>
+                        </div>
+                        <div class="vor-found-body" id="vor-found-body"></div>
+                    </div>
+
+                    <div class="vor-results hidden" id="vor-results">
+                        <table class="vor-table">
+                            <thead>
+                                <tr>
+                                    <th>&#8470;</th>
+                                    <th>Наименование вида работ</th>
+                                    <th>Ед. изм.</th>
+                                    <th>Объем</th>
+                                    <th>Формула</th>
+                                    <th>Ссылка на чертежи</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vor-tbody"></tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -171,21 +218,255 @@
         fileCounter.textContent = q ? `${visible} / ${totalFiles} файлов` : `${totalFiles} файлов`;
     });
 
+    // ── File Upload ──
+    (function() {
+        var dropArea = document.getElementById('upload-drop-area');
+        var uploadInput = document.getElementById('upload-input');
+        var folderInput = document.getElementById('upload-folder-input');
+
+        // Drag & drop visual
+        ['dragenter','dragover'].forEach(function(ev) {
+            dropArea.addEventListener(ev, function(e) {
+                e.preventDefault(); e.stopPropagation();
+                dropArea.classList.add('drag-over');
+            });
+        });
+        ['dragleave','drop'].forEach(function(ev) {
+            dropArea.addEventListener(ev, function(e) {
+                e.preventDefault(); e.stopPropagation();
+                dropArea.classList.remove('drag-over');
+            });
+        });
+
+        // Drop handler — supports folders via webkitGetAsEntry
+        dropArea.addEventListener('drop', function(e) {
+            var items = e.dataTransfer.items;
+            if (items && items.length > 0 && items[0].webkitGetAsEntry) {
+                // Use FileSystem API to recursively read folders
+                var entries = [];
+                for (var i = 0; i < items.length; i++) {
+                    var entry = items[i].webkitGetAsEntry();
+                    if (entry) entries.push(entry);
+                }
+                collectFilesFromEntries(entries).then(function(fileList) {
+                    var pdfs = fileList.filter(function(fp) {
+                        return fp.file.name.toLowerCase().endsWith('.pdf');
+                    });
+                    if (pdfs.length) sendUpload(pdfs);
+                });
+            } else {
+                // Fallback: plain files
+                var files = Array.from(e.dataTransfer.files)
+                    .filter(function(f) { return f.name.toLowerCase().endsWith('.pdf'); });
+                if (files.length) sendUpload(files.map(function(f) { return {file: f, path: f.name}; }));
+            }
+        });
+
+        // Recursively read all files from entries (FileSystemEntry API)
+        function collectFilesFromEntries(entries) {
+            var result = [];
+            var promises = [];
+            entries.forEach(function(entry) {
+                promises.push(traverseEntry(entry, '', result));
+            });
+            return Promise.all(promises).then(function() { return result; });
+        }
+
+        function traverseEntry(entry, basePath, result) {
+            return new Promise(function(resolve) {
+                if (entry.isFile) {
+                    entry.file(function(f) {
+                        result.push({ file: f, path: basePath ? basePath + '/' + f.name : f.name });
+                        resolve();
+                    });
+                } else if (entry.isDirectory) {
+                    var reader = entry.createReader();
+                    var allEntries = [];
+                    // readEntries may return partial results, call until empty
+                    (function readAll() {
+                        reader.readEntries(function(batch) {
+                            if (batch.length === 0) {
+                                var dirPath = basePath ? basePath + '/' + entry.name : entry.name;
+                                var sub = [];
+                                batch = allEntries;  // process collected entries
+                                var ps = [];
+                                allEntries.forEach(function(child) {
+                                    ps.push(traverseEntry(child, dirPath, result));
+                                });
+                                Promise.all(ps).then(resolve);
+                            } else {
+                                allEntries = allEntries.concat(Array.from(batch));
+                                readAll();
+                            }
+                        });
+                    })();
+                } else {
+                    resolve();
+                }
+            });
+        }
+
+        // File input (plain files)
+        uploadInput.addEventListener('change', function() {
+            if (uploadInput.files.length) {
+                var pdfs = Array.from(uploadInput.files)
+                    .filter(function(f) { return f.name.toLowerCase().endsWith('.pdf'); })
+                    .map(function(f) { return {file: f, path: f.name}; });
+                if (pdfs.length) sendUpload(pdfs);
+            }
+            uploadInput.value = '';
+        });
+
+        // Folder input (webkitdirectory)
+        folderInput.addEventListener('change', function() {
+            if (folderInput.files.length) {
+                var pdfs = Array.from(folderInput.files)
+                    .filter(function(f) { return f.name.toLowerCase().endsWith('.pdf'); })
+                    .map(function(f) {
+                        // webkitRelativePath = "FolderName/sub/file.pdf"
+                        return {file: f, path: f.webkitRelativePath || f.name};
+                    });
+                if (pdfs.length) sendUpload(pdfs);
+            }
+            folderInput.value = '';
+        });
+
+        // Send files + relative paths to backend
+        function sendUpload(fileList) {
+            var form = new FormData();
+            fileList.forEach(function(fp) {
+                form.append('files', fp.file);
+                form.append('paths', fp.path);
+            });
+
+            var progress = document.getElementById('upload-progress');
+            var fill = document.getElementById('upload-fill');
+            var status = document.getElementById('upload-status');
+            progress.classList.remove('hidden');
+            fill.style.width = '0%';
+            status.textContent = '\u23F3 Загрузка ' + fileList.length + ' файлов...';
+
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/upload');
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable)
+                    fill.style.width = Math.round(e.loaded / e.total * 100) + '%';
+            };
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    var d = JSON.parse(xhr.responseText);
+                    status.textContent = '\u2713 Загружено ' + d.files_count + ' файлов';
+                    setTimeout(function() { location.reload(); }, 1200);
+                } else {
+                    var errText = '';
+                    try { errText = JSON.parse(xhr.responseText).detail; } catch(x) { errText = xhr.statusText; }
+                    status.textContent = '\u2717 Ошибка: ' + errText;
+                }
+            };
+            xhr.onerror = function() { status.textContent = '\u2717 Ошибка сети'; };
+            xhr.send(form);
+        }
+    })();
+
     // ── VOR Processing ──
-    function startVor(folderId, folderName) {
+    var _vorFoundItems = [];
+    var _vorFoundTotal = 0;
+    var _currentFolderId = '';
+    var _currentFolderName = '';
+
+    // Download helper — fetch blob and trigger download
+    function downloadVorFile(folderId, filename) {
+        fetch('/api/folder/' + folderId + '/vor_download/' + encodeURIComponent(filename))
+            .then(function(resp) {
+                if (!resp.ok) throw new Error('Ошибка загрузки');
+                return resp.blob();
+            })
+            .then(function(blob) {
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = filename;
+                a.click();
+                URL.revokeObjectURL(a.href);
+            })
+            .catch(function(err) { alert(err.message); });
+    }
+
+    // Render saved VOR files list
+    function renderVorFiles(folderId, files) {
+        var list = document.getElementById('vor-saved-list');
+        var btn = document.getElementById('btn-create-vor');
+        if (!files || files.length === 0) {
+            list.innerHTML = '<p class="vor-no-files">Нет сохранённых ВОР файлов</p>';
+            btn.innerHTML = '&#9997; Создать ВОР';
+        } else {
+            var html = '<div class="vor-files-header">Сохранённые ВОР файлы:</div>';
+            html += '<div class="vor-files-list">';
+            files.forEach(function(f) {
+                html += '<div class="vor-file-row">'
+                    + '<span class="vor-file-icon">&#128196;</span>'
+                    + '<span class="vor-file-name">' + escHtml(f.filename) + '</span>'
+                    + '<span class="vor-file-date">' + f.created + '</span>'
+                    + '<span class="vor-file-size">' + f.size_kb + ' КБ</span>'
+                    + '<button class="btn btn-sm btn-download" onclick="downloadVorFile(\'' + folderId + '\', \'' + escHtml(f.filename) + '\')">&#128190; Скачать</button>'
+                    + '</div>';
+            });
+            html += '</div>';
+            list.innerHTML = html;
+            btn.innerHTML = '&#128260; Пересоздать ВОР';
+        }
+    }
+
+    // Open VOR modal — show saved files, offer create/recreate
+    function openVor(folderId, folderName) {
+        _currentFolderId = folderId;
+        _currentFolderName = folderName;
+
         var modal = document.getElementById('vor-modal');
+        document.getElementById('vor-folder-name').textContent = folderName;
+        document.getElementById('vor-processing').classList.add('hidden');
+        document.getElementById('vor-saved-list').innerHTML = '<p>Загрузка...</p>';
+        modal.classList.remove('hidden');
+
+        // Load saved VOR files
+        fetch('/api/folder/' + folderId + '/vor_files')
+            .then(function(resp) { return resp.json(); })
+            .then(function(data) {
+                renderVorFiles(folderId, data.files || []);
+            })
+            .catch(function() {
+                document.getElementById('vor-saved-list').innerHTML = '<p>Ошибка загрузки</p>';
+            });
+
+        // Wire create/recreate button
+        document.getElementById('btn-create-vor').onclick = function() {
+            startVor(folderId, folderName);
+        };
+    }
+
+    // Start VOR processing (SSE)
+    function startVor(folderId, folderName) {
+        var processing = document.getElementById('vor-processing');
         var fill = document.getElementById('vor-fill');
         var ptext = document.getElementById('vor-ptext');
         var log = document.getElementById('vor-log');
         var results = document.getElementById('vor-results');
         var tbody = document.getElementById('vor-tbody');
+        var foundEl = document.getElementById('vor-found');
+        var foundBody = document.getElementById('vor-found-body');
+        var foundCount = document.getElementById('vor-found-count');
 
-        document.getElementById('vor-folder-name').textContent = folderName;
-        modal.classList.remove('hidden');
+        // Show processing, hide create button
+        processing.classList.remove('hidden');
+        document.getElementById('btn-create-vor').disabled = true;
+        document.getElementById('btn-create-vor').textContent = 'Обработка...';
         results.classList.add('hidden');
+        foundEl.classList.add('hidden');
         log.innerHTML = '';
+        foundBody.innerHTML = '';
         fill.style.width = '0%';
         ptext.textContent = 'Подготовка...';
+        _vorFoundItems = [];
+        _vorFoundTotal = 0;
 
         var src = new EventSource('/api/folder/' + folderId + '/process');
 
@@ -194,19 +475,23 @@
             ptext.textContent = '0 / ' + d.total + ' файлов...';
         });
 
-        src.addEventListener('progress', function(e) {
-            var d = JSON.parse(e.data);
-            var pct = Math.round((d.current / d.total) * 100);
-            fill.style.width = pct + '%';
-            ptext.textContent = d.current + ' / ' + d.total + ': ' + d.filename;
-        });
-
         src.addEventListener('file_done', function(e) {
             var d = JSON.parse(e.data);
             var icon = d.status === 'ok' ? '&#10003;' : '&#10007;';
             var cls = d.status === 'ok' ? 'log-ok' : 'log-err';
             log.innerHTML += '<div class="log-entry ' + cls + '">' + icon + ' ' + escHtml(d.filename) + ' (' + d.items + ' эл.)</div>';
             log.scrollTop = log.scrollHeight;
+
+            if (d.current && d.total) {
+                var pct = Math.round((d.current / d.total) * 100);
+                fill.style.width = pct + '%';
+                ptext.textContent = d.current + ' / ' + d.total + ' файлов...';
+            }
+
+            if (d.status === 'ok' && d.items_detail && d.items_detail.length > 0) {
+                _vorFoundItems.push({ filename: d.filename, items: d.items_detail });
+                _vorFoundTotal += d.items_detail.length;
+            }
         });
 
         src.addEventListener('done', function(e) {
@@ -215,24 +500,93 @@
             fill.style.width = '100%';
             ptext.textContent = 'Готово: ' + d.files_processed + ' / ' + d.total_files + ' файлов';
 
+            if (_vorFoundItems.length > 0) {
+                renderFoundItems(foundBody, _vorFoundItems);
+                foundCount.textContent = '(' + _vorFoundTotal + ' шт.)';
+                foundEl.classList.remove('hidden');
+            }
+
             tbody.innerHTML = '';
             (d.aggregated || []).forEach(function(item) {
                 var tr = document.createElement('tr');
-                tr.innerHTML = '<td>' + item.row + '</td><td>' + escHtml(item.name) + '</td><td>' + item.unit + '</td><td>' + item.total + '</td><td class="mono">' + escHtml(item.formula) + '</td><td>' + escHtml(item.drawing_refs) + '</td>';
+                if (item.is_section_header) {
+                    tr.className = 'vor-section-header';
+                    tr.innerHTML = '<td colspan="6"><strong>' + escHtml(item.name) + '</strong></td>';
+                } else if (item.is_material) {
+                    tr.className = 'vor-material-row';
+                    tr.innerHTML = '<td></td><td class="indent">' + escHtml(item.name) + '</td><td>' + item.unit + '</td><td>' + item.total + '</td><td class="mono">' + escHtml(item.formula || '') + '</td><td>' + escHtml(item.drawing_refs || '') + '</td>';
+                } else {
+                    tr.innerHTML = '<td>' + item.row + '</td><td>' + escHtml(item.name) + '</td><td>' + item.unit + '</td><td>' + item.total + '</td><td class="mono">' + escHtml(item.formula || '') + '</td><td>' + escHtml(item.drawing_refs || '') + '</td>';
+                }
                 tbody.appendChild(tr);
             });
             results.classList.remove('hidden');
 
-            document.getElementById('btn-vor-xlsx').onclick = function() {
-                window.location.href = '/api/folder/' + folderId + '/export_xlsx';
-            };
+            // Re-enable create button and refresh file list
+            var btn = document.getElementById('btn-create-vor');
+            btn.disabled = false;
+            btn.innerHTML = '&#128260; Пересоздать ВОР';
+
+            // Refresh saved files list (new file should appear)
+            fetch('/api/folder/' + folderId + '/vor_files')
+                .then(function(resp) { return resp.json(); })
+                .then(function(data) { renderVorFiles(folderId, data.files || []); });
         });
 
         src.onerror = function() {
             src.close();
             ptext.textContent = 'Ошибка соединения';
+            var btn = document.getElementById('btn-create-vor');
+            btn.disabled = false;
+            btn.innerHTML = '&#9997; Создать ВОР';
         };
     }
+
+    function renderFoundItems(container, fileItems) {
+        container.innerHTML = '';
+        fileItems.forEach(function(fi) {
+            // File header (collapsible)
+            var group = document.createElement('div');
+            group.className = 'found-file-group';
+
+            var header = document.createElement('div');
+            header.className = 'found-file-header';
+            header.innerHTML = '<span class="found-file-arrow">&#9654;</span> '
+                + '<strong>' + escHtml(fi.filename) + '</strong>'
+                + ' <span class="found-file-badge">' + fi.items.length + '</span>';
+            group.appendChild(header);
+
+            var table = document.createElement('table');
+            table.className = 'found-items-table hidden';
+            var thead = '<thead><tr><th>Обозн.</th><th>Наименование</th><th>Кол-во</th><th>Ед.</th></tr></thead>';
+            table.innerHTML = thead;
+            var tbodyEl = document.createElement('tbody');
+            fi.items.forEach(function(it) {
+                var tr = document.createElement('tr');
+                tr.innerHTML = '<td class="found-sym">' + escHtml(it.symbol || '') + '</td>'
+                    + '<td>' + escHtml(it.name) + '</td>'
+                    + '<td class="found-qty">' + (it.total || '') + '</td>'
+                    + '<td class="found-unit">' + escHtml(it.unit || '') + '</td>';
+                tbodyEl.appendChild(tr);
+            });
+            table.appendChild(tbodyEl);
+            group.appendChild(table);
+
+            header.addEventListener('click', function() {
+                var hidden = table.classList.toggle('hidden');
+                header.querySelector('.found-file-arrow').innerHTML = hidden ? '&#9654;' : '&#9660;';
+            });
+
+            container.appendChild(group);
+        });
+    }
+
+    // Toggle entire found-items section
+    document.getElementById('vor-found-toggle').addEventListener('click', function() {
+        var body = document.getElementById('vor-found-body');
+        var hidden = body.classList.toggle('hidden');
+        this.querySelector('.vor-found-arrow').innerHTML = hidden ? '&#9654;' : '&#9660;';
+    });
 
     function escHtml(t) {
         var d = document.createElement('div');

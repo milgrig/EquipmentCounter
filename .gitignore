@@ -3,6 +3,7 @@
 
 # Test data and large binary files
 Data/
+uploads/
 
 # Python
 __pycache__/
