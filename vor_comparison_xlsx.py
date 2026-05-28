@@ -595,6 +595,14 @@ def _names_match(ref_name: str, our_name: str) -> float:
     if r_has_flat and not r_has_round and o_has_round and not o_has_flat:
         return 0.0
 
+    # Refuse to match different luminaire models
+    # (prevents CD LED from stealing INSEL row, SLICK from matching ARCTIC, etc.)
+    _LUMI_MODELS = ["insel", "slick", "arctic", "cd led", "mercury", "atom", "mars", "luna"]
+    r_lumi = [m for m in _LUMI_MODELS if m in rl]
+    o_lumi = [m for m in _LUMI_MODELS if m in ol]
+    if r_lumi and o_lumi and r_lumi != o_lumi:
+        return 0.0
+
     # Refuse to match different cable brands (ВБШвнг vs ППГнг vs ВВГнг)
     _CABLE_BRANDS = ["вбшвнг", "ппгнг", "ввгнг"]
     r_brands = [b for b in _CABLE_BRANDS if b in rl]
@@ -756,6 +764,11 @@ def _build_comparison(our_rows: list[dict], ref_rows: list[dict]) -> list[dict]:
             score = _names_match(ref_name, orow["name"])
             if score < 0.5:
                 continue
+
+            # Exact name match: strong bonus to prevent height-context
+            # mismatch from stealing a perfect match (e.g., INSEL row)
+            if score >= 1.0:
+                score += 0.5
 
             # Bonus for matching height context
             if ref_height_context and ohctx:

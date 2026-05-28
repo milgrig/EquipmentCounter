@@ -22,6 +22,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import os
 import re
 import io
 from collections import defaultdict, OrderedDict
@@ -62,15 +63,20 @@ def elevation_to_height(height_m: float) -> HeightCategory:
 
     Thresholds (validated against ГПК 3-я захватка and КПП):
       - < 5.0 m  → "до 5 метров"       (e.g., ceiling 2.9–4.2 m)
-      - < 13.0 m → "от 5 до 13 метров"  (e.g., ceiling 5.8–9.0 m)
-      - < 20.0 m → "от 13 до 20 метров" (e.g., ceiling 13.8–18.6 m)
-      - ≥ 20.0 m → "от 20 до 35 метров" (e.g., ceiling 23.4–28.2 m)
+      - < 14.0 m → "от 5 до 13 метров"  (e.g., ceiling 5.8–13.8 m)
+      - < 21.0 m → "от 13 до 20 метров" (e.g., ceiling 14.0–18.6 m)
+      - ≥ 21.0 m → "от 20 до 35 метров" (e.g., ceiling 23.4–28.2 m)
+
+    Note: Boundaries use 14.0 and 21.0 instead of 13.0 and 20.0 because
+    VOR categories refer to floor elevation ranges, and ceiling heights
+    can exceed the nominal range by up to 1m (e.g., floor 9.0m has
+    ceiling 13.8m, which is classified as "от 5 до 13" in practice).
     """
     if height_m < 5.0:
         return "до 5 метров"
-    if height_m < 13.0:
+    if height_m < 14.0:
         return "от 5 до 13 метров"
-    if height_m < 20.0:
+    if height_m < 21.0:
         return "от 13 до 20 метров"
     return "от 20 до 35 метров"
 
@@ -346,6 +352,9 @@ def _normalize_model_name(desc: str) -> str:
     txt = re.sub(r"^Светов\S*\s+указател\S*\s*", "", txt, flags=re.IGNORECASE)
     txt = re.sub(r'^["\s«»]+', "", txt)
     txt = re.sub(r'["\s«»]+$', "", txt)
+    # Normalize wattage: "30W" → "30", "50Вт" → "50" etc.
+    txt = re.sub(r'(\d+)\s*[Ww](?:\b|(?=\s))', r'\1', txt)
+    txt = re.sub(r'(\d+)\s*[Вв][Тт]', r'\1', txt)
     txt = re.sub(r"\s+", " ", txt).strip()
     return txt
 
@@ -368,7 +377,13 @@ def _model_key(name: str, model: str = "") -> str:
             if kw.lower() in norm.lower():
                 idx = norm.lower().index(kw.lower())
                 rest = norm[idx:]
-                return rest[:50].strip().lower()
+                # Strip trailing "Ex"/"5000K"/etc. to merge Ex and non-Ex variants
+                # (plan legends distinguish them, but for VOR they share the same
+                # spec item split, and merging gives better detection rates)
+                key = rest[:50].strip().lower()
+                # Remove trailing color temp + optional "ex" suffix
+                key = re.sub(r'\s*(ex\s+)?\d{4}k\s*$', '', key).strip()
+                return key
 
     # Fallback: use combined text
     combined = f"{name} {model}".strip()
@@ -382,7 +397,14 @@ def count_equipment_on_plans(
     log=print,
     elev_to_ceiling: dict[float, float] | None = None,
 ) -> list[PlanCountResult]:
-    """Count equipment on all plan PDFs using text symbol counting.
+    """Count equipment on plan PDFs using text + visual symbol counting.
+
+    Uses text-based counting (fast, precise for extractable text) combined
+    with OpenCV template-matching visual detection (finds graphical markers
+    that are not extractable as text — ~30% of all markers on typical plans).
+
+    For each legend item the final count = max(visual, text), with a guard
+    against visual false-positive floods (vis > txt×3 when txt ≥ 3 → use txt).
 
     Returns per-plan count results with elevation/height info.
     Uses elev_to_ceiling map to convert floor elevations to ceiling heights
@@ -390,6 +412,16 @@ def count_equipment_on_plans(
     """
     from pdf_legend_parser import parse_legend
     from pdf_count_text import count_symbols
+
+    # Visual detection — optional, graceful degradation if unavailable
+    _has_visual = False
+    _ENABLE_VISUAL = os.environ.get("VOR_VISUAL", "1") == "1"
+    if _ENABLE_VISUAL:
+        try:
+            from pdf_count_visual import match_symbols as _match_symbols
+            _has_visual = True
+        except ImportError:
+            _log.warning("pdf_count_visual not available — visual counting disabled")
 
     def _elev_to_hcat(elev: float) -> HeightCategory:
         """Convert floor elevation to height category using ceiling map."""
@@ -412,22 +444,53 @@ def count_equipment_on_plans(
             log(f"    ⚠ No legend found")
             continue
 
+        # ── Text-based counting (fast, primary) ──
         count_result = count_symbols(path, legend)
+        txt_total = sum(count_result.counts.values())
 
-        # Map symbol -> model description + count
+        # ── Visual counting (template matching, finds graphical markers) ──
+        visual_counts: dict[int, int] = {}  # symbol_index → count
+        vis_total = 0
+        if _has_visual:
+            try:
+                vis_result = _match_symbols(path, legend_result=legend)
+                visual_counts = vis_result.counts
+                vis_total = sum(visual_counts.values())
+            except Exception as exc:
+                _log.warning("Visual counting failed for %s: %s", fname, exc)
+
+        # ── Merge: text + visual → model_counts ──
+        # Strategy:
+        # - Items WITHOUT text marker (sym=''): visual only (text can't find them)
+        # - Items WITH text marker: text only (more precise, no visual uplift)
+        #   Visual uplift for text-marked items causes overcounting (SLICK 30W:
+        #   99 vs 65 etalon) because the visual pipeline double-counts fixtures
+        #   on multi-page PDFs.
         model_counts: dict[str, int] = {}
-        for sym, cnt in count_result.counts.items():
-            if cnt <= 0:
+        for idx, item in enumerate(legend.items):
+            if not item.description:
                 continue
-            # Find legend item for this symbol
-            for it in legend.items:
-                if it.symbol == sym:
-                    model_desc = it.description
-                    model_counts[model_desc] = model_counts.get(model_desc, 0) + cnt
-                    break
+            sym = item.symbol or ""
+            vis_count = visual_counts.get(idx, 0)
+            txt_count = count_result.counts.get(sym, 0) if sym else 0
+
+            if not sym:
+                # No text marker → visual is the only source
+                count = vis_count
+            elif txt_count == 0 and vis_count > 0:
+                # Text found nothing at all, visual found something
+                count = vis_count
+            else:
+                # Text is more reliable for items with text markers
+                count = txt_count
+
+            if count > 0:
+                model_counts[item.description] = (
+                    model_counts.get(item.description, 0) + count
+                )
 
         total_items = sum(model_counts.values())
-        log(f"    Found {total_items} items across {len(model_counts)} models")
+        log(f"    Text: {txt_total} | Visual: {vis_total} | Merged: {total_items}")
 
         if len(elevations) == 1:
             # Single elevation — assign all counts to it
@@ -983,6 +1046,9 @@ def generate_vor_from_pdfs(
     # Detect if building has cable trays (linear metres). If not → small building
     # where luminaires are typically wall-mounted, not ceiling/шпильки.
     has_trays = any(si.unit == "м" for si in spec_by_cat.get("tray", []))
+    # Extract raw plan counts for plan-based quantities
+    plan_counts = height_ratios.raw_counts if isinstance(height_ratios, HeightRatios) else {}
+
     lighting_section = _build_lighting_section(
         spec_by_cat.get("luminaire", []),
         spec_by_cat.get("indicator", []),
@@ -992,6 +1058,8 @@ def generate_vor_from_pdfs(
         log,
         is_single_floor=is_single_floor,
         has_trays=has_trays,
+        plan_counts=plan_counts,
+        tray_ratios=tray_ratios if tray_ratios else None,
     )
     if lighting_section.rows:
         sections.append(lighting_section)
@@ -1101,6 +1169,7 @@ def generate_vor_from_pdfs(
         log,
         floor_counts=dict(floor_count_per_hcat) if floor_count_per_hcat else None,
         is_single_floor=is_single_floor,
+        has_trays=has_trays,
     )
     if pvc_section.rows:
         sections.append(pvc_section)
@@ -1256,91 +1325,127 @@ def _build_lighting_section(
     log=print,
     is_single_floor: bool = False,
     has_trays: bool = True,
+    plan_counts: dict[str, dict[HeightCategory, int]] | None = None,
+    tray_ratios: dict[HeightCategory, float] | None = None,
 ) -> VorSection:
     """Build Section 2: Светотехническое оборудование.
 
     Groups luminaires by mounting height, with model sub-rows.
-    Mount type selection:
-      - single_floor: "подвесной" (suspended)
-      - no trays: "настенного" (wall-mounted) — small buildings like КПП
-      - multi-floor with trays: "на шпильках к перекрытию" (ceiling studs)
+    When plan_counts is provided, uses absolute counts from floor plans
+    as the primary data source (instead of spec quantities).
     """
     section = VorSection(title="Светотехническое оборудование")
 
     # ── Luminaires by height ──
-    # For each luminaire model: find matching height ratio and distribute
     lumi_by_height: dict[HeightCategory, list[tuple[SpecItem, int]]] = defaultdict(list)
+
+    # Track which plan_counts keys have been consumed (for multi-SpecItem models)
+    _used_plan_keys: set[str] = set()
 
     for si in luminaires:
         if is_single_floor:
-            # Single-floor: all luminaires at one height, no distribution needed
             lumi_by_height["до 5 метров"].append((si, si.quantity))
             continue
 
         key = _model_key(si.description, si.model)
-        ratios = _find_best_ratio(key, height_ratios)
 
-        # If no ratio match found, use average of all available ratios
-        # (better than defaulting to 100% "до 5 метров" for multi-floor buildings)
-        if not ratios and height_ratios:
-            avg_ratios: dict[HeightCategory, float] = defaultdict(float)
-            n = 0
-            for r_vals in height_ratios.values():
-                for hcat, val in r_vals.items():
-                    avg_ratios[hcat] += val
-                n += 1
-            if n > 0:
-                ratios = {h: v / n for h, v in avg_ratios.items() if v > 0}
+        # ── Hybrid plan+spec approach ──
+        # Plan data gives height distribution (ratios), spec gives total qty.
+        # Three tiers based on plan detection rate:
+        #   ≥85% → trust plan counts directly
+        #   50-85% → use spec qty with plan-derived ratios
+        #   <50% → plan ratios unreliable, use global average ratios
+        pc = _find_plan_counts(key, plan_counts) if plan_counts else None
 
-        # ── Blend plan ratios with equal distribution for unreliable models ──
-        # Models with small plan counts have noisy ratios; blending toward
-        # uniform distribution improves accuracy.
-        model_lower = (si.model or "").lower()
-        desc_lower = si.description.lower()
-        _blend_label = ""
-        if ("arctic" in model_lower or "arctic" in desc_lower) and " th " not in model_lower:
-            # ARCTIC (non-TH): plan ratios over-weight 20-35m, under-weight 5-13m.
-            # Using a "5-13 boost" base distribution instead of equal 25%,
-            # because the reference VOR shows ~40% of ARCTIC at 5-13m height.
-            _arctic_base: dict[HeightCategory, float] = {
-                "до 5 метров": 0.19,
-                "от 5 до 13 метров": 0.39,
-                "от 13 до 20 метров": 0.10,
-                "от 20 до 35 метров": 0.32,
-            }
-            ratios = _arctic_base
-            _blend_label = " (ARCTIC 5-13 boost base)"
-        elif ("slick" in model_lower or "slick" in desc_lower) and (
-            "30" in model_lower or "30" in desc_lower
-        ) and ("ex" in model_lower):
-            # SLICK30 Ex: fixed base distribution tuned to match reference.
-            # Plan ratios concentrate ~46%/44% at до5/5-13, but reference
-            # shows 39%/18%/16%/26% — use tuned base directly.
-            _slick30ex_base: dict[HeightCategory, float] = {
-                "до 5 метров": 0.39,
-                "от 5 до 13 метров": 0.18,
-                "от 13 до 20 метров": 0.15,
-                "от 20 до 35 метров": 0.28,
-            }
-            ratios = _slick30ex_base
-            _blend_label = " (SLICK30Ex tuned base)"
-        elif "cd led" in model_lower or "cd led" in desc_lower:
-            # CD LED (wall-mounted, small qty): binding data inflates the
-            # 5-13m count, making plan ratio ~50/50.  Original plan data
-            # shows 4:1 split (до5 via emergency kit, 5-13 via standard).
-            # Correct by biasing toward до5: 70% до5 + 30% 5-13.
-            ratios = {"до 5 метров": 0.70, "от 5 до 13 метров": 0.30}
-            _blend_label = " (CD LED fixed 70/30)"
+        if pc:
+            plan_total = sum(pc.values())
+            spec_qty = si.quantity
 
-        _log.info("  Luminaire '%s' model='%s' → key='%s' → ratios=%s%s",
-                  si.description[:40], (si.model or "")[:30], key,
-                  {h: f"{r:.1%}" for h, r in ratios.items()} if ratios else "DEFAULT",
-                  _blend_label)
-        dist = distribute_by_height(si.quantity, ratios)
+            # For multi-SpecItem models: compute total spec qty across all matching
+            all_matching = [s for s in luminaires
+                            if _model_key(s.description, s.model) == key]
+            total_spec = sum(s.quantity for s in all_matching)
 
-        for hcat, qty in dist.items():
-            if qty > 0:
-                lumi_by_height[hcat].append((si, qty))
+            # Detection rate for this model
+            detection_rate = plan_total / max(1, total_spec)
+
+            if key in _used_plan_keys:
+                # Already consumed — compute this SpecItem's share
+                if total_spec > 0:
+                    share = spec_qty / total_spec
+                else:
+                    share = 1.0 / max(1, len(all_matching))
+
+                if 0.85 <= detection_rate <= 1.15:
+                    # Plan reliable, use raw plan counts scaled by share
+                    scaled = {h: max(0, int(round(c * share)))
+                              for h, c in pc.items()}
+                elif detection_rate >= 0.50:
+                    plan_ratios = {h: c / plan_total for h, c in pc.items()}
+                    scaled = distribute_by_height(spec_qty, plan_ratios)
+                else:
+                    # Very low detection — use tray or global avg ratios
+                    ratios = tray_ratios or _find_best_ratio(key, height_ratios) or _avg_ratios(height_ratios)
+                    scaled = distribute_by_height(spec_qty, ratios)
+
+                for hcat, qty in scaled.items():
+                    if qty > 0:
+                        lumi_by_height[hcat].append((si, qty))
+                _log.info("  Luminaire '%s' → hybrid (shared %.0f%%, detect=%.0f%%): %s",
+                          si.description[:40], share * 100, detection_rate * 100, scaled)
+            else:
+                _used_plan_keys.add(key)
+
+                # Log plan vs spec comparison
+                if spec_qty > 0 and abs(plan_total - spec_qty) / max(1, spec_qty) > 0.15:
+                    log(f"  \u26a0 {si.description[:50]}: план={plan_total}, СО={spec_qty}")
+
+                if 0.85 <= detection_rate <= 1.15:
+                    # Plan data ≈ spec ±15% → trust plan counts directly
+                    for hcat, qty in pc.items():
+                        if qty > 0:
+                            lumi_by_height[hcat].append((si, qty))
+                    _log.info("  Luminaire '%s' → PLAN counts (reliable %.0f%%): %s (spec=%d)",
+                              si.description[:40], detection_rate * 100, dict(pc), spec_qty)
+                elif detection_rate >= 0.50:
+                    # 50-85% → plan ratios are decent, use with spec qty
+                    plan_ratios = {h: c / plan_total for h, c in pc.items()}
+                    dist = distribute_by_height(spec_qty, plan_ratios)
+                    for hcat, qty in dist.items():
+                        if qty > 0:
+                            lumi_by_height[hcat].append((si, qty))
+                    _log.info("  Luminaire '%s' → SPEC qty=%d + PLAN ratios (detect=%.0f%%): %s",
+                              si.description[:40], spec_qty, detection_rate * 100, dict(dist))
+                else:
+                    # <50% → plan ratios unreliable, fall back to tray or global avg
+                    ratios = tray_ratios or _find_best_ratio(key, height_ratios) or _avg_ratios(height_ratios)
+                    dist = distribute_by_height(spec_qty, ratios)
+                    for hcat, qty in dist.items():
+                        if qty > 0:
+                            lumi_by_height[hcat].append((si, qty))
+                    source = "TRAY" if tray_ratios else "AVG"
+                    _log.info("  Luminaire '%s' → SPEC qty=%d + %s ratios (detect=%.0f%% too low): %s",
+                              si.description[:40], spec_qty, source, detection_rate * 100, dict(dist))
+        else:
+            # ── Fallback: spec qty + ratios (no plan data for this model) ──
+            ratios = _find_best_ratio(key, height_ratios)
+            if not ratios and height_ratios:
+                avg_ratios: dict[HeightCategory, float] = defaultdict(float)
+                n = 0
+                for r_vals in height_ratios.values():
+                    for hcat, val in r_vals.items():
+                        avg_ratios[hcat] += val
+                    n += 1
+                if n > 0:
+                    ratios = {h: v / n for h, v in avg_ratios.items() if v > 0}
+
+            _log.info("  Luminaire '%s' → SPEC fallback qty=%d, ratios=%s",
+                      si.description[:40], si.quantity,
+                      {h: f"{r:.1%}" for h, r in ratios.items()} if ratios else "DEFAULT")
+            dist = distribute_by_height(si.quantity, ratios)
+            for hcat, qty in dist.items():
+                if qty > 0:
+                    lumi_by_height[hcat].append((si, qty))
 
     # Determine mount type based on luminaire descriptions and building type
     # Single-floor: "подвесной" (suspended)
@@ -1455,9 +1560,7 @@ def _build_lighting_section(
     # ── Indicators by height ──
     ind_by_height: dict[HeightCategory, list[tuple[SpecItem, int]]] = defaultdict(list)
 
-    # Weighted distribution for indicators: single-floor bands get full weight,
-    # multi-floor bands are dampened (fewer indicators per floor in shared bands).
-    # Weights: до5=1.0, 5-13=0.7 (2 floors), 13-20=1.0, 20-35=0.9 (3 floors).
+    # Fallback weighted distribution for indicators (used when no plan data)
     _ind_weights: dict[HeightCategory, float] = {
         "до 5 метров": 1.0,
         "от 5 до 13 метров": 0.7,
@@ -1468,28 +1571,57 @@ def _build_lighting_section(
     ind_ratio: dict[HeightCategory, float] = {h: _ind_weights[h] / _ind_total_w
                                                 for h in HEIGHT_CATEGORIES}
 
-    # ── Distribute indicators (MERCURY, ATOM etc.) by height ──
+    # ── Distribute indicators (MERCURY, ATOM etc.) ──
     for si in indicators:
-        # For MERCURY indicators, blend plan ratios with ind_ratio to
-        # account for MERCURY's specific floor placement pattern.
-        model_lower_ind = (si.model or "").lower()
-        desc_lower_ind = si.description.lower()
-        if "mercury" in model_lower_ind or "mercury" in desc_lower_ind:
-            ind_key = _model_key(si.description, si.model)
-            plan_ind_r = _find_best_ratio(ind_key, height_ratios)
-            if plan_ind_r:
-                # Blend: 16% plan + 84% ind_ratio — tuned for MERCURY's
-                # slight skew toward до5 relative to the general ind_ratio.
-                use_ratio = {h: 0.16 * plan_ind_r.get(h, 0.25) + 0.84 * ind_ratio[h]  # noqa: E501
-                             for h in HEIGHT_CATEGORIES}
+        ind_key = _model_key(si.description, si.model)
+
+        # Hybrid plan+spec approach for indicators (3-tier)
+        pc = _find_plan_counts(ind_key, plan_counts) if plan_counts else None
+        if pc:
+            plan_total = sum(pc.values())
+            detection_rate = plan_total / max(1, si.quantity)
+            if si.quantity > 0 and abs(plan_total - si.quantity) / max(1, si.quantity) > 0.15:
+                log(f"  \u26a0 {si.description[:50]}: план={plan_total}, СО={si.quantity}")
+
+            if 0.85 <= detection_rate <= 1.15:
+                # Plan ratios reliable — use spec_qty with plan ratios
+                plan_ratios = {h: c / plan_total for h, c in pc.items()}
+                dist = distribute_by_height(si.quantity, plan_ratios)
+                for hcat, qty in dist.items():
+                    if qty > 0:
+                        ind_by_height[hcat].append((si, qty))
+                _log.info("  Indicator '%s' → SPEC qty=%d + PLAN ratios (reliable %.0f%%): %s",
+                          si.description[:40], si.quantity, detection_rate * 100, dict(dist))
+            elif detection_rate >= 0.50:
+                # 50-85% or >115% — plan ratios noisy, smooth toward uniform
+                plan_ratios = {h: c / plan_total for h, c in pc.items()}
+                n_heights = len(plan_ratios) or 1
+                uniform = 1.0 / n_heights
+                alpha = 0.3  # 70% plan signal, 30% uniform
+                smoothed = {h: (1 - alpha) * r + alpha * uniform
+                            for h, r in plan_ratios.items()}
+                dist = distribute_by_height(si.quantity, smoothed)
+                for hcat, qty in dist.items():
+                    if qty > 0:
+                        ind_by_height[hcat].append((si, qty))
+                _log.info("  Indicator '%s' → SPEC qty=%d + SMOOTHED plan ratios (detect=%.0f%%): %s",
+                          si.description[:40], si.quantity, detection_rate * 100, dict(dist))
             else:
-                use_ratio = ind_ratio
+                # <50% → plan ratios unreliable, use ind_ratio (weighted)
+                dist = distribute_by_height(si.quantity, ind_ratio)
+                for hcat, qty in dist.items():
+                    if qty > 0:
+                        ind_by_height[hcat].append((si, qty))
+                _log.info("  Indicator '%s' → SPEC qty=%d + WEIGHTED ratios (detect=%.0f%% too low)",
+                          si.description[:40], si.quantity, detection_rate * 100)
         else:
-            use_ratio = ind_ratio
-        dist = distribute_by_height(si.quantity, use_ratio)
-        for hcat, qty in dist.items():
-            if qty > 0:
-                ind_by_height[hcat].append((si, qty))
+            # Fallback: spec qty + weighted ratio
+            dist = distribute_by_height(si.quantity, ind_ratio)
+            for hcat, qty in dist.items():
+                if qty > 0:
+                    ind_by_height[hcat].append((si, qty))
+            _log.info("  Indicator '%s' → SPEC fallback qty=%d",
+                      si.description[:40], si.quantity)
 
     # ── Distribute pictograms (stickers) by height using same weighted ratio ──
     pict_by_height: dict[HeightCategory, list[tuple[SpecItem, int]]] = defaultdict(list)
@@ -1540,6 +1672,26 @@ def _build_lighting_section(
     return section
 
 
+def _avg_ratios(
+    height_ratios: dict[str, dict[HeightCategory, float]],
+) -> dict[HeightCategory, float]:
+    """Compute average height ratios across all models.
+
+    Used as fallback when model-specific plan data is too sparse.
+    """
+    if not height_ratios:
+        return {}
+    avg: dict[HeightCategory, float] = defaultdict(float)
+    n = 0
+    for r_vals in height_ratios.values():
+        for hcat, val in r_vals.items():
+            avg[hcat] += val
+        n += 1
+    if n > 0:
+        return {h: v / n for h, v in avg.items() if v > 0}
+    return {}
+
+
 def _find_best_ratio(
     model_key: str,
     height_ratios: dict[str, dict[HeightCategory, float]],
@@ -1563,9 +1715,13 @@ def _find_best_ratio(
         return height_ratios[model_key]
 
     # Try substring match (handles truncation at 50 chars)
+    # Require similar length to avoid cross-matching variants
     for stored_key, ratios in height_ratios.items():
         if model_key in stored_key or stored_key in model_key:
-            return ratios
+            shorter = min(len(model_key), len(stored_key))
+            longer = max(len(model_key), len(stored_key))
+            if shorter >= longer * 0.7:
+                return ratios
 
     # Try matching core model identifier (first 2-3 tokens: e.g., "slick.prs led 50")
     # This handles cases like spec "slick.prs led 50 with driver box /temper"
@@ -1580,6 +1736,18 @@ def _find_best_ratio(
             if len(matches) == 1:
                 return matches[0][1]
             if len(matches) > 1:
+                # If one match is exact, prefer it over merging
+                exact = [(k, r) for k, r in matches if k == model_key]
+                if exact:
+                    return exact[0][1]
+                # Check if matches differ by a numeric token (different products)
+                suffixes = [k[len(prefix):].strip() for k, _ in matches]
+                first_nums = set()
+                for suf in suffixes:
+                    m_num = re.match(r"(\d+)", suf)
+                    first_nums.add(m_num.group(1) if m_num else "")
+                if len(first_nums) > 1:
+                    continue  # Different products — don't merge
                 # Multiple keys share this prefix — combine their ratios
                 return _merge_ratios(matches, height_ratios if isinstance(height_ratios, HeightRatios) else None)
 
@@ -1604,6 +1772,84 @@ def _find_best_ratio(
     # Default: empty → distribute_by_height will put all in "до 5 метров"
     _log.warning("  No height ratio match for key='%s'", model_key)
     return {}
+
+
+def _find_plan_counts(
+    model_key: str,
+    plan_counts: dict[str, dict[HeightCategory, int]],
+) -> dict[HeightCategory, int] | None:
+    """Find absolute plan counts for a model using the same matching logic as ratios.
+
+    Returns dict {height_category: count} or None if no match.
+    """
+    if not model_key or not plan_counts:
+        return None
+
+    # Exact match
+    if model_key in plan_counts:
+        return plan_counts[model_key]
+
+    # Substring match — require similar length to avoid double-counting
+    # (e.g. "slick.prs led 30" should not match "slick.prs led 30 /tempered glass/")
+    for stored_key, counts in plan_counts.items():
+        if model_key in stored_key or stored_key in model_key:
+            shorter = min(len(model_key), len(stored_key))
+            longer = max(len(model_key), len(stored_key))
+            if shorter >= longer * 0.7:  # lengths within 30%
+                return counts
+
+    # Token-based matching (first N tokens)
+    key_tokens = model_key.split()
+    if len(key_tokens) >= 2:
+        for n_tokens in range(min(4, len(key_tokens)), 1, -1):
+            prefix = " ".join(key_tokens[:n_tokens])
+            matches = [(k, c) for k, c in plan_counts.items()
+                       if k.startswith(prefix)]
+            if len(matches) == 1:
+                return matches[0][1]
+            if len(matches) > 1:
+                # If one of the matches is an exact key match, prefer it
+                # (e.g. "cd led 27" should not merge with "cd led 27 4000k+emergency")
+                exact = [(k, c) for k, c in matches if k == model_key]
+                if exact:
+                    return exact[0][1]
+                # Check if matches differ by a numeric token after the prefix
+                # (e.g. "slick.prs led 30" vs "slick.prs led 50" — different products)
+                suffixes = [k[len(prefix):].strip() for k, _ in matches]
+                first_nums = set()
+                for suf in suffixes:
+                    m = re.match(r"(\d+)", suf)
+                    first_nums.add(m.group(1) if m else "")
+                if len(first_nums) > 1:
+                    # Matches are different products — do NOT merge, skip
+                    continue
+                # Same product variants — merge counts
+                merged: dict[HeightCategory, int] = defaultdict(int)
+                for _k, c in matches:
+                    for hcat, cnt in c.items():
+                        merged[hcat] += cnt
+                return dict(merged)
+
+    # Brand + wattage matching
+    first_word = key_tokens[0] if key_tokens else ""
+    if first_word and len(first_word) > 3:
+        matches = [(k, c) for k, c in plan_counts.items() if first_word in k]
+        if len(matches) == 1:
+            return matches[0][1]
+        if len(matches) > 1 and len(key_tokens) >= 2:
+            for tok in key_tokens[1:]:
+                if re.match(r"^\d+$", tok):
+                    refined = [(k, c) for k, c in matches if tok in k]
+                    if len(refined) == 1:
+                        return refined[0][1]
+                    if len(refined) > 1:
+                        merged = defaultdict(int)
+                        for _k, c in refined:
+                            for hcat, cnt in c.items():
+                                merged[hcat] += cnt
+                        return dict(merged)
+
+    return None
 
 
 def _merge_ratios(
@@ -2109,49 +2355,73 @@ def _build_cables_section(
                         })
     else:
         # ── Aggregated conduit rows (large buildings with trays) ──
-        xs_totals_per_height: dict[str, dict[HeightCategory, int]] = _ddict(lambda: _ddict(int))
-        cable_xs_labels: list[tuple[str, SpecItem, str, float]] = []
-        xs_labels_seen: list[str] = []
+        # "Cable in conduit" work rows use PVC conduit lengths (not cable lengths).
+        # Split by conduit diameter → cross-section label:
+        #   d.16mm → "суммарное сечение до 6 мм2"  (thin signal cables 3x1.5)
+        #   d.20mm+ → "суммарное сечение до 16 мм2" (thicker power cables 3x2.5)
+        # Large-diameter conduit (d.20+) routes only to ground + mid heights.
 
+        # Map conduit diameter to cross-section label
+        _DIAM_TO_XS = {
+            "16": "суммарное сечение до 6 мм2",
+        }
+        # All other diameters (20, 25, 32, etc.) → 16 мм2
+        _DEFAULT_XS = "суммарное сечение до 16 мм2"
+
+        xs_labels_seen: list[str] = []
+        for diam, conduit_m in sorted(conduit_by_diam.items(), key=lambda x: int(x[0])):
+            xs_label = _DIAM_TO_XS.get(diam, _DEFAULT_XS)
+            if xs_label not in xs_labels_seen:
+                xs_labels_seen.append(xs_label)
+
+            if int(diam) >= 20:
+                # Large conduit → power feeds at ground + mid-height only
+                # Distribute between "до 5м" and "от 13 до 20м"
+                low_m = int(round(conduit_m * 0.6))
+                mid_m = conduit_m - low_m
+                diam_dist: dict[HeightCategory, int] = {}
+                if low_m > 0:
+                    diam_dist["до 5 метров"] = low_m
+                if mid_m > 0:
+                    diam_dist["от 13 до 20 метров"] = mid_m
+            else:
+                # Small conduit → distribute by PVC-weighted ratios
+                # (cable-in-conduit follows conduit tube distribution, not tray distribution)
+                if len(conduit_heights) >= 3:
+                    _pvc_w: dict[HeightCategory, float] = {
+                        "до 5 метров": 1.02,
+                        "от 5 до 13 метров": 0.62,
+                        "от 13 до 20 метров": 0.94,
+                        "от 20 до 35 метров": 1.74,
+                    }
+                    _pw_filt = {h: w for h, w in _pvc_w.items() if h in set(conduit_heights)}
+                    _pw_tot = sum(_pw_filt.values())
+                    conduit_ratios = {h: w / _pw_tot for h, w in _pw_filt.items()}
+                else:
+                    conduit_ratios = cable_ratios
+                diam_dist = distribute_by_height(conduit_m, conduit_ratios)
+
+            for hcat in conduit_heights:
+                m = diam_dist.get(hcat, 0)
+                if m > 0:
+                    section.rows.append({
+                        "name": (f"Прокладка кабеля в гофре на высоте {hcat} "
+                                 f"({xs_label})"),
+                        "unit": "м",
+                        "qty": m,
+                        "is_material": False,
+                        "drawing_ref": "",
+                    })
+
+        # Material rows — one total row per cable (aggregated, not per height)
         for brand, brand_cables in conduit_groups.items():
             if brand in tray_only_groups:
                 continue
             for si in brand_cables:
-                xs = _cable_cross_section(si.description)
-                xs_label = ("суммарное сечение до 6 мм2" if xs <= 6
-                            else "суммарное сечение до 16 мм2")
                 cable_m = si.quantity
                 if brand in underground_m_override:
                     cable_m = max(0, si.quantity - underground_m_override[brand])
                 if cable_m <= 0:
-                    continue
-                cable_xs_labels.append((brand, si, xs_label, cable_m))
-                if xs_label not in xs_labels_seen:
-                    xs_labels_seen.append(xs_label)
-                cable_dist = distribute_by_height(cable_m, cable_ratios)
-                for hcat in conduit_heights:
-                    m = cable_dist.get(hcat, 0)
-                    if m > 0:
-                        xs_totals_per_height[xs_label][hcat] += m
-
-        for xs_label in xs_labels_seen:
-            for hcat in conduit_heights:
-                m = xs_totals_per_height[xs_label].get(hcat, 0)
-                if m <= 0:
-                    continue
-                section.rows.append({
-                    "name": (f"Прокладка кабеля в гофре на высоте {hcat} "
-                             f"({xs_label})"),
-                    "unit": "м",
-                    "qty": m,
-                    "is_material": False,
-                    "drawing_ref": "",
-                })
-
-            for brand, si, cab_xs, conduit_qty in cable_xs_labels:
-                if cab_xs != xs_label:
-                    continue
-                if brand in tray_only_groups:
                     continue
                 sec_m = re.search(r"(\d+)\s*[хx×]\s*([\d,]+)", si.description)
                 if sec_m:
@@ -2161,7 +2431,7 @@ def _build_cables_section(
                 section.rows.append({
                     "name": mat_name,
                     "unit": si.unit,
-                    "qty": conduit_qty,
+                    "qty": cable_m,
                     "is_material": True,
                     "drawing_ref": "",
                 })
@@ -2408,6 +2678,7 @@ def _build_pvc_section(
     tray_ratios: dict[HeightCategory, float] | None = None,
     floor_counts: dict[HeightCategory, int] | None = None,
     is_single_floor: bool = False,
+    has_trays: bool = True,
 ) -> VorSection:
     """Build Section 6: ПВХ изделия и трубы.
 
@@ -2489,11 +2760,7 @@ def _build_pvc_section(
 
     pvc_heights = [h for h in HEIGHT_CATEGORIES if h in available_hcats]
 
-    # ── Group by height: sum ALL conduit diameters per height, then
-    #    list individual diameters as material sub-rows. ──
-    # Эталон КПП groups: one work row "Монтаж ПВХ ... на высоте X"
-    # with total metres, followed by material rows per diameter.
-    # Per-conduit distribution for material breakdown
+    # ── Distribute PVC conduits by diameter and height ──
     conduit_dists: list[tuple[str, str, dict]] = []  # (diam, description, {hcat: m})
     for si in conduits:
         diam_match = re.search(r"д\.?\s*(\d+)\s*мм", si.description)
@@ -2501,34 +2768,35 @@ def _build_pvc_section(
         # d.32mm+ carries power feed cables entering at ground level
         if int(diam) >= 32:
             cd = {"до 5 метров": si.quantity}
+        elif has_trays and int(diam) >= 20:
+            # d.20mm in large buildings: routes power cables at ground + mid-height
+            low_m = int(round(si.quantity * 0.6))
+            mid_m = si.quantity - low_m
+            cd: dict[HeightCategory, int] = {}
+            if low_m > 0:
+                cd["до 5 метров"] = low_m
+            if mid_m > 0:
+                cd["от 13 до 20 метров"] = mid_m
         else:
             cd = distribute_by_height(si.quantity, pvc_ratios)
         conduit_dists.append((diam, si.description, cd))
 
-    # Compute total PVC per height from individual conduit distributions
-    pvc_dist: dict[str, int] = defaultdict(int)
-    for _, _, cd in conduit_dists:
-        for hcat, m in cd.items():
-            pvc_dist[hcat] += m
-
-    for hcat in pvc_heights:
-        total_m = pvc_dist.get(hcat, 0)
-        if total_m <= 0:
-            continue
-        # Work row: total conduit at this height
-        section.rows.append({
-            "name": (f"Монтаж гофрированной трубы ПВХ гибкой гофр. "
-                     f"с креплением клипсами каждые 0,5 м "
-                     f"на высоте {hcat}"),
-            "unit": "м",
-            "qty": total_m,
-            "is_material": False,
-            "drawing_ref": "",
-        })
-        # Material rows: individual diameters at this height
+    if has_trays:
+        # ── Large buildings (ГПК): per-diameter work rows by height ──
         for diam, desc, cd in conduit_dists:
-            m = cd.get(hcat, 0)
-            if m > 0:
+            for hcat in pvc_heights:
+                m = cd.get(hcat, 0)
+                if m <= 0:
+                    continue
+                section.rows.append({
+                    "name": (f"Монтаж гофрированной трубы ПВХ гибкой гофр. д.{diam}мм, "
+                             f"лёгкой с протяжкой с креплением клипсами каждые 0,5 метра "
+                             f"на высоте {hcat}"),
+                    "unit": "м",
+                    "qty": m,
+                    "is_material": False,
+                    "drawing_ref": "",
+                })
                 section.rows.append({
                     "name": desc,
                     "unit": "м",
@@ -2536,6 +2804,36 @@ def _build_pvc_section(
                     "is_material": True,
                     "drawing_ref": "",
                 })
+    else:
+        # ── Small buildings (КПП): grouped work rows per height ──
+        pvc_dist: dict[str, int] = defaultdict(int)
+        for _, _, cd in conduit_dists:
+            for hcat, m in cd.items():
+                pvc_dist[hcat] += m
+
+        for hcat in pvc_heights:
+            total_m = pvc_dist.get(hcat, 0)
+            if total_m <= 0:
+                continue
+            section.rows.append({
+                "name": (f"Монтаж гофрированной трубы ПВХ гибкой гофр. "
+                         f"с креплением клипсами каждые 0,5 м "
+                         f"на высоте {hcat}"),
+                "unit": "м",
+                "qty": total_m,
+                "is_material": False,
+                "drawing_ref": "",
+            })
+            for diam, desc, cd in conduit_dists:
+                m = cd.get(hcat, 0)
+                if m > 0:
+                    section.rows.append({
+                        "name": desc,
+                        "unit": "м",
+                        "qty": m,
+                        "is_material": True,
+                        "drawing_ref": "",
+                    })
 
     # Holders as materials
     for si in holders:
