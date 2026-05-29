@@ -908,6 +908,49 @@ def generate_vor_from_pdfs(
     for ftype, files in sorted(classified.items()):
         log(f"  {ftype}: {len(files)} files")
 
+    # ── Step 2: Parse specs (СО) ───────────────────────────────────────
+    # Parsed early so no-СО (plan-driven) mode can be detected before the
+    # elevation/ceiling maps are built.
+    log("\nStep 2: Parsing specifications (СО)...")
+    from pdf_spec_parser import parse_all_specs_in_folder
+    spec_items = parse_all_specs_in_folder(folder)
+    log(f"  Extracted {len(spec_items)} spec items")
+    no_spec = len(spec_items) == 0
+
+    # Classify spec items
+    spec_by_cat: dict[str, list[SpecItem]] = defaultdict(list)
+    for si in spec_items:
+        cat = classify_spec_item(si.description)
+        spec_by_cat[cat].append(si)
+        _log.debug("  %s → %s: %s qty=%d", cat, si.unit, si.description[:50], si.quantity)
+
+    for cat, items in sorted(spec_by_cat.items()):
+        log(f"    {cat}: {len(items)} items")
+
+    # ── Step 1a (no-СО intake): promote legend-bearing PDFs to plans ──
+    # Without a СО spec, equipment quantities must come from the drawings.
+    # Combined per-позиция PDFs classify as "other" (no "план"/elevation in
+    # the filename), so promote any PDF that contains a parseable legend
+    # into plan_info.  Guarded by no_spec → zero effect on СО projects.
+    if no_spec:
+        log("  ⚠ No СО spec — entering plan-driven (no-СО) mode")
+        from pdf_legend_parser import parse_legend as _probe_legend
+        _known = {f for f, _ in plan_info} | {f for f, _ in binding_info}
+        for pdf in all_pdfs:
+            if pdf.name in _known:
+                continue
+            elevs = _extract_elevations(pdf.name)
+            if not elevs:
+                elevs = _extract_elevations_from_content(str(pdf))
+            try:
+                _lg = _probe_legend(str(pdf))
+            except Exception:  # noqa: BLE001
+                _lg = None
+            if _lg and _lg.items:
+                plan_info.append((pdf.name, elevs or [0.0]))
+                log(f"    [no-СО] plan: {pdf.name} "
+                    f"(legend items={len(_lg.items)}, elevs={elevs or [0.0]})")
+
     # ── Step 1b: Build ceiling-height map from all elevations ─────────
     # Collect ALL unique floor elevations, then estimate ceiling height
     # for each floor.  Ceiling of floor i ≈ elevation of floor i+1.
@@ -931,22 +974,6 @@ def generate_vor_from_pdfs(
         ceil_str = ", ".join(f"elev {e:.1f} → ceil {c:.1f}m" for e, c in sorted(elev_to_ceiling.items()))
         log(f"  Ceiling map: {ceil_str}")
 
-    # ── Step 2: Parse specs (СО) ───────────────────────────────────────
-    log("\nStep 2: Parsing specifications (СО)...")
-    from pdf_spec_parser import parse_all_specs_in_folder
-    spec_items = parse_all_specs_in_folder(folder)
-    log(f"  Extracted {len(spec_items)} spec items")
-
-    # Classify spec items
-    spec_by_cat: dict[str, list[SpecItem]] = defaultdict(list)
-    for si in spec_items:
-        cat = classify_spec_item(si.description)
-        spec_by_cat[cat].append(si)
-        _log.debug("  %s → %s: %s qty=%d", cat, si.unit, si.description[:50], si.quantity)
-
-    for cat, items in sorted(spec_by_cat.items()):
-        log(f"    {cat}: {len(items)} items")
-
     # ── Step 3: Count equipment on plans ───────────────────────────────
     log("\nStep 3: Counting equipment on floor plans...")
     plan_results = count_equipment_on_plans(folder, plan_info, log=log,
@@ -965,6 +992,43 @@ def generate_vor_from_pdfs(
     for model, ratios in sorted(height_ratios.items()):
         ratio_str = ", ".join(f"{h}: {r:.1%}" for h, r in sorted(ratios.items()) if r > 0)
         log(f"  {model[:50]}: {ratio_str}")
+
+    # ── Step 4a (no-СО): synthesize spec items from plan counts ──
+    # Turn merged plan model_counts into SpecItem rows and route them with
+    # the same classify_spec_item used for СО, so all section builders work
+    # unchanged.  Equipment found only by visual matching (marker-less
+    # pictograms/luminaires) thus becomes real VOR rows.
+    if no_spec:
+        synth_counts: dict[str, int] = defaultdict(int)
+        # Per-page sweep across ALL sheets (power / lighting / grounding).
+        # Combined per-позиция PDFs carry a different legend on each sheet, so
+        # a single whole-PDF legend (Step 3) misses most element types (e.g.
+        # luminaires on the lighting sheet).  count_plans_nospec parses and
+        # counts every page independently for full marker-less coverage.
+        try:
+            from pdf_vor_nospec import count_plans_nospec
+            pp_results, _ = count_plans_nospec(folder, log, include_all=True)
+            for pr in pp_results:
+                for desc, c in pr.counts.items():
+                    synth_counts[desc] += int(c)
+        except Exception as exc:  # noqa: BLE001
+            log(f"  [no-СО] per-page sweep failed ({exc}); using whole-PDF counts")
+        # Fallback: if the per-page sweep produced nothing, use Step-3 counts.
+        if not synth_counts:
+            for pr in plan_results:
+                for desc, c in pr.counts.items():
+                    synth_counts[desc] += int(c)
+        for desc, qty in synth_counts.items():
+            if qty <= 0:
+                continue
+            si = SpecItem(
+                position="", description=desc, model="",
+                catalog_code="", supplier="", unit="шт", quantity=int(qty),
+            )
+            spec_by_cat[classify_spec_item(desc)].append(si)
+        n_cats = sum(1 for k in spec_by_cat if spec_by_cat[k])
+        log(f"  [no-СО] synthesized {sum(synth_counts.values())} units across "
+            f"{len(synth_counts)} models into {n_cats} categories")
 
     # ── Step 4b: Parse schema PDFs for panels/breakers ──────────────────
     log("\nStep 4b: Parsing schema PDFs for panel/breaker data...")
