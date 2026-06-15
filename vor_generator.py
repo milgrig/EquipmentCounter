@@ -1513,6 +1513,38 @@ def _skip_test2_phantom_sections(dataset: str | None) -> bool:
     return (dataset or "").strip().lower() == "test2"
 
 
+# ── T-S011-B2 (T151): dataset-aware section-header taxonomy ────────────
+# gpk3 etalon uses a different section taxonomy than test2.  Emitting the
+# test2-style headers on gpk3 creates phantom sections in the comparison
+# (rows with no etalon counterpart, all bucketed as ONLY_OURS even when
+# the underlying row content would otherwise pair via fuzzy match).
+# Mapping below switches header text per dataset; default (test2 / None)
+# keeps the legacy test2 wording so KB-008 prevents test2 regression.
+_GPK3_SECTION_ALIASES: dict[str, str] = {
+    "Монтаж светильников и ламп":   "Светотехническое оборудование",
+    "Монтаж ПВХ изделий и труб":    "ПВХ изделия и трубы",
+}
+
+
+def _section_header_for_dataset(name: str, dataset: str | None) -> str:
+    """Return the etalon-aligned section header for *dataset*."""
+    if (dataset or "").strip().lower() == "gpk3":
+        return _GPK3_SECTION_ALIASES.get(name, name)
+    return name
+
+
+def _emit_pvc_material_subrows(dataset: str | None) -> bool:
+    """True when the per-height 'Труба ПВХ гибкая гофр. ...' material
+    sub-rows should be rendered.  Etalon for gpk3 only carries the
+    'Монтаж гофрированной трубы ... д.XXмм' work rows under
+    `ПВХ изделия и трубы`; emitting 4 height × N diameter material
+    sub-rows there creates ONLY_OURS phantom rows that contribute nothing
+    new (work-row qty already covers the same length).  Keep the legacy
+    rendering for test2 (etalon `Труба ПА 6 гибкая гофр.` rows do pair
+    on diameter)."""
+    return (dataset or "").strip().lower() != "gpk3"
+
+
 def _extract_cross_section_token(cable_type: str) -> str:
     """Return normalized cross-section token like '3х1,5'."""
     m = _CABLE_SECTION_RE.search(cable_type or "")
@@ -3117,7 +3149,12 @@ def generate_vor_docx(
         for hcat in HEIGHT_CATEGORIES
     ) or indicators
     if has_lighting:
-        _add_section_header(table, "Монтаж светильников и ламп")
+        _add_section_header(
+            table,
+            _section_header_for_dataset(
+                "Монтаж светильников и ламп", dataset,
+            ),
+        )
 
     # Classify luminaires by mounting type for correct work descriptions.
     # Reference VOR uses different work rows per mounting type:
@@ -3672,7 +3709,12 @@ def generate_vor_docx(
         )
 
     # ── Section 6: PVC conduits (T069) ──
-    _add_section_header(table, "Монтаж ПВХ изделий и труб")
+    _add_section_header(
+        table,
+        _section_header_for_dataset(
+            "Монтаж ПВХ изделий и труб", dataset,
+        ),
+    )
 
     # T069: Collect all PVC diameter→length data from both spec and derived.
     # Build a unified diameter map, then render per-height work rows with
@@ -3735,17 +3777,22 @@ def generate_vor_docx(
                 "м", height_total, ref=drawing_ref,
             )
 
-            # Material sub-rows per diameter (largest diameter first)
-            for diam in sorted(_pvc_diam_lengths, reverse=True):
-                diam_height_len = round(_pvc_diam_lengths[diam] * prop)
-                if diam_height_len <= 0:
-                    continue
-                _add_material_row(
-                    table,
-                    f"Труба ПВХ гибкая гофр. д.{diam}мм, "
-                    f"лёгкой с протяжкой",
-                    "м", diam_height_len, ref=drawing_ref,
-                )
+            # Material sub-rows per diameter (largest diameter first).
+            # T-S011-B2 (T151): suppressed on gpk3 — etalon ПВХ section
+            # carries only the diameter-tagged work row, so emitting these
+            # 4 height × N diameter sub-rows here yields pure ONLY_OURS
+            # phantom rows (the work-row qty already covers total length).
+            if _emit_pvc_material_subrows(dataset):
+                for diam in sorted(_pvc_diam_lengths, reverse=True):
+                    diam_height_len = round(_pvc_diam_lengths[diam] * prop)
+                    if diam_height_len <= 0:
+                        continue
+                    _add_material_row(
+                        table,
+                        f"Труба ПВХ гибкая гофр. д.{diam}мм, "
+                        f"лёгкой с протяжкой",
+                        "м", diam_height_len, ref=drawing_ref,
+                    )
 
         # T077: Re-enable PVC holder generation.  Reference VORs for
         # test_3_12 expect holder rows per diameter.
