@@ -84,6 +84,25 @@ class TestPvcMaterialSubrowSuppression:
         assert vor_generator._emit_pvc_material_subrows("") is True
 
 
+class TestAggregateByHeightCallable:
+    """Regression guard for the T-S011-B2 follow-up NameError fix.
+
+    The pictogram spec→plan enrichment path in ``aggregate_by_height``
+    calls a *local* helper ``_apply_spec_qty_to_indicator``.  A typo at
+    two call sites (``apply_spec_qty_to_indicator`` without the leading
+    underscore) raised ``NameError`` whenever a pictogram-class spec
+    item was processed (every gpk3 run), short-circuiting both the
+    section-alias rename and the PVC sub-row gate.  This test pins the
+    module compiling and ``aggregate_by_height`` running on an empty
+    input without raising — i.e. the local helper resolves.
+    """
+
+    def test_aggregate_by_height_does_not_raise_nameerror(self):
+        agg = vor_generator.aggregate_by_height([], log=lambda *_: None)
+        assert isinstance(agg, dict)
+        assert "luminaires" in agg
+
+
 class TestPhantomGateBookkeeping:
     """Regression guard for the T-S011-B2 gate.
 

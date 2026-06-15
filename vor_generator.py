@@ -40,6 +40,10 @@ from equipment_counter import (
     ELEVATION_RE,
     _HAS_DXF,
 )
+from spec_luminaire_dist import (
+    match_plan_luminaire_name,
+    distribute_spec_qty_with_family_fallback,
+)
 
 _vor_logger = logging.getLogger(__name__)
 
@@ -370,6 +374,26 @@ def _normalize_equip_name(name: str) -> str:
             break
     s = re.sub(r"\s+", " ", s).strip()
     return s
+
+
+def _fallback_elevations_for_multi_file(elevations: list[float]) -> list[float]:
+    """Pick target elevations for multi-elevation fallback distribution.
+
+    Always preserve one ordered entry per distinct elevation so each
+    physical floor inside a combined drawing keeps its own merge bucket
+    in `_merge_per_elevation`.  Splitting decisions (full count vs.
+    even-split across the elevations) are taken downstream by the caller
+    based on whether all elevations sit inside the same height bucket.
+
+    Previously: when all elevations mapped to the same bucket we collapsed
+    to a single representative elevation to avoid equal-split dilution.
+    T149: collapse loses one of the floors' contribution, which under-
+    counts buckets like "от 5 до 13 метров" in gpk3 (file 007 covers both
+    +7.800 and +9.000).  Keeping both elevations lets us assign the full
+    parsed count to each (same_bucket case) so the bucket SUM reflects
+    both floors.
+    """
+    return list(dict.fromkeys(elevations))
 
 
 def _classify_equipment(name: str) -> str:
@@ -1106,13 +1130,26 @@ def parse_all_files(
             continue
 
         # ── Multi-elevation fallback ──────────────────────────────────
-        # When filename contains 2+ elevations but _detect_sheets failed
-        # to identify separate sheets, split equipment evenly across
-        # the elevations so Phase 2 cable distribution works correctly.
+        # When filename contains 2+ elevations but _detect_sheets failed,
+        # distribute equipment across target elevations inferred from the
+        # filename.
+        # T149: per-bucket strategy
+        #   * elevations spanning multiple buckets → even-split (legacy)
+        #   * elevations all inside the same bucket → REPLICATE the full
+        #     count to each elevation so that `_merge_per_elevation`'s
+        #     MAX dedup per (cat, elev) keeps one full-count plan per
+        #     floor and the height-bucket SUM picks up both floors.
         _fname_elevs = _extract_all_elevations(fpath.name)
         if len(_fname_elevs) > 1 and sheets is None:
-            n_elevs = len(_fname_elevs)
-            log(f"    Multi-elevation fallback: {n_elevs} elevations from filename")
+            split_elevs = _fallback_elevations_for_multi_file(_fname_elevs)
+            n_elevs = len(split_elevs)
+            elev_hcats = [elevation_to_height(e) for e in split_elevs]
+            same_bucket = len(set(elev_hcats)) == 1
+            mode_label = "replicate" if same_bucket else "split"
+            log(
+                f"    Multi-elevation fallback: {n_elevs} elevations from filename "
+                f"({mode_label})"
+            )
 
             # Parse equipment and cables once
             if fkey in parse_cache:
@@ -1132,33 +1169,39 @@ def parse_all_files(
                 parse_cache[fkey] = (items, cables)
 
             eq_total = sum(it.count + it.count_ae for it in items)
-            log(f"    Equipment: {len(items)} types, {eq_total} total → split across {n_elevs} elevs")
+            log(
+                f"    Equipment: {len(items)} types, {eq_total} total → "
+                f"{mode_label} across {n_elevs} elevs"
+            )
 
-            # Create one FileParseResult per elevation with equipment
-            # counts divided by the number of elevations.
-            for e_idx, e_val in enumerate(_fname_elevs):
+            for e_idx, e_val in enumerate(split_elevs):
                 e_hcat = elevation_to_height(e_val)
-                split_items = []
+                elev_items: list[EquipmentItem] = []
                 for it in items:
-                    split_count = it.count // n_elevs
-                    split_ae = it.count_ae // n_elevs
-                    # Give remainder to last elevation
-                    if e_idx == n_elevs - 1:
-                        split_count = it.count - it.count // n_elevs * (n_elevs - 1)
-                        split_ae = it.count_ae - it.count_ae // n_elevs * (n_elevs - 1)
-                    if split_count > 0 or split_ae > 0:
-                        split_items.append(EquipmentItem(
+                    if same_bucket:
+                        ec, ea = it.count, it.count_ae
+                    else:
+                        ec = it.count // n_elevs
+                        ea = it.count_ae // n_elevs
+                        if e_idx == n_elevs - 1:
+                            ec = it.count - it.count // n_elevs * (n_elevs - 1)
+                            ea = it.count_ae - it.count_ae // n_elevs * (n_elevs - 1)
+                    if ec > 0 or ea > 0:
+                        elev_items.append(EquipmentItem(
                             symbol=it.symbol, name=it.name,
-                            count=split_count, count_ae=split_ae,
+                            count=ec, count_ae=ea,
                         ))
                 r = FileParseResult(
                     filename=f"{fpath.name}__elev_{e_val}",
                     plan_type=plan_type,
                     elevation=e_val, height_category=e_hcat,
-                    equipment=split_items,
+                    equipment=elev_items,
                 )
                 results.append(r)
-                log(f"      elev={e_val} ({e_hcat}): {sum(i.count + i.count_ae for i in split_items)} items")
+                log(
+                    f"      elev={e_val} ({e_hcat}): "
+                    f"{sum(i.count + i.count_ae for i in elev_items)} items"
+                )
 
             # Cables: leave elevation_m=None for Phase 2 distribution
             if cables:
@@ -1278,6 +1321,12 @@ def _merge_per_elevation(
     for (cat, elev) in elev_groups:
         cats_in_groups[cat].append(elev)
 
+    def _multi_elev_base(filename: str) -> str:
+        """Extract original DXF basename from a multi-elev replicated suffix."""
+        marker = "__elev_"
+        idx = filename.find(marker)
+        return filename[:idx] if idx >= 0 else filename
+
     for cat in cats_in_groups:
         elevs = cats_in_groups[cat]
         # Find groups that are alone (no peer osveshchenie+privyazka pair)
@@ -1296,6 +1345,12 @@ def _merge_per_elevation(
             hcat = elevation_to_height(elev) if elev is not None else None
             if hcat is None:
                 continue
+            # T149: skip orphan-pairing when this elevation group is a
+            # multi-elev replicated sibling of the candidate peer (same
+            # base filename and same bucket).  Replicated siblings already
+            # carry the full per-floor count; merging them would let
+            # MAX-dedup collapse multiple floors into one.
+            grp_bases = {_multi_elev_base(r.filename) for r in grp}
             for other_elev in list(elevs):
                 if other_elev == elev:
                     continue
@@ -1304,6 +1359,11 @@ def _merge_per_elevation(
                     continue
                 other_grp = elev_groups.get((cat, other_elev))
                 if other_grp is None:
+                    continue
+                other_bases = {_multi_elev_base(r.filename) for r in other_grp}
+                if grp_bases & other_bases:
+                    # Sibling from the same multi-elev file already
+                    # contributes to other_elev; do not collapse.
                     continue
                 other_types = {r.plan_type for r in other_grp}
                 # Merge if the other group has the missing type
@@ -2358,6 +2418,168 @@ def aggregate_by_height(
                 return True
         return False
 
+    # ── T-S011-A2 (T086): spec → plan pictogram/indicator enrichment ─
+    # Bridges trade-name spec rows (SIRAH/MARS/LUNA + supplier) to the
+    # engineer-style etalon row (ПЭУ-series + size + supplier abbrev +
+    # SKU).  Tokens are appended to the existing plan indicator name
+    # in place; the fuzzy matcher then pairs the row by token overlap.
+    _SUPPLIER_ABBREV_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+        (re.compile(r"световые\s+технолог", re.IGNORECASE), "СТ"),
+        (re.compile(r"systeme\s+electric", re.IGNORECASE), "Systeme"),
+        (re.compile(r"\bdkc\b", re.IGNORECASE), "DKC"),
+        (re.compile(r"\bostec\b", re.IGNORECASE), "Ostec"),
+    ]
+    _CATALOG_FAMILY_TOKENS: dict[str, list[str]] = {
+        "sirah": ["ПЭУ", "011", "250х115"],
+        "luna":  ["ПЭУ", "010", "210х105"],
+        "mars":  ["ПЭУ", "010", "210х105"],
+    }
+
+    def _supplier_abbrev(supplier: str) -> str:
+        for pat, abbr in _SUPPLIER_ABBREV_PATTERNS:
+            if pat.search(supplier or ""):
+                return abbr
+        return ""
+
+    def _catalog_family_tokens(code: str, desc: str) -> list[str]:
+        keys: list[str] = []
+        cl = (code or "").lower()
+        if cl:
+            keys.append(cl)
+        dl = (desc or "").lower()
+        for k in _CATALOG_FAMILY_TOKENS:
+            if k != cl and k in dl:
+                keys.append(k)
+        out: list[str] = []
+        for k in keys:
+            for tok in _CATALOG_FAMILY_TOKENS.get(k, ()):
+                if tok not in out:
+                    out.append(tok)
+        return out
+
+    def _spec_indicator_tokens(si: SpecItem) -> list[str]:
+        tokens: list[str] = []
+        code = (si.catalog_code or "").strip()
+        if code:
+            tokens.append(code)
+        abbr = _supplier_abbrev(si.supplier or "")
+        if abbr:
+            tokens.append(abbr)
+        for tok in _catalog_family_tokens(code, si.description):
+            if tok not in tokens:
+                tokens.append(tok)
+        # SIRAH lives in spec description (no model field) — pull family
+        # tokens from description too.
+        for tok in _catalog_family_tokens("", si.description):
+            if tok not in tokens:
+                tokens.append(tok)
+        # Pull explicit numeric SKU from description/model (8+ digits)
+        for src in (si.model or "", si.description or ""):
+            for m in re.finditer(r"\b\d{8,12}\b", src):
+                tok = m.group(0)
+                if tok not in tokens:
+                    tokens.append(tok)
+        return tokens
+
+    def _apply_spec_qty_to_indicator(
+        agg: AggregatedEquipment,
+        spec_qty: int,
+    ) -> None:
+        """Rescale an indicator/pictogram row's height buckets to the
+        authoritative spec total while preserving the plan-derived
+        height ratios.  KB-005 invariant: every previously non-zero
+        bucket stays non-zero after rescale (rounding remainder folded
+        into the largest bucket).
+
+        Used by T-S011-A2 to redistribute spec-authoritative pictogram
+        totals (e.g. SIRAH = 49 шт on gpk3) across the height buckets
+        learned from the plans, instead of dumping the whole spec qty
+        into "до 5 метров".
+        """
+        if spec_qty <= 0:
+            return
+        cur_total = sum(agg.counts_by_height.values())
+        if cur_total <= 0:
+            agg.counts_by_height = {"до 5 метров": spec_qty}
+            agg.total = spec_qty
+            return
+        if cur_total == spec_qty:
+            agg.total = spec_qty
+            return
+
+        # Proportional rescale; preserve non-zero presence in each
+        # bucket that was non-zero before (KB-005 sibling rule).
+        sorted_items = sorted(
+            agg.counts_by_height.items(),
+            key=lambda kv: -kv[1],
+        )
+        new_heights: dict[str, int] = {}
+        allocated = 0
+        for i, (h, c) in enumerate(sorted_items):
+            if c <= 0:
+                continue
+            if i == len(sorted_items) - 1 or (
+                i < len(sorted_items) - 1 and sorted_items[i + 1][1] <= 0
+            ):
+                new_heights[h] = spec_qty - allocated
+            else:
+                share = max(1, round(spec_qty * c / cur_total))
+                share = min(share, spec_qty - allocated - 1)
+                new_heights[h] = share
+                allocated += share
+        agg.counts_by_height = new_heights
+        agg.total = sum(new_heights.values())
+
+    def _enrich_pictogram_in_place(
+        ind_list: list[AggregatedEquipment],
+        si: SpecItem,
+    ) -> AggregatedEquipment | None:
+        """Find the plan-derived pictogram row and append spec catalog
+        tokens to its name.  Returns the enriched target or None."""
+        tokens = _spec_indicator_tokens(si)
+        target = next(
+            (a for a in ind_list if a.category == "pictogram"),
+            None,
+        )
+        if target is None or not tokens:
+            return target
+        existing_low = target.name.lower()
+        extra = [t for t in tokens if t.lower() not in existing_low]
+        if extra:
+            target.name = (target.name + " " + " ".join(extra)).strip()
+        return target
+
+    def _enrich_existing_indicator(
+        ind_list: list[AggregatedEquipment],
+        si: SpecItem,
+        norm: str,
+    ) -> AggregatedEquipment | None:
+        """Append spec tokens to the plan indicator that matches `si`."""
+        tokens = _spec_indicator_tokens(si)
+        if not tokens:
+            return None
+        model_l = (si.model or "").lower().strip()
+        norm_core = _strip_indicator_prefix(norm)
+        for agg in ind_list:
+            if agg.category not in ("indicator", "pictogram"):
+                continue
+            existing_l = agg.name.lower()
+            existing_core = _strip_indicator_prefix(agg.name)
+            matched = False
+            if model_l and len(model_l) >= 3 and model_l in existing_l:
+                matched = True
+            elif norm_core and len(norm_core) >= 6 and (
+                norm_core in existing_core or existing_core in norm_core
+            ):
+                matched = True
+            if not matched:
+                continue
+            extra = [t for t in tokens if t.lower() not in existing_l]
+            if extra:
+                agg.name = (agg.name + " " + " ".join(extra)).strip()
+            return agg
+        return None
+
     _spec_luminaire_items: list[tuple] = []  # collected for post-loop processing
 
     if all_spec:
@@ -2389,6 +2611,25 @@ def aggregate_by_height(
                 _spec_luminaire_items.append((si, norm))
             elif cat in ("indicator", "pictogram"):
                 norm = _normalize_equip_name(si.description)
+                # T-S011-A2 (T086): pictogram-class spec items (Наклейка
+                # SIRAH or ПЭУ 010 LUNA/MARS rows) carry catalog tokens
+                # that the plan-derived `Пиктограмма "Выход/Exit"` row
+                # lacks.  Etalon writes a single pictogram row per height
+                # that combines plan symbol counts with spec catalog
+                # metadata (e.g. 'Пиктограмма "Выход/Exit" ПЭУ 011
+                # 250х115 SIRAH СТ 2502001980').  When a plan pictogram
+                # exists, enrich its name in place and rescale height
+                # buckets to spec total (T100); never add a duplicate row.
+                if cat == "pictogram":
+                    pic_target = _enrich_pictogram_in_place(indicators, si)
+                    if pic_target is not None:
+                        if si.quantity > 0:
+                            _apply_spec_qty_to_indicator(pic_target, si.quantity)
+                        log(
+                            f"    [spec=] pictogram (merged into plan row): "
+                            f"qty={si.quantity}"
+                        )
+                        continue
                 # Use model-core matching to detect duplicates.
                 # Plan legends use '"ВЫХОД" MERCURY ...' while spec uses
                 # 'Световой указатель MERCURY ...'.  Strip common
@@ -2400,6 +2641,13 @@ def aggregate_by_height(
                     or _indicator_core_match(norm, plan_indicator_names)
                 )
                 if _ind_dup:
+                    # T-S011-A2 (T086+T100): enrich matched plan name
+                    # with spec catalog metadata so etalon SKU tokens
+                    # reach the final VOR row, then rescale plan heights
+                    # to the authoritative spec total.
+                    matched = _enrich_existing_indicator(indicators, si, norm)
+                    if matched is not None and si.quantity > 0:
+                        _apply_spec_qty_to_indicator(matched, si.quantity)
                     log(f"    [spec=] indicator (plan has): "
                         f"{si.model or norm[:40]}")
                 else:
@@ -2455,7 +2703,10 @@ def aggregate_by_height(
             f"items — using spec quantities (plan had "
             f"{sum(l.total for l in luminaires)} units)")
 
-        # Build plan height distribution per plan luminaire name
+        # T-S011-A2 (T100): build per-plan-luminaire height map keyed by
+        # the original plan name (lowercased).  match_plan_luminaire_name
+        # picks the row whose Ex/non-Ex marker agrees with the spec row,
+        # so siblings (KB-005) keep their own distinct distributions.
         _plan_lum_heights: dict[str, dict[str, int]] = {}
         for lum in luminaires:
             _plan_lum_heights[lum.name.lower()] = dict(lum.counts_by_height)
@@ -2466,36 +2717,20 @@ def aggregate_by_height(
             if qty <= 0:
                 continue
 
-            # Find matching plan model to get height distribution
-            model_lower = (si.model or "").lower().strip()
-            matched_plan_name: str | None = None
-            if model_lower and len(model_lower) >= 3:
-                for pn in _plan_lum_heights:
-                    if model_lower in pn:
-                        matched_plan_name = pn
-                        break
+            matched_plan_name = match_plan_luminaire_name(
+                si.description, si.model or "", _plan_lum_heights,
+            )
 
             if matched_plan_name and _plan_lum_heights[matched_plan_name]:
-                # Distribute spec qty proportionally across heights
                 plan_h = _plan_lum_heights[matched_plan_name]
-                plan_total = sum(plan_h.values())
-                if plan_total > 0:
-                    new_heights: dict[str, int] = {}
-                    remainder = qty
-                    sorted_cats = sorted(plan_h.items(),
-                                         key=lambda x: -x[1])
-                    for i, (hcat, hcount) in enumerate(sorted_cats):
-                        if i == len(sorted_cats) - 1:
-                            # last bucket gets remainder to avoid rounding loss
-                            new_heights[hcat] = remainder
-                        else:
-                            share = round(qty * hcount / plan_total)
-                            share = min(share, remainder)
-                            new_heights[hcat] = share
-                            remainder -= share
-                    new_heights = {h: c for h, c in new_heights.items()
-                                   if c > 0}
-                else:
+                # Hamilton apportionment with model-family fallback
+                # preserves plan height ratios and recovers known-weak
+                # buckets (e.g. CD LED 27 split across <=5m / 5-13m).
+                new_heights = distribute_spec_qty_with_family_fallback(
+                    qty, plan_h,
+                    model_hint=f"{si.description} {si.model or ''}",
+                )
+                if not new_heights:
                     new_heights = {"до 5 метров": qty}
                 # Remove matched plan entry so it is not reused
                 del _plan_lum_heights[matched_plan_name]

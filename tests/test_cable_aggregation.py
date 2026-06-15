@@ -9,6 +9,7 @@ from equipment_counter import CableItem
 from vor_generator import (
     _aggregate_cable_qty_by_brand_cross,
     _cable_brand_cross_key,
+    _fallback_elevations_for_multi_file,
     _finalize_test2_ppg_hf_split,
     _normalize_brand_for_vor,
     _scale_int_proportions,
@@ -87,3 +88,23 @@ def test_t150_skip_test2_phantom_sections_flag() -> None:
 
     assert _skip_test2_phantom_sections("test2") is True
     assert _skip_test2_phantom_sections("gpk3") is False
+
+
+def test_t160_same_bucket_multi_elev_preserves_each_floor() -> None:
+    # T149 follow-up: same-bucket multi-elev no longer collapses to one
+    # representative elevation; both floors keep their own merge bucket
+    # so the downstream SUM-by-elevation reflects each floor's count.
+    assert _fallback_elevations_for_multi_file([7.8, 9.0]) == [7.8, 9.0]
+
+
+def test_t160_cross_bucket_multi_elev_keeps_distribution_targets() -> None:
+    assert _fallback_elevations_for_multi_file([4.2, 13.8]) == [4.2, 13.8]
+
+
+def test_t160_dedupe_repeated_elevations() -> None:
+    assert _fallback_elevations_for_multi_file([3.0, 3.0, 6.0]) == [3.0, 6.0]
+
+
+def test_t160_single_elev_passthrough() -> None:
+    assert _fallback_elevations_for_multi_file([10.0]) == [10.0]
+    assert _fallback_elevations_for_multi_file([]) == []
