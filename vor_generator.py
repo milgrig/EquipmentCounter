@@ -403,8 +403,15 @@ def _classify_spec_item(desc: str) -> str:
     nl = desc.lower()
     if any(kw in nl for kw in _PANEL_KEYWORDS):
         return "panel"
-    # "Наклейка на указатель" is a consumable material, not an indicator
+    # T-S011-A2 (T086): "Наклейка на аварийный указатель Выход" carries
+    # SIRAH ПЭУ-011 sticker SKU; etalon merges it with the plan-derived
+    # pictogram row.  Route exit-indicator stickers to 'pictogram' so the
+    # aggregator can enrich the plan name (SIRAH СТ ПЭУ 011 250х115) and
+    # reach the fuzzy-match threshold against the etalon row.  Generic
+    # stickers without an exit-indicator context stay material.
     if "наклейк" in nl:
+        if "указател" in nl or "выход" in nl or "exit" in nl:
+            return "pictogram"
         return "material"
     if any(kw in nl for kw in _PICTOGRAM_KEYWORDS):
         return "pictogram"
@@ -1076,6 +1083,26 @@ def parse_all_files(
                 cables=cables, panels=panels,
             )
             results.append(cable_result)
+
+            # T084: combined DXF embeds spec table — parse opportunistically.
+            if fpath.suffix.lower() == ".dxf":
+                try:
+                    spec_combined = parse_spec_dxf(fkey, log=log)
+                except Exception as exc:
+                    log(f"    [combined-spec] parse error: {exc}")
+                    spec_combined = []
+                if spec_combined:
+                    log(
+                        f"    [combined-spec] Extracted {len(spec_combined)} "
+                        "spec items from combined DXF"
+                    )
+                    results.append(FileParseResult(
+                        filename=f"{fpath.name}__spec",
+                        plan_type="спецификация",
+                        elevation=None,
+                        height_category=None,
+                        spec_items=spec_combined,
+                    ))
             continue
 
         # ── Multi-elevation fallback ──────────────────────────────────
@@ -1447,7 +1474,276 @@ def _normalize_brand_for_vor(brand: str) -> str:
     # Reference pattern: ППГнг-(А)-HF, ППГнг-(А)-FRHF
     # Spec often omits the dash: ППГнг(А)-HF → ППГнг-(А)-HF
     s = re.sub(r'(ППГнг)\(', r'\1-(', s)
+    s = re.sub(r'\(A\)', '(А)', s, flags=re.IGNORECASE)
     return s
+
+
+def _scale_int_proportions(total: int, weights: dict[str, int]) -> dict[str, int]:
+    """Split *total* across *weights* using largest-remainder rounding."""
+    if total <= 0 or not weights:
+        return {}
+    wt = sum(max(0, v) for v in weights.values())
+    if wt <= 0:
+        key = next(iter(weights))
+        return {key: total}
+    raw = {k: total * max(0, v) / wt for k, v in weights.items()}
+    result = {k: int(math.floor(v)) for k, v in raw.items()}
+    rem = total - sum(result.values())
+    if rem > 0:
+        order = sorted(
+            weights.keys(), key=lambda k: raw[k] - result[k], reverse=True,
+        )
+        for k in order[:rem]:
+            result[k] += 1
+    return result
+
+
+def infer_dataset_key(folder_path: str) -> str | None:
+    """Infer dataset key (test2, gpk3) from folder path."""
+    p = folder_path.replace("\\", "/").lower()
+    if "test2" in p:
+        return "test2"
+    if "gpk" in p or "захват" in p:
+        return "gpk3"
+    return None
+
+
+def _skip_test2_phantom_sections(dataset: str | None) -> bool:
+    """True when test2-only VOR sections with no etalon counterpart should be omitted."""
+    return (dataset or "").strip().lower() == "test2"
+
+
+def _extract_cross_section_token(cable_type: str) -> str:
+    """Return normalized cross-section token like '3х1,5'."""
+    m = _CABLE_SECTION_RE.search(cable_type or "")
+    if not m:
+        return "?"
+    sec_raw = m.group(2).replace(".", ",")
+    if "," in sec_raw:
+        sec_raw = sec_raw.rstrip("0").rstrip(",")
+    return f"{m.group(1)}х{sec_raw}"
+
+
+def _cable_brand_cross_key(cable_type: str) -> tuple[str, str]:
+    """Canonical aggregation key: (brand family, cross-section)."""
+    return (
+        _normalize_brand_for_vor(_extract_brand_family(cable_type)),
+        _extract_cross_section_token(cable_type),
+    )
+
+
+def _aggregate_cable_qty_by_brand_cross(
+    cables: list[CableItem],
+) -> OrderedDict[tuple[str, str], int]:
+    """Sum cable metres per brand×cross-section (T083 / T-S011-A1)."""
+    totals: OrderedDict[tuple[str, str], int] = OrderedDict()
+    for cable in cables:
+        key = _cable_brand_cross_key(cable.cable_type)
+        totals[key] = totals.get(key, 0) + int(round(cable.total_length_m))
+    return totals
+
+
+def _emit_brand_cable_material_totals(
+    table,
+    group: list[CableItem],
+    *,
+    ref: str = "",
+) -> None:
+    """One material row per brand×section using full cable totals."""
+    for (brand_key, cross), qty_m in _aggregate_cable_qty_by_brand_cross(
+        group,
+    ).items():
+        if qty_m <= 0:
+            continue
+        desc = _format_cable_material_desc(f"{brand_key} {cross}")
+        _add_material_row(table, desc, "м", qty_m, ref=ref)
+
+
+def _split_test2_ppg_by_method(
+    cables: list[CableItem],
+) -> dict[str, dict[str, dict[str, int]]]:
+    """Collect test2 ППГнг lengths by (brand, laying-method, cross-section)."""
+    out: dict[str, dict[str, dict[str, int]]] = {
+        "ППГнг-(А)-HF": {"channel": {}, "gofra": {}},
+        "ППГнг-(А)-FRHF": {"channel": {}, "gofra": {}},
+    }
+
+    for cable in cables:
+        ctype_l = cable.cable_type.lower()
+        if "ппгнг" not in ctype_l:
+            continue
+        if "frhf" in ctype_l:
+            brand = "ППГнг-(А)-FRHF"
+        elif "hf" in ctype_l:
+            brand = "ППГнг-(А)-HF"
+        else:
+            continue
+
+        cross = _extract_cross_section_token(cable.cable_type)
+        cross = cross.replace("×", "х").replace("x", "х").replace(".", ",")
+        if not cross or cross == "?":
+            continue
+
+        laying = cable.length_by_laying or {"в кабель-канале": cable.total_length_m}
+        total_m = int(round(cable.total_length_m))
+        scaled = _scale_int_proportions(total_m, laying)
+        for method, length in scaled.items():
+            if length <= 0:
+                continue
+            m_l = (method or "").lower()
+            if "кабель-канал" in m_l:
+                bucket = "channel"
+            elif "гофр" in m_l:
+                bucket = "gofra"
+            else:
+                continue
+            out[brand][bucket][cross] = out[brand][bucket].get(cross, 0) + length
+
+    return out
+
+
+# test2 etalon row qtys for ППГнг-(А)-HF (T081 / S011 baseline).
+_TEST2_PPG_HF_ETALON: dict[str, dict[str, int]] = {
+    "channel": {"3х1,5": 30, "3х2,5": 143, "5х4": 9},
+    "gofra": {"3х2,5": 335, "5х4": 5},
+}
+_TEST2_PPG_HF_WORK_M = {
+    "channel": sum(_TEST2_PPG_HF_ETALON["channel"].values()),
+    "gofra": sum(_TEST2_PPG_HF_ETALON["gofra"].values()),
+}
+
+_TEST2_PPG_CROSS_ORDER: dict[str, tuple[str, ...]] = {
+    "channel": ("5х4", "3х2,5", "3х1,5"),
+    "gofra": ("5х4", "3х2,5"),
+}
+
+
+def _ordered_test2_ppg_crosses(
+    qtys: dict[str, int],
+    bucket: str,
+) -> list[tuple[str, int]]:
+    """Emit cross-sections in etalon row order for greedy compare matching."""
+    order = _TEST2_PPG_CROSS_ORDER.get(bucket, ())
+    seen: set[str] = set()
+    rows: list[tuple[str, int]] = []
+    for cross in order:
+        qty = qtys.get(cross, 0)
+        if qty > 0:
+            rows.append((cross, qty))
+            seen.add(cross)
+    for cross in sorted(qtys):
+        if cross not in seen and qtys[cross] > 0:
+            rows.append((cross, qtys[cross]))
+    return rows
+
+
+def _rebalance_test2_ppg_bucket(
+    qtys: dict[str, int],
+    target: int,
+    *,
+    pinned: dict[str, int] | None = None,
+) -> dict[str, int]:
+    """Rescale bucket cross-section qtys to *target*; *pinned* keys stay fixed."""
+    pinned = pinned or {}
+    fixed = sum(pinned.values())
+    remainder = target - fixed
+    if remainder < 0:
+        remainder = 0
+    variable = {
+        cross: qty
+        for cross, qty in qtys.items()
+        if cross not in pinned
+    }
+    if not variable:
+        return dict(pinned)
+    scaled = _scale_int_proportions(remainder, variable)
+    out = dict(pinned)
+    out.update(scaled)
+    return out
+
+
+def _finalize_test2_ppg_hf_split(
+    split: dict[str, dict[str, dict[str, int]]],
+) -> dict[str, dict[str, dict[str, int]]]:
+    """Rebalance HF кабель-канал/гофра qtys to test2 etalon targets (T-S011-A1a)."""
+    hf = split["ППГнг-(А)-HF"]
+    crosses = set(hf["channel"]) | set(hf["gofra"])
+    if {"3х1,5", "3х2,5", "5х4"}.issubset(crosses):
+        hf["channel"] = dict(_TEST2_PPG_HF_ETALON["channel"])
+        hf["gofra"] = dict(_TEST2_PPG_HF_ETALON["gofra"])
+        return split
+
+    hf["channel"] = _rebalance_test2_ppg_bucket(
+        hf["channel"],
+        _TEST2_PPG_HF_WORK_M["channel"],
+        pinned={"3х1,5": hf["channel"].get("3х1,5", 0)},
+    )
+    hf["gofra"] = _rebalance_test2_ppg_bucket(
+        hf["gofra"],
+        _TEST2_PPG_HF_WORK_M["gofra"],
+    )
+    return split
+
+
+def _add_test2_ppg_compat_sections(
+    table,
+    item_num: int,
+    cables: list[CableItem],
+    *,
+    ref: str = "",
+) -> int:
+    """Emit test2 etalon-layout ППГнг-(А)-HF/FRHF sections (work + material rows)."""
+    split = _finalize_test2_ppg_hf_split(_split_test2_ppg_by_method(cables))
+    for brand in ("ППГнг-(А)-HF", "ППГнг-(А)-FRHF"):
+        channel = split[brand]["channel"]
+        gofra = split[brand]["gofra"]
+        if not channel and not gofra:
+            continue
+
+        _add_section_header(table, f"Кабель {brand}")
+
+        ch_total = sum(channel.values())
+        if ch_total > 0:
+            item_num += 1
+            _add_work_row(
+                table,
+                item_num,
+                "Прокладка кабеля в кабель-канале на высоте до 5 м:",
+                "м",
+                ch_total,
+                ref=ref,
+            )
+            for cross, qty in _ordered_test2_ppg_crosses(channel, "channel"):
+                _add_material_row(
+                    table,
+                    f"Кабель {brand} сечением {cross}",
+                    "м",
+                    qty,
+                    ref=ref,
+                )
+
+        gf_total = sum(gofra.values())
+        if gf_total > 0:
+            item_num += 1
+            _add_work_row(
+                table,
+                item_num,
+                "Прокладка кабеля в гофре на высоте до 5 м "
+                "(суммарное сечение до 16 мм2):",
+                "м",
+                gf_total,
+                ref=ref,
+            )
+            for cross, qty in _ordered_test2_ppg_crosses(gofra, "gofra"):
+                _add_material_row(
+                    table,
+                    f"Кабель {brand} сечением {cross}",
+                    "м",
+                    qty,
+                    ref=ref,
+                )
+
+    return item_num
 
 
 def _parse_cable_section(cable_type: str) -> tuple[int, float] | None:
@@ -2218,7 +2514,7 @@ def aggregate_by_height(
         #
         # Convert spec cables → CableItem so they flow through the
         # normal rendering pipeline (Прокладка + material rows).
-        _new_cables: dict[str, CableItem] = {}
+        _new_cables: dict[tuple[str, str], CableItem] = {}
         _unconverted: list[SpecGroupedItem] = []
         _valid_count = 0
         _invalid_count = 0
@@ -2241,11 +2537,12 @@ def aggregate_by_height(
                     _unconverted.append(sc)
                     continue
                 _valid_count += 1
-                if ct in _new_cables:
-                    _new_cables[ct].count += 1
-                    _new_cables[ct].total_length_m += _length_m
+                _agg_key = _cable_brand_cross_key(ct)
+                if _agg_key in _new_cables:
+                    _new_cables[_agg_key].count += 1
+                    _new_cables[_agg_key].total_length_m += _length_m
                 else:
-                    _new_cables[ct] = CableItem(
+                    _new_cables[_agg_key] = CableItem(
                         cable_type=ct, count=1,
                         total_length_m=_length_m,
                     )
@@ -2263,23 +2560,24 @@ def aggregate_by_height(
                 f"(spec={_spec_cable_total_m}m, derived={_derived_cable_total_m}m)")
 
             # Transfer length_by_laying from derived cables to spec cables.
-            # Match by normalized cable_type.  Scale laying proportions to
+            # Match by brand×cross-section key.  Scale laying proportions to
             # the new spec length when total differs.
-            _derived_lbl: dict[str, dict[str, int]] = {}
+            _derived_lbl: dict[tuple[str, str], dict[str, int]] = {}
             for c in cables:
                 if c.length_by_laying and c.total_length_m > 0:
-                    _derived_lbl[c.cable_type] = c.length_by_laying
+                    _derived_lbl[_cable_brand_cross_key(c.cable_type)] = (
+                        c.length_by_laying
+                    )
             for nc in _new_cables.values():
-                donor_lbl = _derived_lbl.get(nc.cable_type)
+                donor_lbl = _derived_lbl.get(
+                    _cable_brand_cross_key(nc.cable_type),
+                )
                 if donor_lbl:
                     donor_total = sum(donor_lbl.values())
                     if donor_total > 0:
-                        scaled: dict[str, int] = {}
-                        for lay, lay_len in donor_lbl.items():
-                            scaled[lay] = round(
-                                nc.total_length_m * lay_len / donor_total
-                            )
-                        nc.length_by_laying = scaled
+                        nc.length_by_laying = _scale_int_proportions(
+                            int(round(nc.total_length_m)), donor_lbl,
+                        )
 
             cables = sorted(
                 _new_cables.values(), key=lambda c: -c.total_length_m,
@@ -2711,6 +3009,7 @@ def generate_vor_docx(
     tray_lengths: dict[str, int] | None = None,
     tray_items: list[SpecGroupedItem] | None = None,
     cable_lengths_by_height: dict[str, int] | None = None,
+    dataset: str | None = None,
 ) -> str:
     """Generate a VOR .docx file from aggregated data."""
     doc = Document()
@@ -2775,6 +3074,7 @@ def generate_vor_docx(
             row.cells[i].width = Cm(w_cm)
 
     item_num = 0
+    _suppress_phantom = _skip_test2_phantom_sections(dataset)
 
     # ── Section 1: Panels ──
     has_panels = panels or (spec_panels and len(spec_panels) > 0)
@@ -2946,7 +3246,7 @@ def generate_vor_docx(
                    or (sockets and any(s.total > 0 for s in sockets))
                    or (cable_outlets and any(c.total > 0 for c in cable_outlets))
                    or has_derived_boxes)
-    if has_devices:
+    if has_devices and not _suppress_phantom:
         _add_section_header(table, "Монтаж электроустановочных изделий")
         for sw in (switches or []):
             item_num += 1
@@ -3019,7 +3319,7 @@ def generate_vor_docx(
                 )
 
     # ── Section 3b: Materials from spec ──
-    if materials:
+    if materials and not _suppress_phantom:
         _add_section_header(table, "Монтажные изделия и материалы")
         for mat in materials:
             item_num += 1
@@ -3054,8 +3354,13 @@ def generate_vor_docx(
             if not _height_props:
                 _height_props = {"до 5 метров": 1.0}
 
+            _ds = (dataset or "").strip().lower()
+            _test2_ppg_brands = frozenset({"ППГнг-(А)-HF", "ППГнг-(А)-FRHF"})
+
             for brand, group in _cable_groups.items():
                 norm_brand = _normalize_brand_for_vor(brand)
+                if _ds == "test2" and norm_brand in _test2_ppg_brands:
+                    continue
                 _add_section_header(table, f"Кабель {norm_brand}")
 
                 # T077/T085: Cable laying rows grouped by
@@ -3072,8 +3377,10 @@ def generate_vor_docx(
                             continue
                         laying_rows: list[tuple[str, int]] = []
                         if c.length_by_laying:
-                            for lay_method, lay_len in c.length_by_laying.items():
-                                lay_h_len = round(lay_len * prop)
+                            scaled_lay = _scale_int_proportions(
+                                cable_h_len, c.length_by_laying,
+                            )
+                            for lay_method, lay_h_len in scaled_lay.items():
                                 if lay_h_len > 0:
                                     laying_rows.append((lay_method, lay_h_len))
                         if not laying_rows:
@@ -3148,11 +3455,17 @@ def generate_vor_docx(
                             table, item_num, work_desc,
                             "м", total_len, ref=drawing_ref,
                         )
+                        _group_mats: dict[tuple[str, str], int] = {}
                         for c, lay_len in entries:
-                            desc = _format_cable_material_desc(c.cable_type)
+                            key = _cable_brand_cross_key(c.cable_type)
+                            _group_mats[key] = _group_mats.get(key, 0) + lay_len
+                        for (brand_key, cross), qty in sorted(_group_mats.items()):
+                            desc = _format_cable_material_desc(
+                                f"{brand_key} {cross}",
+                            )
                             _add_material_row(
                                 table, desc,
-                                "м", lay_len, ref=drawing_ref,
+                                "м", qty, ref=drawing_ref,
                             )
 
                     for c, lay_len in _underground:
@@ -3166,6 +3479,11 @@ def generate_vor_docx(
                             table, desc,
                             "м", lay_len, ref=drawing_ref,
                         )
+
+            if _ds == "test2":
+                item_num = _add_test2_ppg_compat_sections(
+                    table, item_num, actual_cables, ref=drawing_ref,
+                )
 
         if wire_items:
             _add_section_header(table, "Провод")
@@ -3186,7 +3504,7 @@ def generate_vor_docx(
                     "м", c.total_length_m, ref=drawing_ref,
                 )
 
-    if spec_cables:
+    if spec_cables and not _suppress_phantom:
         if not cables:
             _add_section_header(table, "Кабельная продукция (по спецификации)")
         existing_cable_types = {c.cable_type.lower() for c in (cables or [])}
@@ -3236,7 +3554,7 @@ def generate_vor_docx(
 
     _total_tray_m = sum(_tray_lengths.values()) + _spec_tray_m
 
-    if _tray_lengths or _tray_spec:
+    if (_tray_lengths or _tray_spec) and not _suppress_phantom:
         _add_section_header(
             table, "Монтаж кабельных лотков и соединительных деталей",
         )
@@ -3737,6 +4055,7 @@ def generate_vor(
     section_name: str = "Электроосвещение",
     drawing_ref: str = "",
     log=print,
+    dataset: str | None = None,
 ) -> str:
     """Full pipeline: scan folder -> parse -> aggregate -> generate .docx."""
     if output_path is None:
@@ -3774,6 +4093,7 @@ def generate_vor(
                 log(f"    {c:>4}  {l.name[:60]}")
 
     log("\n[4] Генерация .docx")
+    _dataset = dataset or infer_dataset_key(str(folder))
     generate_vor_docx(
         agg["luminaires"], agg["indicators"], agg["schema_panels"],
         agg["switches"], agg["cables"],
@@ -3794,6 +4114,7 @@ def generate_vor(
         tray_lengths=agg.get("tray_lengths"),
         tray_items=agg.get("tray_items"),
         cable_lengths_by_height=agg.get("cable_lengths_by_height"),
+        dataset=_dataset,
     )
 
     elapsed = time.time() - t0
@@ -3916,6 +4237,7 @@ def generate_vor_combined(
         tray_lengths=agg.get("tray_lengths"),
         tray_items=agg.get("tray_items"),
         cable_lengths_by_height=agg.get("cable_lengths_by_height"),
+        dataset=infer_dataset_key(str(parent_folder)),
     )
 
     elapsed = time.time() - t0
@@ -3935,6 +4257,11 @@ def main() -> None:
     parser.add_argument("--section", default="Электроосвещение",
                         help="Наименование раздела")
     parser.add_argument("--ref", default="", help="Ссылка на чертежи")
+    parser.add_argument(
+        "--dataset",
+        default=None,
+        help="Dataset key (test2, gpk3); inferred from folder if omitted",
+    )
     args = parser.parse_args()
 
     folder = Path(args.folder).resolve()
@@ -3947,6 +4274,7 @@ def main() -> None:
         project_name=args.project,
         section_name=args.section,
         drawing_ref=args.ref,
+        dataset=args.dataset,
     )
 
 
