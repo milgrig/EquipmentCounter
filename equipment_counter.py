@@ -831,9 +831,19 @@ def _extract_plan_annotations(
 ) -> list[EquipmentItem]:
     """Extract equipment counts from Revit plan annotations like '5-INSEL LB_S LED G3...'.
 
-    Deduplicates: same annotation text on different views → counted once.
+    T-S011-A2 (T149): Each annotation marks a distinct *zone* on the plan and
+    carries its own per-zone count.  A plan may have several such annotations
+    for the same model spread across different zones (e.g. file 007 in gpk3
+    has SLICK.PRS LED 50 annotated as 26, 29, 2 at three distinct positions —
+    real zone total = 57, not max = 29).  Therefore we SUM counts across
+    distinct annotation positions per description, but still drop true
+    duplicates (identical text at the same coordinate, which can occur in
+    Revit-exported DXFs with overlapping view boundaries).
     """
-    seen_texts: dict[str, int] = {}
+    POS_ROUND = 1.0
+
+    seen_pos: set[tuple[str, int, int, int]] = set()
+    per_desc_counts: dict[str, int] = {}
 
     for text, x, y in entries:
         in_legend = any(
@@ -853,13 +863,15 @@ def _extract_plan_annotations(
             continue
         if desc.startswith(("На отм", "Щ", "ВРУ", "Гр.")):
             continue
-        if desc not in seen_texts:
-            seen_texts[desc] = count
-        else:
-            seen_texts[desc] = max(seen_texts[desc], count)
+
+        key = (desc, count, int(round(x / POS_ROUND)), int(round(y / POS_ROUND)))
+        if key in seen_pos:
+            continue
+        seen_pos.add(key)
+        per_desc_counts[desc] = per_desc_counts.get(desc, 0) + count
 
     items = []
-    for i, (desc, count) in enumerate(seen_texts.items(), 1):
+    for i, (desc, count) in enumerate(per_desc_counts.items(), 1):
         items.append(EquipmentItem(symbol=f"P{i}", name=desc, count=count))
     return items
 
