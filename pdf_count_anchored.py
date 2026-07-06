@@ -31,6 +31,7 @@ end-cap-пар; зафиксировано на ГПК-3 006 (символы «3
 from __future__ import annotations
 
 import math
+import os
 from dataclasses import dataclass, field
 
 import cv2
@@ -76,21 +77,24 @@ LINE_KERNEL_PX = 121
 
 
 def _remove_long_lines(mask: np.ndarray) -> np.ndarray:
-    """Вычесть длинные прямые штрихи (кабельные трассы) из маски.
+    """Вычесть длинные прямые ОСЕВЫЕ штрихи (кабельные трассы) из маски.
 
     Без этого вся синяя/красная графика листа сливается через провода в
     один гигантский компонент, и глифы светильников не отделяются.
+
+    Только сепарабельные rect-ядра (121×1 и 1×121): дёшево даже на
+    60-Мпикс рендерах. Диагональные ядра (np.eye(121)) из первой версии
+    стоили O(N·k²) — минуты CPU на страницу × 8 воркеров и подвесили
+    прод-сервер; при этом на контрольном листе ГПК-3 006 они не меняли
+    ни одного счётчика. Наклонные трассы не вычитаются: глифы на них
+    остаются слитыми и просто не учитываются якорным счётчиком
+    (деградация к текстовому счёту, не ошибка).
     """
     out = mask.copy()
     k = LINE_KERNEL_PX
-    kernels = [
-        cv2.getStructuringElement(cv2.MORPH_RECT, (k, 1)),
-        cv2.getStructuringElement(cv2.MORPH_RECT, (1, k)),
-        np.eye(k, dtype=np.uint8),
-        np.flipud(np.eye(k, dtype=np.uint8)),
-    ]
     grown = cv2.dilate(mask, np.ones((3, 3), np.uint8))
-    for ker in kernels:
+    for ker in (cv2.getStructuringElement(cv2.MORPH_RECT, (k, 1)),
+                cv2.getStructuringElement(cv2.MORPH_RECT, (1, k))):
         lines = cv2.morphologyEx(grown, cv2.MORPH_OPEN, ker)
         out = cv2.subtract(out, cv2.dilate(lines, np.ones((5, 5), np.uint8)))
     return out
@@ -190,6 +194,11 @@ def count_by_marker_anchors(
     легенды (категория «светильник» и прочие точечные глифы).
     """
     res = AnchoredResult()
+    # Аварийный рубильник: VOR_ANCHORED=0 полностью выключает якорный
+    # подсчёт (например, на слабом сервере).
+    if os.environ.get("VOR_ANCHORED", "1") != "1":
+        res.notes.append("disabled by VOR_ANCHORED=0")
+        return res
     page_idx = legend_result.page_index if page_index is None else page_index
 
     # Якоря по символам: symbol -> [(x_pt, y_pt), ...]
@@ -208,8 +217,16 @@ def count_by_marker_anchors(
         return res
 
     bgr = _render_page(pdf_path, page_idx, dpi=render_dpi)
+    # Предохранитель по размеру: сверхбольшие рендеры (нестандартные листы)
+    # съедают RAM в параллельных воркерах — пропускаем, итог остаётся
+    # текстовым (деградация, не зависание).
+    n_mpx = (bgr.shape[0] * bgr.shape[1]) / 1e6
+    if n_mpx > 120:
+        res.notes.append(f"skipped: render {n_mpx:.0f} Mpx > 120 Mpx")
+        return res
     px_per_pt = render_dpi / 72.0
     masks = _color_masks(bgr)
+    del bgr
 
     # Зоны исключения (легенда, штамп, оси) в pt.
     with pdfplumber.open(pdf_path) as pdf:
