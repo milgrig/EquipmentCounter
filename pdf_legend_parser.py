@@ -200,15 +200,21 @@ def _reverse_cyrillic_words(words: list[dict]) -> list[dict]:
         out.append(new_w)
     return out
 
-# Category detection keywords (checked in order — first match wins)
+# Category detection keywords (checked in order — first match wins).
+# S011: словарь расширен — «коробка» и «пиктограмма» отсутствовали вовсе
+# (строки уходили в category="" и обеднялся маппинг в ВОР), а узкие ключи
+# («Светильник» без «прожектор»/«указател») пропускали реальные строки.
 CATEGORY_KEYWORDS = {
-    "эвакуационный": ["эвакуационный", "ВЫХОД"],
-    "светильник": ["Светильник", "светодиодный"],
-    "выключатель": ["Выключатель"],
-    "розетка": ["Розетка"],
-    "щит": ["Щит"],
+    "эвакуационный": ["эвакуационный", "ВЫХОД", "аварийного выхода"],
+    "пиктограмма": ["пиктограмм"],
+    "светильник": ["Светильник", "светодиодный", "прожектор", "лампа"],
+    "выключатель": ["Выключатель", "переключател"],
+    "розетка": ["Розетка", "штепсельн"],
+    "коробка": ["коробк"],
+    "щит": ["Щит", "щиток"],
     "кабельная трасса": ["Кабельная трасса"],
     "проводка": ["Проводка"],
+    "лоток": ["лотк", "лоток"],
 }
 
 # Minimum length for a horizontal/vertical line to be considered a table border.
@@ -1419,9 +1425,15 @@ def _legend_density_score(result: LegendResult) -> float:
     return sym_count * 1000.0 + total * 10.0 + desc_count
 
 
-def parse_legend(pdf_path: str) -> LegendResult:
+def parse_legend(pdf_path: str, restrict_page: int | None = None) -> LegendResult:
     """
     Parse legend table(s) from a PDF file.
+
+    ``restrict_page`` (no-СО per-page mode): when given, only that page index
+    is scanned for a legend. Combined single-file projects place a different
+    legend on every sheet (power / lighting / grounding), so callers can sweep
+    pages individually. Default ``None`` preserves the original whole-document
+    behaviour byte-for-byte (zero regression for the СО pipeline).
 
     S1.4 (T019): scans ALL pages, collects EVERY plausible legend
     candidate (both header-based and content-based), and returns the one
@@ -1451,6 +1463,8 @@ def parse_legend(pdf_path: str) -> LegendResult:
 
     with pdfplumber.open(pdf_path) as pdf:
         for page_idx, page in enumerate(pdf.pages):
+            if restrict_page is not None and page_idx != restrict_page:
+                continue
             lines = page.lines or []
             rects = page.rects or []
 
@@ -1556,6 +1570,8 @@ def parse_legend(pdf_path: str) -> LegendResult:
         # so we always add any results it produces to the pool instead
         # of returning the first hit.
         for page_idx, page in no_header_pages:
+            if restrict_page is not None and page_idx != restrict_page:
+                continue
             result = _content_based_legend_search(page, page_idx)
             if result is not None and result.items:
                 _stamp_page_index(result, page_idx)
@@ -1569,6 +1585,8 @@ def parse_legend(pdf_path: str) -> LegendResult:
         # every page is safe — it's strictly additive because the
         # density-score selector will pick the densest candidate.
         for page_idx, page in enumerate(pdf.pages):
+            if restrict_page is not None and page_idx != restrict_page:
+                continue
             spec_result = _spec_table_as_legend(page, page_idx)
             if spec_result is not None and spec_result.items:
                 _stamp_page_index(spec_result, page_idx)
@@ -1582,6 +1600,8 @@ def parse_legend(pdf_path: str) -> LegendResult:
         # produced a legend.
         if not all_candidates:
             for page_idx, page in enumerate(pdf.pages):
+                if restrict_page is not None and page_idx != restrict_page:
+                    continue
                 dens_result = _detect_legend_by_symbol_density(page, page_idx)
                 if dens_result is not None and dens_result.items:
                     _stamp_page_index(dens_result, page_idx)

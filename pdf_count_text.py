@@ -58,6 +58,10 @@ class CountResult:
     symbols_searched: list[str] = field(default_factory=list)
     total_words_on_page: int = 0
     words_in_drawing_area: int = 0
+    # Диагностика Pass 3: symbol → {причина_отбраковки: сколько раз}.
+    # Заполняется только для одиночных цифр — помогает понять, какой
+    # фильтр съедает маркеры на конкретном листе.
+    rejects: dict[str, dict[str, int]] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -109,6 +113,18 @@ TEXT_DENSE_THRESHOLD = 8    # if ≥ this many words nearby, it's a text block
 # Minimum text height fraction — standalone digits shorter than
 # min_height_factor * median_ref_height are likely annotation artifacts
 MIN_HEIGHT_FACTOR = 0.5
+
+# --- Ampere-rating guard (S011) ---------------------------------------------
+# Токены вида "16А"/"25А" проходят под SYMBOL_RE и, если легенда определяет
+# такой символ, номиналы автоматов на листе засчитывались как маркеры.
+# Токен считается номиналом (не маркером), когда рядом стоит контекст
+# аппарата защиты: QF/QS/ВА/кА/Iн/хар-ка C16/B10 и т.п.
+AMP_VALUE_RE = re.compile(r"^(6|10|16|20|25|32|40|50|63)А$")
+AMP_CONTEXT_RE = re.compile(
+    r"^(QF\d*|QS\d*|QD\d*|ВА\d*|кА|Iн\.?|[BCD]\d{1,2}|1П|2П|3П|П\d)$",
+    re.IGNORECASE,
+)
+AMP_CONTEXT_RADIUS = 45.0  # pt
 
 
 # ---------------------------------------------------------------------------
@@ -643,6 +659,25 @@ def count_symbols(
         # Index words for fast neighbor lookup
         word_index = drawing_words  # simple list for now
 
+        def _is_amp_rating(w: dict) -> bool:
+            """True, если digit+А токен выглядит как номинал автомата:
+            типовое значение ампер + рядом контекст аппарата защиты."""
+            if not AMP_VALUE_RE.match(w["text"]):
+                return False
+            wx = (w["x0"] + w["x1"]) / 2
+            wy = (w["top"] + w["bottom"]) / 2
+            for other in drawing_words:
+                if other is w:
+                    continue
+                if not AMP_CONTEXT_RE.match(other["text"]):
+                    continue
+                ox = (other["x0"] + other["x1"]) / 2
+                oy = (other["top"] + other["bottom"]) / 2
+                if abs(ox - wx) <= AMP_CONTEXT_RADIUS and \
+                        abs(oy - wy) <= AMP_CONTEXT_RADIUS:
+                    return True
+            return False
+
         # Pass 1: Find exact compound symbol matches (e.g., '5А', '10А', '5АЭ')
         # These are highest confidence — no false positive risk
         compound_symbols = {s for s in text_symbols if re.search(r"[А-Яа-яЁё]", s)}
@@ -652,6 +687,9 @@ def count_symbols(
                 if CABLE_RE.search(w["text"]):
                     continue
                 if PANEL_RE.search(w["text"]):
+                    continue
+                # Ampere-rating guard: "16А" рядом с QF/ВА/C16 — номинал
+                if _is_amp_rating(w):
                     continue
                 found_positions.append(SymbolPosition(
                     symbol=w["text"],
@@ -739,6 +777,12 @@ def count_symbols(
 
         # Pass 3: Count standalone digit symbols (e.g., '1', '5')
         # These need careful false-positive filtering
+        rejects: dict[str, dict[str, int]] = {}
+
+        def _rej(sym: str, reason: str) -> None:
+            rejects.setdefault(sym, {})
+            rejects[sym][reason] = rejects[sym].get(reason, 0) + 1
+
         for di in digit_indices:
             if di in used_word_indices:
                 continue  # already merged
@@ -753,10 +797,12 @@ def count_symbols(
 
             # Filter: skip if text is too tall (room numbers, section labels)
             if word_height > max_marker_height:
+                _rej(digit_text, "too_tall")
                 continue
 
             # Filter: skip if text is too short (tiny annotation artifacts)
             if word_height < min_marker_height:
+                _rej(digit_text, "too_short")
                 continue
 
             # --- Color filter (strongest signal) ---
@@ -766,12 +812,14 @@ def count_symbols(
                 expected_color = symbol_color_map[digit_text]
                 actual_color = _word_color_label(dw)
                 if actual_color and expected_color and actual_color != expected_color:
+                    _rej(digit_text, "color_mismatch")
                     continue
 
             # --- Grey / very light text filter ---
             # Grey text (grid numbers, dimensions) is never an equipment marker.
             word_color = _word_color_label(dw)
             if word_color == "grey":
+                _rej(digit_text, "grey")
                 continue
 
             # --- Equipment zone proximity filter ---
@@ -791,6 +839,7 @@ def count_symbols(
                             near_color_equip = True
                             break
                     if not near_color_equip:
+                        _rej(digit_text, "outside_equip_zone")
                         continue
 
             # --- Contextual filters ---
@@ -799,37 +848,45 @@ def count_symbols(
             # Relax near coloured equipment — markers like "2" next to
             # "CD LED 27" are legitimate equipment labels.
             if not near_color_equip and _is_near_latin_text(dw, word_index):
+                _rej(digit_text, "near_latin")
                 continue
 
             # Filter: skip if part of ЛК value
             if _is_lk_context(dw, word_index):
+                _rej(digit_text, "lk_context")
                 continue
 
             # Filter: skip if part of cable section
             if _is_cable_context(dw, word_index):
+                _rej(digit_text, "cable_context")
                 continue
 
             # Filter: skip room numbers (3+ digit standalone)
             if ROOM_NUMBER_RE.match(dw["text"]):
+                _rej(digit_text, "room_number")
                 continue
 
             # Filter: skip if near panel reference (ЩАО1-Гр.5)
             if _is_near_panel_ref(dw, word_index):
+                _rej(digit_text, "near_panel_ref")
                 continue
 
             # Filter: skip if part of a split multi-digit number
             if _is_part_of_multi_digit(dw, word_index):
+                _rej(digit_text, "multi_digit")
                 continue
 
             # Filter: skip if in a text-dense area (notes, specs, paragraphs)
             # Relax this filter when digit is near coloured equipment —
             # equipment labels often sit in annotation-dense areas.
             if not near_color_equip and _is_in_text_dense_area(dw, word_index):
+                _rej(digit_text, "text_dense")
                 continue
 
             # Filter: skip if adjacent to Cyrillic text (sentence context)
             # Also relaxed near coloured equipment clusters.
             if not near_color_equip and _is_near_cyrillic_text(dw, word_index):
+                _rej(digit_text, "near_cyrillic")
                 continue
 
             found_positions.append(SymbolPosition(
@@ -847,6 +904,7 @@ def count_symbols(
         return CountResult(
             counts=counts,
             positions=found_positions,
+            rejects=rejects,
             page_index=page_idx,
             exclusion_zones=zones,
             symbols_searched=text_symbols,

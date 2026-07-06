@@ -186,10 +186,30 @@ def _collect_text_lines(page) -> list[dict]:
     return raw_lines
 
 
+# Слияние строк одной аннотации. Реальные многострочные аннотации набраны
+# одним цветом с межстрочным зазором ~0.2 высоты строки и общим левым краем;
+# соседние НЕЗАВИСИМЫЕ аннотации отстоят по вертикали на ≥1 высоту строки.
+# Старые пороги (dy≤25 pt, dx±80 pt) склеивали независимые аннотации и
+# подписи светильников в один блок: на листе 006 ГПК-3 это давало 65 групп
+# вместо 27 и завышало метраж стояков ×2.4.
+_MERGE_DY_FACTOR = 0.6   # зазор ≤ доля от меньшей высоты строки
+_MERGE_DY_CAP = 6.0      # абсолютный потолок зазора, pt
+_MERGE_DX_TOL = 6.0      # допустимый горизонтальный разрыв X-диапазонов, pt
+
+
 def _merge_multiline_blocks(lines: list[dict],
-                             max_dx: float = 80.0,
-                             max_dy: float = 25.0) -> list[dict]:
-    """Объединить близко расположенные строки в один блок."""
+                             max_dx: float = _MERGE_DX_TOL,
+                             max_dy: float | None = None) -> list[dict]:
+    """Объединить строки одной многострочной аннотации в блок.
+
+    Правила пары строк:
+      • вертикальный зазор ≤ ``max_dy`` (по умолчанию адаптивно:
+        ``_MERGE_DY_FACTOR`` × высота меньшей строки, но не более
+        ``_MERGE_DY_CAP``);
+      • X-диапазоны перекрываются или разорваны не более чем на ``max_dx``;
+      • строки с разными определёнными цветами не сливаются (красная и
+        синяя трассы — разные аннотации).
+    """
     if not lines:
         return []
     s_lines = sorted(lines, key=lambda L: (L["y0"], L["x0"]))
@@ -209,15 +229,23 @@ def _merge_multiline_blocks(lines: list[dict],
                 M = s_lines[j]
                 close = False
                 for B in block:
-                    dy = abs(M["y0"] - B["y1"])
-                    if M["y0"] >= B["y1"]:
-                        dy = M["y0"] - B["y1"]
-                    if 0 <= dy <= max_dy:
-                        bx0, bx1 = B["x0"], B["x1"]
-                        mx0, mx1 = M["x0"], M["x1"]
-                        if not (mx1 < bx0 - max_dx or mx0 > bx1 + max_dx):
-                            close = True
-                            break
+                    if B["color"] and M["color"] and B["color"] != M["color"]:
+                        continue
+                    if max_dy is not None:
+                        dy_lim = max_dy
+                    else:
+                        h = min(B["y1"] - B["y0"], M["y1"] - M["y0"])
+                        dy_lim = min(_MERGE_DY_FACTOR * h, _MERGE_DY_CAP)
+                    # Вертикальный зазор (0 при перекрытии по Y).
+                    dy = max(B["y0"] - M["y1"], M["y0"] - B["y1"], 0.0)
+                    if dy > dy_lim:
+                        continue
+                    # Горизонтальный разрыв X-диапазонов (0 при перекрытии).
+                    gap = max(B["x0"] - M["x1"], M["x0"] - B["x1"], 0.0)
+                    if gap > max_dx:
+                        continue
+                    close = True
+                    break
                 if close:
                     block.append(M)
                     used[j] = True
@@ -240,6 +268,8 @@ _TITLE_RE = re.compile(
     r"^\s*план\s+(освещения|привязк|кабеленесущ)",
     re.IGNORECASE,
 )
+# Ссылка на распределительный щит (ЩО3-, ЩАО3-, ЦСАО-, ВРУ- и т.п.).
+_PANEL_TOKEN_RE = re.compile(r"\b(?:ЩО|ЩАО|ЦСАО|ЩС|ЩР|ВРУ)\d*\s*[-–]", re.IGNORECASE)
 
 
 def extract_annotations_from_page(page, page_num: int = 1,
@@ -258,6 +288,10 @@ def extract_annotations_from_page(page, page_num: int = 1,
         if not elevs:
             continue
         groups = parse_groups(text)
+        # Стояковая аннотация всегда ссылается на группы или щит; блоки без
+        # них (фрагменты штампа/примечаний с числами вида N.NNN) — шум.
+        if not groups and not _PANEL_TOKEN_RE.search(text):
+            continue
         cx = (blk["x0"] + blk["x1"]) / 2
         cy = (blk["y0"] + blk["y1"]) / 2
         out.append(CableAnnotation(

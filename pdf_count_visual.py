@@ -93,6 +93,22 @@ DEFAULT_THRESHOLD = 0.75     # minimum match confidence
 SCALES = [1.0]                        # single scale (T142: 3→1 cuts 3× match calls)
 ROTATIONS = [0, 90]                   # 0° + 90° (symbols may be placed vertically)
 
+# Scale sweep for MARKED (non-compound) symbols. The legend icon and the
+# plan instance of a luminaire are frequently drawn at different sizes
+# (ARCTIC/CD fixtures on GPK3 006: legend icon ≠ plan glyph → 0 detections
+# at scale 1.0). The pyramid coarse pass (T142) keeps the extra scales
+# cheap: the coarse sweep discards most of the page before verification.
+MARKED_SCALES = [0.7, 0.85, 1.0, 1.2]
+
+# T054 / KB-015: extended scale set used for legend items that have no
+# symbol-text marker.  These items (switches, posts, cable trasses on
+# 007-Plans osvescheniya) tend to be drawn on the plan at roughly 50–70%
+# of the legend-icon size, so the default SCALES=[1.0] misses them
+# entirely.  This wider sweep restores them at the cost of a few extra
+# template calls per symbol-less item (typically 3–7 per legend).
+NO_SYMBOL_SCALES = [0.5, 0.6, 0.7, 0.85, 1.0]
+NO_SYMBOL_ROTATIONS = [0, 90, 180, 270]
+
 # Pyramid (coarse-to-fine) matching (T142)
 PYRAMID_DOWNSAMPLE = 0.5    # coarse pass at 50% resolution
 PYRAMID_COARSE_THRESH = 0.55 # lower threshold for coarse pass (catch all candidates)
@@ -122,8 +138,11 @@ FP_ROI_EXPAND = 1.5             # expand ROI by this factor for context analysis
 
 # Shape verification (visual anti-flood)
 # Verifies that the matched ROI actually resembles the template's binary shape.
-SHAPE_VERIFY_MIN_RECALL = 0.22
-SHAPE_VERIFY_MIN_PRECISION = 0.08
+# Raised 0.22/0.08 → 0.28/0.10 (S011): generic small templates (SLICK 50)
+# matched repetitive background 5× over truth; the looser floor let matches
+# through whose ROI shared <1/4 of the template's ink.
+SHAPE_VERIFY_MIN_RECALL = 0.28
+SHAPE_VERIFY_MIN_PRECISION = 0.10
 # Hard cap for simple one-letter compound markers (e.g. 1А).
 # T014/S4.1 (QW5): Disabled (set to 0) — candidate-first detection now handles
 # flood prevention by restricting matches to validated connected-component
@@ -960,6 +979,31 @@ def _extract_symbol_images(
             results.append((item_idx, item, None))
             continue
 
+        # T054 / KB-015: For legend rows with no symbol marker text
+        # (item.symbol == ""), the cell may be much taller than the actual
+        # icon (e.g. a small switch pictogram inside a 60-pt tall row).
+        # Tight-crop the template to the non-white bounding box so the
+        # foreground/background ratio is high enough for cv2.matchTemplate
+        # (TM_CCOEFF_NORMED) to register peaks above the
+        # content-density-adjusted threshold (0.85–0.88).
+        sym_text = (item.symbol or "").strip()
+        if not sym_text:
+            ys, xs = np.where(gray < 240)
+            if ys.size > 0:
+                y0, y1 = int(ys.min()), int(ys.max()) + 1
+                x0, x1 = int(xs.min()), int(xs.max()) + 1
+                # Apply small padding (in raster px, scaled by DPI)
+                pad_px = max(2, int(2 * zoom))
+                y0 = max(0, y0 - pad_px)
+                x0 = max(0, x0 - pad_px)
+                y1 = min(img.shape[0], y1 + pad_px)
+                x1 = min(img.shape[1], x1 + pad_px)
+                cropped = img[y0:y1, x0:x1]
+                # Guard against degenerate crops
+                if (cropped.shape[0] >= MIN_SYMBOL_SIZE_PX and
+                        cropped.shape[1] >= MIN_SYMBOL_SIZE_PX):
+                    img = cropped
+
         results.append((item_idx, item, img))
 
     doc.close()
@@ -1556,6 +1600,26 @@ _DISAMBIG_TOKENS = {
 }
 
 
+def _template_similarity(tpl_a: np.ndarray, tpl_b: np.ndarray,
+                         size: int = 48) -> float:
+    """Визуальное сходство двух шаблонов ∈ [0..1]: IoU бинарных масок,
+    приведённых к общему размеру. Используется cross-symbol NMS, чтобы
+    подавлять только реально похожие шаблоны (ARCTIC TH vs ARCTIC), а не
+    любые два символа, совпавшие рядом по координатам."""
+    try:
+        a = cv2.resize(tpl_a, (size, size), interpolation=cv2.INTER_AREA)
+        b = cv2.resize(tpl_b, (size, size), interpolation=cv2.INTER_AREA)
+        _, ba = cv2.threshold(a, 200, 255, cv2.THRESH_BINARY_INV)
+        _, bb = cv2.threshold(b, 200, 255, cv2.THRESH_BINARY_INV)
+        inter = np.count_nonzero(cv2.bitwise_and(ba, bb))
+        union = np.count_nonzero(cv2.bitwise_or(ba, bb))
+        if union == 0:
+            return 0.0
+        return inter / union
+    except Exception:  # noqa: BLE001
+        return 1.0  # при сбое ведём себя как раньше (подавление разрешено)
+
+
 def _find_confusable_groups(
     templates: list[tuple[int, object, object, str, float]],
 ) -> list[tuple[int, int, set[str], set[str]]]:
@@ -1992,8 +2056,31 @@ def match_symbols(
                 candidate_thresh, len(raw_detections),
             )
         else:
+            # T054 / KB-015: legend items with no symbol marker (switches,
+            # posts, control devices on 007-Plans osvescheniya) are often
+            # drawn at smaller scale than the legend icon. Use a wider
+            # scale + rotation sweep for these items so we can find their
+            # drawing-area instances.  Default callers still get the
+            # single-scale fast path.
+            item_scales = scales
+            item_rotations = rotations
+            if not sym_text:
+                # Merge defaults with the wider sweep (preserve any caller
+                # override that already includes extra scales).
+                merged_scales = sorted({float(s) for s in scales}
+                                       | {float(s) for s in NO_SYMBOL_SCALES})
+                merged_rotations = sorted({int(r) for r in rotations}
+                                          | {int(r) for r in NO_SYMBOL_ROTATIONS})
+                item_scales = merged_scales
+                item_rotations = merged_rotations
+            else:
+                # Marked (non-compound) symbols: legend icon vs plan glyph
+                # size mismatch previously zeroed detections (SCALES=[1.0]).
+                item_scales = sorted({float(s) for s in scales}
+                                     | {float(s) for s in MARKED_SCALES})
             raw_detections = _match_template_multi(
-                match_target, template, adj_threshold, scales, rotations, dpi_ratio,
+                match_target, template, adj_threshold,
+                item_scales, item_rotations, dpi_ratio,
                 page_gray_coarse=page_gray_coarse,
             )
 
@@ -2177,16 +2264,35 @@ def match_symbols(
             [(a, b) for a, b, _, _ in confusable_groups],
         )
 
-    # --- Cross-symbol NMS (T147, refined T148, S021) --------------------------
+    # --- Cross-symbol NMS (T147, refined T148, S021; recalibrated S011) -------
     # When two DIFFERENT templates match at the same physical location,
     # deduplicate.  But SKIP suppression for confusable pairs — they will
     # be resolved by text disambiguation instead.
+    # S011: suppression now requires (a) a larger confidence advantage
+    # (0.04 → 0.07: near-identical templates like ARCTIC TH vs non-TH lost
+    # 73% of the specific variant's matches to noise-level gaps) and
+    # (b) genuine VISUAL similarity of the two templates — dissimilar
+    # symbols co-located on the drawing are two real objects, not dups.
     CROSS_NMS_RADIUS_PT = 25.0   # ~25pt ≈ 9mm — catches offset matches
-    CROSS_NMS_CONF_GAP = 0.04   # min confidence advantage to suppress
+    CROSS_NMS_CONF_GAP = 0.07   # min confidence advantage to suppress
+    CROSS_NMS_SIM_THRESH = 0.45  # min template IoU for suppression eligibility
 
     if len(all_matches) > 1:
         # Sort by confidence descending
         all_matches.sort(key=lambda m: m.confidence, reverse=True)
+
+        # Pairwise template similarity, computed lazily per template pair.
+        tpl_by_idx = {t[0]: t[2] for t in templates}
+        _sim_cache: dict[tuple[int, int], float] = {}
+
+        def _pair_similar(ia: int, ib: int) -> bool:
+            key = (min(ia, ib), max(ia, ib))
+            if key not in _sim_cache:
+                ta, tb = tpl_by_idx.get(ia), tpl_by_idx.get(ib)
+                _sim_cache[key] = (_template_similarity(ta, tb)
+                                   if ta is not None and tb is not None
+                                   else 1.0)
+            return _sim_cache[key] >= CROSS_NMS_SIM_THRESH
 
         deduped: list[VisualMatch] = []
         for m in all_matches:
@@ -2203,11 +2309,13 @@ def match_symbols(
                 dist = math.sqrt((m.x - kept.x) ** 2 + (m.y - kept.y) ** 2)
                 if dist < CROSS_NMS_RADIUS_PT:
                     conf_gap = kept.confidence - m.confidence
-                    if conf_gap >= CROSS_NMS_CONF_GAP:
-                        # Clear winner — suppress the weaker match
+                    if (conf_gap >= CROSS_NMS_CONF_GAP
+                            and _pair_similar(kept.symbol_index,
+                                              m.symbol_index)):
+                        # Clear winner over a look-alike — suppress it
                         dominated = True
                         break
-                    # else: gap too small — both survive (ambiguous pair)
+                    # else: gap too small or templates dissimilar — both live
             if not dominated:
                 deduped.append(m)
 

@@ -23,3 +23,22 @@ nul
 output_*.docx
 mass_test_report.xlsx
 mass_test.py
+
+# Run logs and scratch outputs
+*.log
+_*.txt
+_*.png
+_current_run.txt
+_hr_query.json
+output/
+uploads/
+vor_output_local/
+
+# Local work directories (deploy staging, backups, run sandboxes)
+.deploy_work/
+.local_backup/
+.local_run/
+experiments/
+
+# Model weights
+*.pt

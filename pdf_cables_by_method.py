@@ -129,12 +129,13 @@ class Polyline:
     color: str = ""                    # 'red' / 'blue'
     points: list[tuple[float, float]] = field(default_factory=list)
     length_pt: float = 0.0
-    laying_method: str = ""            # 'gofra/truba' | 'lotok' | 'po_konstrukciyam'
+    # 'gofra/truba' | 'lotok' | 'po_konstrukciyam' | 'kabel_kanal' | 'v_zemle'
+    laying_method: str = ""
     nearby_label_m: Optional[float] = None  # length in meters from L=… label
-
-    @property
-    def length_m(self) -> float:
-        return self.length_pt * 0.0  # placeholder; report fills via scale
+    # Attributes bound from the nearest on-plan annotation (may stay empty)
+    cable_mark: str = ""               # e.g. "ВВГнг(А)-LS"
+    cross_section: str = ""            # e.g. "3x1.5"
+    method_source: str = ""            # 'annotation' | 'marker' | 'sheet_default'
 
 
 @dataclass
@@ -163,6 +164,11 @@ class CableMethodReport:
     tray_ticks: int = 0
     # Sheet-level cable marks (most common to least)
     sheet_cable_marks: list = field(default_factory=list)
+    # totals_by_mark_m[(mark, section)] = metres of polylines bound to that
+    # mark via on-plan annotations ("" keys collect unattributed length)
+    totals_by_mark_m: dict[tuple[str, str], float] = field(default_factory=dict)
+    # How many on-plan annotations were bound to a polyline
+    annotations_bound: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -903,16 +909,30 @@ SHEET_METHOD_RULES = [
     (re.compile(r"\bпо\s+лоткам\b", re.IGNORECASE), "lotok", 3),
     (re.compile(r"в\s+(металл\w*\s+)?(перфорированн\w*\s+)?лотк\w+",
                 re.IGNORECASE), "lotok", 2),
-    # "в трубе" / "в трубах ПВХ/ПНД" / "в гофре"
+    # "в трубе" / "в трубах ПВХ/ПНД" / "в гофре" / "в гофротрубе"
     (re.compile(r"\bв\s+труб[еах]\w*\s*(пвх|пнд)?\b", re.IGNORECASE),
         "gofra/truba", 2),
-    (re.compile(r"\bв\s+гофр[еа]\b", re.IGNORECASE), "gofra/truba", 2),
+    (re.compile(r"\bв\s+гофр\w*", re.IGNORECASE), "gofra/truba", 2),
+    # "в кабель-канале" / "в кабельном канале" — отдельный способ: эталонные
+    # ВОР различают гофру и кабель-канал, смешивать их нельзя.
+    (re.compile(r"кабель[\s-]?канал", re.IGNORECASE), "kabel_kanal", 3),
+    (re.compile(r"\bв\s+кабельн\w+\s+канал\w*", re.IGNORECASE),
+        "kabel_kanal", 3),
+    # "в земле" / "в траншее" — подземная прокладка (обычно ВБШвнг + ПНД).
+    (re.compile(r"\bв\s+земл[ею]\b", re.IGNORECASE), "v_zemle", 3),
+    (re.compile(r"\bв\s+транше[ея]\w*", re.IGNORECASE), "v_zemle", 3),
     # "по строительным конструкциям" / "открыто по конструкциям"
     (re.compile(r"по\s+(строительн\w+\s+)?конструкц\w+", re.IGNORECASE),
         "po_konstrukciyam", 2),
     (re.compile(r"\bоткрыт[оа]\s+по\s+", re.IGNORECASE),
         "po_konstrukciyam", 2),
 ]
+
+# Методы, которые лист может задать как дефолт для немаркированных трасс.
+# "lotok" сознательно исключён: лотковые трассы подтверждаются только
+# геометрическими маркерами (см. комментарий в measure_cables), иначе
+# планы освещения со спусками к выключателям уезжают в лоток целиком.
+_SHEET_DEFAULT_CANDIDATES = ("gofra/truba", "kabel_kanal", "v_zemle")
 
 
 # Cable mark patterns. We look for canonical Russian power-cable marks
@@ -1005,6 +1025,133 @@ def _detect_sheet_default_method(words: list[dict]) -> tuple[str, dict]:
 
 
 # ---------------------------------------------------------------------------
+# On-plan route annotations → nearest polyline binding
+# ---------------------------------------------------------------------------
+
+# Максимальное расстояние от центра аннотации до ближайшей вершины
+# полилинии, при котором аннотация считается относящейся к этой трассе.
+ANNOT_TO_LINE_MAX_PT = 40.0
+
+# Способ прокладки, если он назван прямо в аннотации у трассы. Такая
+# аннотация авторитетнее любых геометрических маркеров.
+_ANNOT_METHOD_RES = [
+    (re.compile(r"кабель[\s-]?канал", re.IGNORECASE), "kabel_kanal"),
+    (re.compile(r"\bв\s+гофр\w*", re.IGNORECASE), "gofra/truba"),
+    (re.compile(r"\bв\s+труб[еах]\w*", re.IGNORECASE), "gofra/truba"),
+    (re.compile(r"\bв\s+земл[ею]\b|\bв\s+транше", re.IGNORECASE), "v_zemle"),
+    (re.compile(r"\bв\s+лотк[еах]\b|\bпо\s+лотк", re.IGNORECASE), "lotok"),
+    (re.compile(r"по\s+(строительн\w+\s+)?конструкц\w+", re.IGNORECASE),
+        "po_konstrukciyam"),
+]
+_LABEL_LEN_RE = re.compile(r"\bL\s*=\s*(\d+(?:[.,]\d+)?)\s*м\b", re.IGNORECASE)
+
+
+def _extract_route_annotations(words: list[dict], zones) -> list[dict]:
+    """Собрать аннотации трасс из текстовых строк листа.
+
+    Аннотацией считается строка, где есть хотя бы одно из: марка кабеля,
+    метка длины ``L=…м`` или словесный способ прокладки. Возвращает список
+    словарей: text, center, mark, section, method, label_m.
+    """
+    lines_by_y: dict[int, list[dict]] = defaultdict(list)
+    for w in words:
+        lines_by_y[round(w["top"] / 3) * 3].append(w)
+
+    out: list[dict] = []
+    for ws in lines_by_y.values():
+        ws.sort(key=lambda w: w["x0"])
+        text = " ".join(w["text"] for w in ws)
+        mm = CABLE_MARK_PREFIX_RE.search(text)
+        lm = _LABEL_LEN_RE.search(text)
+        method = ""
+        for pat, meth in _ANNOT_METHOD_RES:
+            if pat.search(text):
+                method = meth
+                break
+        if not (mm or lm or method):
+            continue
+        section = ""
+        sm = CABLE_SECTION_RE.search(text)
+        if sm:
+            cores, area = int(sm.group(1)), float(sm.group(2).replace(",", "."))
+            # Отсев размеров лотков/каналов ("50х50"): у кабеля жил ≤ 19
+            # и сечение ≤ 95 мм² (та же граница, что в pdf_count_cables).
+            if cores <= 19 and area <= 95:
+                section = f"{cores}x{sm.group(2).replace(',', '.')}"
+        x0 = min(w["x0"] for w in ws); x1 = max(w["x1"] for w in ws)
+        y0 = min(w["top"] for w in ws); y1 = max(w["bottom"] for w in ws)
+        cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        if _excluded((cx, cy), zones):
+            continue
+        out.append(dict(
+            text=text[:120], center=(cx, cy),
+            mark=(mm.group(0).strip() if mm else ""),
+            section=section, method=method,
+            label_m=(float(lm.group(1).replace(",", ".")) if lm else None),
+        ))
+    return out
+
+
+def _pt_seg_dist(ax: float, ay: float,
+                 x1: float, y1: float, x2: float, y2: float) -> float:
+    """Расстояние от точки до отрезка."""
+    dx, dy = x2 - x1, y2 - y1
+    l2 = dx * dx + dy * dy
+    if l2 <= 1e-9:
+        return math.hypot(ax - x1, ay - y1)
+    t = max(0.0, min(1.0, ((ax - x1) * dx + (ay - y1) * dy) / l2))
+    return math.hypot(ax - (x1 + t * dx), ay - (y1 + t * dy))
+
+
+def _bind_annotations_to_polylines(annotations: list[dict],
+                                    polylines: list[Polyline]) -> int:
+    """Привязать каждую аннотацию к БЛИЖАЙШЕЙ полилинии (≤ ANNOT_TO_LINE_MAX_PT).
+
+    Расстояние меряется до СЕГМЕНТОВ трассы (points хранит пары концов
+    сегментов), а не только до вершин — подпись у середины длинного
+    прогона тоже привязывается. Способ прокладки из аннотации перекрывает
+    решение маркеров/дефолта листа; марка, сечение и L=…м вешаются как
+    атрибуты трассы (первая аннотация выигрывает — вторичные не затирают).
+    Возвращает число привязанных.
+    """
+    bound = 0
+    for ann in annotations:
+        ax, ay = ann["center"]
+        best: Optional[Polyline] = None
+        best_d = ANNOT_TO_LINE_MAX_PT
+        for pl in polylines:
+            pts = pl.points
+            # points наполняется парами (a, b) на каждый сегмент —
+            # шагаем по чётным индексам, чтобы не мерить фантомные
+            # перемычки между несмежными сегментами компоненты.
+            for i in range(0, len(pts) - 1, 2):
+                x1, y1 = pts[i]
+                x2, y2 = pts[i + 1]
+                # дешёвый прямоугольный пре-фильтр по bbox сегмента
+                if (max(x1, x2) < ax - best_d or min(x1, x2) > ax + best_d
+                        or max(y1, y2) < ay - best_d
+                        or min(y1, y2) > ay + best_d):
+                    continue
+                d = _pt_seg_dist(ax, ay, x1, y1, x2, y2)
+                if d < best_d:
+                    best_d = d
+                    best = pl
+        if best is None:
+            continue
+        bound += 1
+        if ann["method"]:
+            best.laying_method = ann["method"]
+            best.method_source = "annotation"
+        if ann["mark"] and not best.cable_mark:
+            best.cable_mark = ann["mark"]
+        if ann["section"] and not best.cross_section:
+            best.cross_section = ann["section"]
+        if ann["label_m"] is not None and best.nearby_label_m is None:
+            best.nearby_label_m = ann["label_m"]
+    return bound
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
@@ -1059,6 +1206,27 @@ def measure_cables(
         rep.raw_red_lines = len(red_segs)
         rep.raw_blue_lines = len(blue_segs)
 
+        # Кривые (дуги/Безье) тоже трассы: pdfplumber отдаёт их опорные
+        # точки в "pts" — режем на хорды-сегменты. Мелкие кривые размером
+        # с кружок-маркер пропускаем: их собирает _collect_circle_markers.
+        for cv in (page.curves or []):
+            cls = _classify_color(cv.get("stroking_color"))
+            if not cls:
+                continue
+            pts = cv.get("pts") or []
+            if len(pts) < 2:
+                continue
+            w_cv = abs(cv.get("x1", 0) - cv.get("x0", 0))
+            h_cv = abs(cv.get("bottom", 0) - cv.get("top", 0))
+            if max(w_cv, h_cv) <= 2 * CIRCLE_MAX_RADIUS_PT:
+                continue
+            for a, b in zip(pts, pts[1:]):
+                seg = {"x0": a[0], "top": a[1], "x1": b[0], "bottom": b[1],
+                       "stroking_color": cv.get("stroking_color")}
+                if _excluded(_midpoint(seg), zones):
+                    continue
+                (red_segs if cls == "red" else blue_segs).append(seg)
+
         # Markers
         circle_markers = _collect_circle_markers(page, zones)
         tray_rects = _collect_tray_rects(page, zones)
@@ -1099,11 +1267,14 @@ def measure_cables(
         # po_konstrukciyam (to switches/sockets), and tray promotion via
         # ticks already covers the lotok case.
         scores = sheet_info.get("scores", {})
-        gofra_score = scores.get("gofra/truba", 0)
-        if gofra_score >= 4 and gofra_score >= 2 * scores.get("lotok", 0):
-            fallback_method = "gofra/truba"
-        else:
-            fallback_method = "po_konstrukciyam"
+        lotok_score = scores.get("lotok", 0)
+        fallback_method = "po_konstrukciyam"
+        best_cand, best_score = "", 0
+        for cand in _SHEET_DEFAULT_CANDIDATES:
+            if scores.get(cand, 0) > best_score:
+                best_cand, best_score = cand, scores[cand]
+        if best_cand and best_score >= 4 and best_score >= 2 * lotok_score:
+            fallback_method = best_cand
         rep.sheet_default_method = fallback_method
         rep.sheet_default_info = sheet_info
         for color, segs in (("red", red_segs), ("blue", blue_segs)):
@@ -1114,13 +1285,27 @@ def measure_cables(
                     tray_ticks=tray_ticks,
                     sheet_default=fallback_method,
                 )
+                pl.method_source = ("sheet_default"
+                                    if pl.laying_method == fallback_method
+                                    else "marker")
                 rep.polylines.append(pl)
+
+        # Bind on-plan annotations (марка/сечение/способ/L=…м) to the
+        # nearest polyline; an explicit method in the annotation overrides
+        # marker-based attribution for that particular route.
+        annotations = _extract_route_annotations(words, zones)
+        rep.annotations_bound = _bind_annotations_to_polylines(
+            annotations, rep.polylines)
 
         # Aggregate totals
         for pl in rep.polylines:
             length_m = pl.length_pt * rep.scale_mm_per_pt / 1000.0
             key = (pl.color, pl.laying_method)
             rep.totals_m[key] = rep.totals_m.get(key, 0.0) + length_m
+            if pl.cable_mark or pl.cross_section:
+                mk = (pl.cable_mark, pl.cross_section)
+                rep.totals_by_mark_m[mk] = (
+                    rep.totals_by_mark_m.get(mk, 0.0) + length_m)
 
         # Optional: aggregate L=…м labels for cross-check
         for w in words:
@@ -1186,6 +1371,15 @@ def _print_report(rep: CableMethodReport) -> None:
     if rep.label_total_m > 0:
         print(f"Cross-check (sum of L=…м labels):    "
               f"{rep.label_total_m:.1f} м")
+    if rep.annotations_bound:
+        print(f"Annotations bound to routes: {rep.annotations_bound}")
+    if rep.totals_by_mark_m:
+        print()
+        print("=== Length by cable mark (annotation-bound) ===")
+        for (mark, sec), L in sorted(rep.totals_by_mark_m.items(),
+                                     key=lambda kv: -kv[1]):
+            label = " ".join(x for x in (mark, sec) if x) or "<unmarked>"
+            print(f"  {label:<32} {L:>10.1f} м")
 
 
 def main() -> None:
