@@ -181,11 +181,24 @@ def _is_color(c, target: tuple, tol: float = COLOR_TOL) -> bool:
     return all(abs(a - b) < tol for a, b in zip(c, target))
 
 
-def _classify_color(c) -> str:
-    if _is_color(c, COLOR_RED):
-        return "red"
-    if _is_color(c, COLOR_BLUE):
-        return "blue"
+# Расширяемая палитра трасс: measure_cables по умолчанию меряет red/blue
+# (кабели ЭО/ЭМ), но вызыватель может передать свой набор цветов —
+# например green для молниеприёмной сетки на планах молниезащиты (ЭГ).
+NAMED_COLORS = {
+    "red": COLOR_RED,
+    "blue": COLOR_BLUE,
+    "green": (0.0, 1.0, 0.0),
+    "magenta": (1.0, 0.0, 1.0),
+    "cyan": (0.0, 1.0, 1.0),
+}
+DEFAULT_TRACE_COLORS = ("red", "blue")
+
+
+def _classify_color(c, colors=DEFAULT_TRACE_COLORS) -> str:
+    for name in colors:
+        target = NAMED_COLORS.get(name)
+        if target is not None and _is_color(c, target):
+            return name
     return ""
 
 
@@ -635,6 +648,67 @@ def _dedupe_parallel_segments(segments: list[dict]) -> tuple[list[dict], dict]:
         removed_pt=round(removed_pt, 1),
     )
     return kept, stats
+
+
+def _bridge_dashes(segments: list[dict], gap_pt: float) -> list[dict]:
+    """Склеить коллинеарные штрихи пунктира в непрерывные сегменты.
+
+    Контур заземлителя/пунктирные трассы рисуются штрихами ~5-15 pt с
+    пробелами: без склейки метраж занижается на долю пробелов, а сборка
+    полилиний рассыпается. Штрихи группируются по направлению (±2°) и
+    перпендикулярному смещению линии (1.5 pt), сортируются вдоль
+    направления и сливаются, если пробел ≤ ``gap_pt`` — длина пробела
+    ВХОДИТ в результирующий сегмент.
+    """
+    if gap_pt <= 0 or not segments:
+        return segments
+    out: list[dict] = []
+    groups: dict[tuple[int, int], list[dict]] = defaultdict(list)
+    for s in segments:
+        dx = s["x1"] - s["x0"]
+        dy = s["bottom"] - s["top"]
+        L = math.hypot(dx, dy)
+        if L < 0.1:
+            out.append(s)
+            continue
+        ang_b = int(round((math.atan2(dy, dx) % math.pi) / math.radians(2.0)))
+        ux, uy = dx / L, dy / L
+        nx, ny = -uy, ux
+        off_b = int(round((s["x0"] * nx + s["top"] * ny) / 1.5))
+        groups[(ang_b, off_b)].append(s)
+
+    for segs in groups.values():
+        proto = segs[0]
+        dx = proto["x1"] - proto["x0"]
+        dy = proto["bottom"] - proto["top"]
+        L = math.hypot(dx, dy)
+        ux, uy = dx / L, dy / L
+        t0 = proto["x0"] * ux + proto["top"] * uy
+
+        def _pt_at(t: float) -> tuple[float, float]:
+            return (proto["x0"] + ux * (t - t0), proto["top"] + uy * (t - t0))
+
+        items = []
+        for s in segs:
+            ta = s["x0"] * ux + s["top"] * uy
+            tb = s["x1"] * ux + s["bottom"] * uy
+            items.append((min(ta, tb), max(ta, tb)))
+        items.sort()
+        cur_a, cur_b = items[0]
+        for a, b in items[1:]:
+            if a - cur_b <= gap_pt:
+                cur_b = max(cur_b, b)
+            else:
+                xa, ya = _pt_at(cur_a)
+                xb, yb = _pt_at(cur_b)
+                out.append({"x0": xa, "top": ya, "x1": xb, "bottom": yb,
+                            "stroking_color": proto.get("stroking_color")})
+                cur_a, cur_b = a, b
+        xa, ya = _pt_at(cur_a)
+        xb, yb = _pt_at(cur_b)
+        out.append({"x0": xa, "top": ya, "x1": xb, "bottom": yb,
+                    "stroking_color": proto.get("stroking_color")})
+    return out
 
 
 def _assemble_polylines(segments: list[dict], color: str) -> list[Polyline]:
@@ -1160,7 +1234,16 @@ def measure_cables(
     page_index: int = 0,
     legend_result: Optional[LegendResult] = None,
     scale_mm_per_pt: Optional[float] = None,
+    colors: tuple = DEFAULT_TRACE_COLORS,
+    dash_bridge_pt: float = 0.0,
 ) -> CableMethodReport:
+    """Измерить трассы на странице.
+
+    ``colors`` — имена целевых цветов из NAMED_COLORS (по умолчанию
+    red/blue — кабели ЭО/ЭМ; для молниеприёмной сетки ЭГ передайте
+    ("green",)). ``dash_bridge_pt`` > 0 склеивает пунктирные штрихи с
+    пробелами до этой величины (контур заземлителя рисуется пунктиром).
+    """
     if legend_result is None:
         try:
             legend_result = parse_legend(pdf_path)
@@ -1192,25 +1275,25 @@ def measure_cables(
 
         zones = _build_zones(page, lines, legend_bbox)
 
-        # Filter colored cable lines
-        red_segs, blue_segs = [], []
+        # Filter colored cable lines (палитра задаётся параметром colors)
+        segs_by_color: dict[str, list] = {c: [] for c in colors}
         for ln in lines:
             sc = ln.get("stroking_color")
-            cls = _classify_color(sc)
+            cls = _classify_color(sc, colors)
             if not cls:
                 continue
             mp = _midpoint(ln)
             if _excluded(mp, zones):
                 continue
-            (red_segs if cls == "red" else blue_segs).append(ln)
-        rep.raw_red_lines = len(red_segs)
-        rep.raw_blue_lines = len(blue_segs)
+            segs_by_color[cls].append(ln)
+        rep.raw_red_lines = len(segs_by_color.get("red", []))
+        rep.raw_blue_lines = len(segs_by_color.get("blue", []))
 
         # Кривые (дуги/Безье) тоже трассы: pdfplumber отдаёт их опорные
         # точки в "pts" — режем на хорды-сегменты. Мелкие кривые размером
         # с кружок-маркер пропускаем: их собирает _collect_circle_markers.
         for cv in (page.curves or []):
-            cls = _classify_color(cv.get("stroking_color"))
+            cls = _classify_color(cv.get("stroking_color"), colors)
             if not cls:
                 continue
             pts = cv.get("pts") or []
@@ -1225,13 +1308,14 @@ def measure_cables(
                        "stroking_color": cv.get("stroking_color")}
                 if _excluded(_midpoint(seg), zones):
                     continue
-                (red_segs if cls == "red" else blue_segs).append(seg)
+                segs_by_color[cls].append(seg)
 
         # Markers
         circle_markers = _collect_circle_markers(page, zones)
         tray_rects = _collect_tray_rects(page, zones)
         # Tray ticks (perpendicular short strokes crossing cable lines)
-        tray_ticks = _collect_tray_ticks(page, zones, red_segs + blue_segs)
+        _all_segs = [s for ss in segs_by_color.values() for s in ss]
+        tray_ticks = _collect_tray_ticks(page, zones, _all_segs)
         rep.circle_markers = len(circle_markers)
         rep.tray_rects = len(tray_rects)
         rep.tray_ticks = len(tray_ticks)
@@ -1245,16 +1329,22 @@ def measure_cables(
 
         # Dedupe exact duplicates first (CAD exporters often emit a
         # cable line 2-7× on the same coordinates), then close-parallel
-        # pairs (tray = two parallel edges).
-        red_segs, dup_red = _dedupe_exact_duplicates(red_segs)
-        blue_segs, dup_blue = _dedupe_exact_duplicates(blue_segs)
-        red_segs, rep.dedup_red = _dedupe_parallel_segments(red_segs)
-        blue_segs, rep.dedup_blue = _dedupe_parallel_segments(blue_segs)
-        # Merge stats: keep both passes visible
-        rep.dedup_red["dup_removed"] = dup_red.get("dup_removed", 0)
-        rep.dedup_red["dup_removed_pt"] = dup_red.get("removed_pt", 0.0)
-        rep.dedup_blue["dup_removed"] = dup_blue.get("dup_removed", 0)
-        rep.dedup_blue["dup_removed_pt"] = dup_blue.get("removed_pt", 0.0)
+        # pairs (tray = two parallel edges). Затем — опциональная склейка
+        # пунктира (контур заземлителя и т.п.).
+        _dedup_stats: dict[str, dict] = {}
+        for c in colors:
+            ss, dup = _dedupe_exact_duplicates(segs_by_color[c])
+            ss, dd = _dedupe_parallel_segments(ss)
+            dd["dup_removed"] = dup.get("dup_removed", 0)
+            dd["dup_removed_pt"] = dup.get("removed_pt", 0.0)
+            if dash_bridge_pt > 0:
+                n_before = len(ss)
+                ss = _bridge_dashes(ss, dash_bridge_pt)
+                dd["dash_merged"] = n_before - len(ss)
+            segs_by_color[c] = ss
+            _dedup_stats[c] = dd
+        rep.dedup_red = _dedup_stats.get("red", {})
+        rep.dedup_blue = _dedup_stats.get("blue", {})
 
         # Polylines per color. Pick the fallback as follows:
         #   * if the sheet's general notes mention "в гофре/трубе" much
@@ -1277,7 +1367,7 @@ def measure_cables(
             fallback_method = best_cand
         rep.sheet_default_method = fallback_method
         rep.sheet_default_info = sheet_info
-        for color, segs in (("red", red_segs), ("blue", blue_segs)):
+        for color, segs in segs_by_color.items():
             polylines = _assemble_polylines(segs, color)
             for pl in polylines:
                 pl.laying_method = _attribute_method(

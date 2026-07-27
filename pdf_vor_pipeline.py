@@ -1542,8 +1542,19 @@ def generate_vor_from_pdfs(
         # растровой картинкой, добираются fallback-движком cable_length.
         # Отключается VOR_MEASURE_CABLES=0.
         if os.environ.get("VOR_MEASURE_CABLES", "1") == "1":
-            _plan_files = sorted({n for n, _ in plan_info}
-                                 | {n for n, _ in binding_info})
+            # Гейт охвата (S011, Test2707): линии схем — не физические
+            # трассы (655 м шума с одной схемы ЩАО); лотковые листы уже
+            # учтены метражом лотков (двойной счёт); ЭГ-листы (заземление/
+            # УП/молниезащита) обрабатывает Step 4a-eg — их линии это
+            # полоса и проводник заземления, а не «кабель в гофре».
+            from pdf_count_grounding import is_eg_sheet
+            _measure_skip_re = re.compile(
+                r"схем|кабеленес|лотк|общие\s+данные|титул|опросн|\bВОР\b",
+                re.IGNORECASE)
+            _plan_files = sorted(
+                n for n in ({n for n, _ in plan_info}
+                            | {n for n, _ in binding_info})
+                if not is_eg_sheet(n) and not _measure_skip_re.search(n))
             _cab_by_mark: dict[tuple[str, str], float] = {}
             _cab_by_method: dict[str, float] = {}
             if _plan_files:
@@ -1576,6 +1587,38 @@ def generate_vor_from_pdfs(
                     sorted(_cab_by_method.items(), key=lambda kv: -kv[1]))
                 log(f"  [no-СО] recovered cable metraж: {_cab_total:.1f} м "
                     f"({_meth_s})")
+
+        # ── Step 4a-eg (no-СО): заземление/УП/молниезащита с ЭГ-листов ──
+        # Раздел ЭГ без СО раньше не считался вовсе: извлекаем измеримое
+        # с чертежей — метраж полосы/сетки по геометрии (с валидацией на
+        # эталоне АБК-1: полоса 228 vs 229 м, держатели 242 vs 245) и
+        # деривации из примечаний листа (шаг держателей, бухты, траншея).
+        try:
+            from pdf_count_grounding import extract_eg_quantities
+            _eg_n = 0
+            for pdf in all_pdfs:
+                if not is_eg_sheet(pdf.name):
+                    continue
+                try:
+                    _egr = extract_eg_quantities(str(pdf), pdf.name, log=log)
+                except Exception as exc:  # noqa: BLE001
+                    log(f"  [no-СО] ЭГ-извлечение: сбой на {pdf.name}: {exc}")
+                    continue
+                for _row in _egr.rows:
+                    _cat = ("lightning" if _row.kind == "lightning"
+                            else "grounding")
+                    spec_by_cat[_cat].append(SpecItem(
+                        position="", description=_row.description, model="",
+                        catalog_code="", supplier="", unit=_row.unit,
+                        quantity=_row.quantity,
+                    ))
+                    _eg_n += 1
+                for _note in _egr.notes:
+                    log(f"    [ЭГ] {_note}")
+            if _eg_n:
+                log(f"  [no-СО] ЭГ: извлечено {_eg_n} позиций с чертежей")
+        except Exception as exc:  # noqa: BLE001
+            log(f"  [no-СО] ЭГ-извлечение недоступно ({exc})")
 
     # ── Step 4b: Parse schema PDFs for panels/breakers ──────────────────
     log("\nStep 4b: Parsing schema PDFs for panel/breaker data...")
@@ -1812,6 +1855,20 @@ def generate_vor_from_pdfs(
     )
     if pnr_section.rows:
         sections.append(pnr_section)
+
+    # Явное предупреждение в результате (первая секция): без СО расчёт
+    # ведётся по чертежам и заведомо неполон — раньше об этом говорила
+    # только строка в логе, и «огрызок» выглядел как полный ВОР.
+    if no_spec and sections:
+        warn = VorSection(title="ВНИМАНИЕ: расчёт выполнен БЕЗ спецификации (СО)")
+        warn.rows.append({
+            "name": ("Спецификация оборудования (СО) в папке не найдена. "
+                     "Количества получены подсчётом и измерением по чертежам: "
+                     "точность ограничена, номенклатура может быть неполной. "
+                     "Для точного ВОР добавьте СО-файлы в папку."),
+            "unit": "", "qty": "", "is_material": False, "drawing_ref": "",
+        })
+        sections.insert(0, warn)
 
     total_rows = sum(len(s.rows) for s in sections)
     log(f"\nGenerated {len(sections)} sections with {total_rows} total rows")
