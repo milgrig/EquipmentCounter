@@ -482,9 +482,26 @@ class PanelInfo:
     circuit_cables: list[tuple[str, int]] = field(default_factory=list)
 
 
+# S011: ВРУ допускается без номера («Схема ВРУ» на КПП-30), добавлен ЯТП
+# (ящик трансформаторный понижающий) — оба systematically MISS в сверке
+# с эталонными ВОР.
 _PANEL_NAME_RE = re.compile(
-    r"(ЩР[-\s]?\d+(?:\.\d+)?|ЩО[-\s]?\d+(?:\.\d+)?|ЩАО[-\s]?\d+(?:\.\d+)?|ЦСАО[-\s]?\d+|ВРУ[-\s]?\d+(?:\.\d+)?)", re.IGNORECASE,
+    r"(ЩР[-\s]?\d+(?:\.\d+)?|ЩО[-\s]?\d+(?:\.\d+)?|ЩАО[-\s]?\d+(?:\.\d+)?"
+    r"|ЦСАО[-\s]?\d+|ВРУ[-\s]?\d*(?:\.\d+)?|ЯТП[-\s]?\d*(?:[.,]\d+)?)",
+    re.IGNORECASE,
 )
+
+
+def _panel_work_name(panel_name: str) -> str:
+    """Наименование работы монтажа щита в терминах эталонных ВОР."""
+    up = panel_name.upper()
+    if up.startswith("ВРУ"):
+        return (f"Монтаж вводно-распределительного устройства {panel_name}"
+                .rstrip())
+    if up.startswith("ЯТП"):
+        return (f"Монтаж ящика трансформаторного понижающего {panel_name}"
+                .rstrip())
+    return f"Монтаж щита распределительного {panel_name}"
 _KM_RE = re.compile(r"^KM-\d+$")
 # Подпись кабельной линии на однолинейной схеме: «марка сечение … L=NNм».
 # S011: между сечением и L= допускается способ прокладки и падение
@@ -581,6 +598,38 @@ def extract_panels_from_schema(dxf_path: str, log=print) -> list[PanelInfo]:
                     circuit_cable_entries.append(
                         (m2.group(1).strip(), _len_m, x, y))
 
+    # S011: подписи линий однолинейной схемы часто живут в ОПРЕДЕЛЕНИЯХ
+    # блоков (КПП-30: 33 из 36 в блоках, msp почти пуст) и в TEXT.
+    # Координаты блочные локальны — такие линии вешаются на первую панель
+    # (для сумм по маркам и подключений жил привязка не важна).
+    for _blk in doc.blocks:
+        # msp уже пройден; прочие анонимные блоки (в т.ч. *T-таблицы
+        # групповых линий ACAD_TABLE — именно там живут подписи на КПП-30)
+        # сканируем.
+        if _blk.name.lower().startswith(("*model_space", "*paper_space")):
+            continue
+        for _be in _blk:
+            _bt = _be.dxftype()
+            if _bt == "MTEXT":
+                _bs = _be.plain_text()
+            elif _bt == "TEXT":
+                _bs = _be.dxf.text if hasattr(_be.dxf, "text") else ""
+            else:
+                continue
+            if not _bs:
+                continue
+            _bm = _CABLE_LEN_RE.search(_bs)
+            if not _bm:
+                continue
+            _blabel = " ".join(_bs.split()).lower()
+            if "ввод" in _blabel:
+                if _blabel in _seen_vvod_labels:
+                    continue
+                _seen_vvod_labels.add(_blabel)
+            _blen = int(float(_bm.group(2).replace(",", ".")) + 0.5)
+            circuit_cable_entries.append(
+                (_bm.group(1).strip(), _blen, None, None))
+
     seen: set[str] = set()
     panels: list[PanelInfo] = []
     for pname, px, py in panel_entries:
@@ -615,15 +664,20 @@ def extract_panels_from_schema(dxf_path: str, log=print) -> list[PanelInfo]:
 
     for ctype, clen, cx, cy in circuit_cable_entries:
         best_panel = None
-        best_d = float("inf")
-        for p in panels:
-            pos = panel_positions.get(p.name)
-            if pos is None:
-                continue
-            d = abs(pos[0] - cx) + abs(pos[1] - cy)
-            if d < best_d:
-                best_d = d
-                best_panel = p
+        if cx is None:
+            # Запись из определения блока: координаты локальны и для
+            # привязки бесполезны — вешаем на первую панель листа.
+            best_panel = panels[0] if panels else None
+        else:
+            best_d = float("inf")
+            for p in panels:
+                pos = panel_positions.get(p.name)
+                if pos is None:
+                    continue
+                d = abs(pos[0] - cx) + abs(pos[1] - cy)
+                if d < best_d:
+                    best_d = d
+                    best_panel = p
         if best_panel is not None:
             best_panel.circuit_cables.append((ctype, clen))
 
@@ -1494,6 +1548,10 @@ class DerivedMaterials:
     """Installation materials derived from cables, panels, and luminaires."""
     # Cable connections at panels: sum of conductor counts across all cables
     cable_connections: int = 0
+    # S011: подключения жил по диапазонам сечений (эталонный формат:
+    # отдельные строки «до 10/16/35/70/95/120 мм2»). Ключ — верхняя
+    # граница диапазона, значение — жилы × 2 конца по линиям схем.
+    cable_connections_by_range: dict = field(default_factory=dict)
     # Junction boxes for power circuits (FS 100x100x50)
     junction_boxes_power: int = 0
     # Junction/distribution boxes for lighting circuits (85x85x40)
@@ -2075,6 +2133,26 @@ def _derive_installation_materials(
     # Each cable run contributes conductor_count connections.
     # When the schema DXF lists cables for every floor of a multi-storey
     # building, the total is divided by floor_count to get per-panel-set value.
+    # S011: расчёт по линиям однолинейных схем — каждая отходящая линия
+    # даёт (число жил × 1 конец) подключений в своём диапазоне сечения:
+    # эталонные ВОР считают здесь щитовой конец, второй конец линии входит
+    # в работу монтажа приёмника. Сверка КПП-30: 31 линия × 3 ≈ 97 vs 91.
+    _CONN_RANGES = (10, 16, 35, 70, 95, 120, 240)
+    _conn_by_range: dict[int, int] = {}
+    _sec_re = re.compile(r"(\d+)[хx×](\d+(?:[.,]\d+)?)")
+    for p in panels:
+        for _ctype, _clen in p.circuit_cables:
+            _mm = _sec_re.search(str(_ctype))
+            if not _mm:
+                continue
+            _n_cond = int(_mm.group(1))
+            _area = float(_mm.group(2).replace(",", "."))
+            if not (1 <= _n_cond <= 19 and _area <= 240):
+                continue
+            _rng = next((r for r in _CONN_RANGES if _area <= r), 240)
+            _conn_by_range[_rng] = _conn_by_range.get(_rng, 0) + _n_cond
+    dm.cable_connections_by_range = _conn_by_range
+
     circuit_connections = 0
     for c in cables:
         n_cond = _conductor_count(c.cable_type)
@@ -3397,7 +3475,7 @@ def generate_vor_docx(
                 item_num += 1
                 _add_work_row(
                     table, item_num,
-                    f"Монтаж щита распределительного {p.name}",
+                    _panel_work_name(p.name),
                     "шт", 1, ref=drawing_ref,
                 )
                 schema_panel_names.add(p.name.lower().replace("-", "").replace(" ", ""))
@@ -3413,7 +3491,19 @@ def generate_vor_docx(
                     sp.unit, sp.quantity, ref=drawing_ref,
                 )
         # Cable connections at panels (derived)
-        if derived and derived.cable_connections > 0:
+        if derived and derived.cable_connections_by_range:
+            # S011: по диапазонам сечений — формат эталонных ВОР.
+            for _rng in sorted(derived.cable_connections_by_range):
+                _cnt = derived.cable_connections_by_range[_rng]
+                if _cnt <= 0:
+                    continue
+                item_num += 1
+                _add_work_row(
+                    table, item_num,
+                    f"Подключение жил кабелей до {_rng} мм2",
+                    "шт", _cnt, ref=drawing_ref,
+                )
+        elif derived and derived.cable_connections > 0:
             item_num += 1
             _add_work_row(
                 table, item_num,
@@ -3796,6 +3886,33 @@ def generate_vor_docx(
                             "м", lay_len, ref=drawing_ref,
                         )
 
+                    # S011: земляные работы для подземной трассы — эталонные
+                    # ВОР всегда сопровождают «в земле» выемкой/постелью/
+                    # засыпкой. Нормы на метр траншеи выверены по эталону
+                    # 8.2 (200 м → выемка 32 м³, песок 3.36 м³).
+                    _ug_total_m = sum(_l for _, _l in _underground)
+                    if _ug_total_m > 0:
+                        item_num += 1
+                        _add_work_row(
+                            table, item_num, "Выемка грунта",
+                            "м3", round(_ug_total_m * 0.16, 1),
+                            ref=drawing_ref,
+                        )
+                        item_num += 1
+                        _add_work_row(
+                            table, item_num,
+                            "Устройство постели из песка под кабель",
+                            "м3", round(_ug_total_m * 0.017, 2),
+                            ref=drawing_ref,
+                        )
+                        item_num += 1
+                        _add_work_row(
+                            table, item_num,
+                            "Обратная засыпка грунта",
+                            "м3", round(_ug_total_m * 0.14, 1),
+                            ref=drawing_ref,
+                        )
+
             if _ds == "test2":
                 item_num = _add_test2_ppg_compat_sections(
                     table, item_num, actual_cables, ref=drawing_ref,
@@ -3835,6 +3952,30 @@ def generate_vor_docx(
                     table, item_num, f"Кабель {sc.description}",
                     sc.unit, sc.quantity, ref=drawing_ref,
                 )
+
+        # S011: бронированный ВБШв в спецификации = подземная прокладка.
+        # Эталонные ВОР сопровождают её работой «в земле» и земляными
+        # работами — добавляем и в spec-ветке (в actual_cables-ветке
+        # аналогичный блок уже есть).
+        _spec_ug_m = sum(
+            sc.quantity for sc in spec_cables
+            if sc.unit in ("м", "м.") and "вбшв" in sc.description.lower())
+        if _spec_ug_m > 0 and not any(
+                "вбшв" in (c.cable_type or "").lower()
+                for c in (cables or [])):
+            item_num += 1
+            _add_work_row(table, item_num, "Прокладка кабеля в земле",
+                          "м", _spec_ug_m, ref=drawing_ref)
+            item_num += 1
+            _add_work_row(table, item_num, "Выемка грунта",
+                          "м3", round(_spec_ug_m * 0.16, 1), ref=drawing_ref)
+            item_num += 1
+            _add_work_row(table, item_num,
+                          "Устройство постели из песка под кабель",
+                          "м3", round(_spec_ug_m * 0.017, 2), ref=drawing_ref)
+            item_num += 1
+            _add_work_row(table, item_num, "Обратная засыпка грунта",
+                          "м3", round(_spec_ug_m * 0.14, 1), ref=drawing_ref)
 
     # ── Section 4b: Cable tray installation (T071) ──
     # Sources:
