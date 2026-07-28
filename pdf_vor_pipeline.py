@@ -1225,8 +1225,13 @@ def _merge_plan_and_binding_results(
 def generate_vor_from_pdfs(
     folder: str | Path,
     log=print,
+    ignore_spec: bool = False,
 ) -> list[VorSection]:
     """Generate complete VOR from a PDF folder.
+
+    ``ignore_spec=True`` — принудительный режим «без СО» (спецификация
+    оборудования игнорируется, даже если найдена): количества берутся
+    подсчётом и измерением по чертежам. Выбор пользователя в веб-UI.
 
     Returns list of VorSection objects representing the full VOR document.
     """
@@ -1270,9 +1275,13 @@ def generate_vor_from_pdfs(
     # Parsed early so no-СО (plan-driven) mode can be detected before the
     # elevation/ceiling maps are built.
     log("\nStep 2: Parsing specifications (СО)...")
-    from pdf_spec_parser import parse_all_specs_in_folder
-    spec_items = parse_all_specs_in_folder(folder)
-    log(f"  Extracted {len(spec_items)} spec items")
+    if ignore_spec:
+        log("  ⚠ СО игнорируется по выбору пользователя (режим «без СО»)")
+        spec_items = []
+    else:
+        from pdf_spec_parser import parse_all_specs_in_folder
+        spec_items = parse_all_specs_in_folder(folder)
+        log(f"  Extracted {len(spec_items)} spec items")
     no_spec = len(spec_items) == 0
 
     # Classify spec items

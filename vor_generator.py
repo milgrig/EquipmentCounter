@@ -4523,8 +4523,14 @@ def generate_vor(
     drawing_ref: str = "",
     log=print,
     dataset: str | None = None,
+    ignore_spec: bool = False,
 ) -> str:
-    """Full pipeline: scan folder -> parse -> aggregate -> generate .docx."""
+    """Full pipeline: scan folder -> parse -> aggregate -> generate .docx.
+
+    ``ignore_spec=True`` — режим «без СО»: листы спецификации оборудования
+    исключаются из обработки, количества идут только с чертежей
+    (схемные линии, подсчёт блоков). Выбор пользователя в веб-UI.
+    """
     if output_path is None:
         output_path = str(folder / "ВОР_ЭО.docx")
 
@@ -4536,6 +4542,10 @@ def generate_vor(
 
     log("\n[1] Сканирование файлов")
     file_list = scan_and_classify(folder)
+    if ignore_spec:
+        _n_spec = sum(1 for _, pt, _ in file_list if pt == "спецификация")
+        file_list = [t for t in file_list if t[1] != "спецификация"]
+        log(f"  ⚠ Режим «без СО»: исключено листов спецификации: {_n_spec}")
     by_type = defaultdict(int)
     for _, pt, _ in file_list:
         by_type[pt] += 1
