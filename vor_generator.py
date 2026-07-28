@@ -486,8 +486,15 @@ _PANEL_NAME_RE = re.compile(
     r"(ЩР[-\s]?\d+(?:\.\d+)?|ЩО[-\s]?\d+(?:\.\d+)?|ЩАО[-\s]?\d+(?:\.\d+)?|ЦСАО[-\s]?\d+|ВРУ[-\s]?\d+(?:\.\d+)?)", re.IGNORECASE,
 )
 _KM_RE = re.compile(r"^KM-\d+$")
+# Подпись кабельной линии на однолинейной схеме: «марка сечение … L=NNм».
+# S011: между сечением и L= допускается способ прокладки и падение
+# напряжения («ППГнг(А)-HF 3х2,5 в гофре ΔU=0,11% L=10м» — формат КПП-30);
+# старый паттерн требовал L= сразу после сечения и терял такие линии
+# целиком. Длина может быть дробной.
 _CABLE_LEN_RE = re.compile(
-    r"([\w()А-Яа-яё\-]+\s+\d+[хx×]\d[\d,]*)\s+L=(\d+)", re.IGNORECASE,
+    r"([\w()А-Яа-яё\-]+\s+\d+[хx×]\d[\d,]*)"
+    r"[^L\n]{0,60}?"
+    r"L\s*=\s*(\d+(?:[.,]\d+)?)\s*м?", re.IGNORECASE,
 )
 
 
@@ -542,6 +549,10 @@ def extract_panels_from_schema(dxf_path: str, log=print) -> list[PanelInfo]:
     feed_cables: list[str] = []
     circuit_cable_entries: list[tuple[str, int, float, float]] = []
     km_count = 0
+    # Подписи вводов («Рабочий ввод…», «Резервный ввод…») повторяются на
+    # листе для каждой секции щита/вида — одинаковый текст ввода
+    # учитывается один раз (СО КПП-30: 2×5м, а не 4×5м).
+    _seen_vvod_labels: set[str] = set()
 
     for e in msp:
         if e.dxftype() == "MTEXT":
@@ -560,7 +571,15 @@ def extract_panels_from_schema(dxf_path: str, log=print) -> list[PanelInfo]:
                 feed_cables.append(plain)
             m2 = _CABLE_LEN_RE.search(plain)
             if m2:
-                circuit_cable_entries.append((m2.group(1).strip(), int(m2.group(2)), x, y))
+                _label = " ".join(plain.split()).lower()
+                _is_dup_vvod = ("ввод" in _label
+                                and _label in _seen_vvod_labels)
+                if "ввод" in _label:
+                    _seen_vvod_labels.add(_label)
+                if not _is_dup_vvod:
+                    _len_m = int(float(m2.group(2).replace(",", ".")) + 0.5)
+                    circuit_cable_entries.append(
+                        (m2.group(1).strip(), _len_m, x, y))
 
     seen: set[str] = set()
     panels: list[PanelInfo] = []
@@ -2749,6 +2768,31 @@ def aggregate_by_height(
         luminaires.sort(key=lambda a: -a.total)
         log(f"  [spec-lum] Result: {sum(l.total for l in luminaires)} "
             f"luminaire units in {len(luminaires)} items")
+
+    # ── Schema-cable fallback (набор БЕЗ СО.dxf) ───────────────────────
+    # Спецификация — авторитет, но когда её в наборе нет, кабельная
+    # продукция раньше пропадала из ВОР целиком. Однолинейные схемы
+    # подписывают каждую отходящую линию («ППГнг(А)-HF 3х2,5 в гофре
+    # ΔU=0,11% L=10м») — агрегируем эти подписи по марке+сечению.
+    # Сверка с СО на КПП-30: 90-100% по основным позициям.
+    if not spec_cables:
+        _schema_cable_m: dict[str, float] = {}
+        for _p in schema_panels:
+            for _ctype, _clen in _p.circuit_cables:
+                _key = " ".join(str(_ctype).split())
+                _schema_cable_m[_key] = _schema_cable_m.get(_key, 0.0) + _clen
+        for _key, _total_m in sorted(_schema_cable_m.items(),
+                                     key=lambda kv: -kv[1]):
+            if _total_m <= 0:
+                continue
+            spec_cables.append(SpecGroupedItem(
+                description=f"{_key} (по однолинейной схеме)",
+                unit="м", quantity=int(round(_total_m)),
+            ))
+        if spec_cables:
+            log(f"  [schema-cables] СО в наборе нет: собрано "
+                f"{len(spec_cables)} кабельных позиций со схем, "
+                f"{sum(sc.quantity for sc in spec_cables)} м")
 
     # ── Detect cable inflation from project-wide schema DXFs ──────────
     # When spec cables exist, they are authoritative (building-specific
