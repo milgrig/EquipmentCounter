@@ -1092,8 +1092,11 @@ def parse_all_files(
     parse_cache: dict[str, tuple[list[EquipmentItem], list[CableItem]]] = {}
     combined_cache: dict[str, list[_SheetRegion] | None] = {}
 
-    for fpath, plan_type, elev in file_list:
+    _total_files = len(file_list)
+    for _file_i, (fpath, plan_type, elev) in enumerate(file_list, 1):
         height_cat = elevation_to_height(elev) if elev is not None else None
+        # Формат «обработано N/M» подхватывается прогресс-баром веб-задачи.
+        log(f"  ⏳ обработано {_file_i - 1}/{_total_files} — {fpath.name}")
         log(f"  [{plan_type}] {fpath.name}  elev={elev}  height={height_cat}")
 
         if plan_type in ("общие", "опросные"):
