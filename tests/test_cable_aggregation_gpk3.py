@@ -62,12 +62,20 @@ def test_t083_gpk3_ppng_hf_3x1_5() -> None:
 
 
 def test_t083_gpk3_material_desc_matches_compare_synonyms() -> None:
+    # Merge S011 (07f7993d): формат материала — «Кабель <марка> сечением
+    # <сечение>» (валидирован сверками с СО/эталонами июля). Июньская
+    # T083-формулировка «Кабель силовой с медными жилами …» осталась в
+    # истории main; возможный возврат к ней — отдельное решение с
+    # ревалидацией фьюзи-матчинга эталонов.
     desc = _format_cable_material_desc("ВБШвнг(А)-FRLS 3х1,5")
-    assert "силовой с медными жилами" in desc
+    assert "Кабель" in desc
     assert "ВБШвнг(А)-FRLS" in desc
     assert "3х1,5" in desc
 
 
 def test_t083_gpk3_ppng_material_desc_uses_latin_a() -> None:
+    # См. комментарий выше: актуальный формат нормализует марку как
+    # «ППГнг-(А)-HF» (кириллическая А с дефисом), а не латинскую «(A)».
     desc = _format_cable_material_desc("ППГнг(А)-HF 3х1,5")
-    assert "ППГнг(A)-HF" in desc
+    assert "ППГнг-(А)-HF" in desc
+    assert "сечением 3х1,5" in desc
