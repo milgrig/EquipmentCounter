@@ -38,7 +38,7 @@ if %errorlevel% neq 0 (
 
 :: Launch web app
 echo.
-echo  Checking for existing server on :8050...
+echo  Checking for existing server...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$killed = $false; " ^
   "$procs = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue ^| Where-Object { " ^
@@ -51,14 +51,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "if (-not $killed) { Write-Output '  No existing web_app server process found.' }"
 timeout /t 1 /nobreak >nul
 
-echo  Starting web server on http://localhost:8050
+echo  Starting web server on http://localhost:8051
 echo  Press Ctrl+C to stop
 echo.
-start "" http://localhost:8050
+start "" http://localhost:8051
 %PYTHON% web_app.py
 if %errorlevel% neq 0 (
     echo.
     echo  Error launching web app.
-    pause
 )
+echo.
+pause
 endlocal

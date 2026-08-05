@@ -500,6 +500,53 @@ def _count_equipment_in_pdf(pdf_path: str, case_name: str = "") -> list[dict]:
     except Exception as exc:
         log.warning("Cable extraction failed for %s: %s", pdf_path, exc)
 
+    # T054 / KB-015: Audit legend coverage — emit a warning row for any
+    # legend index that did not reach any producer stage. This prevents
+    # symbol-less legend items (switches, posts, wirings drawn without
+    # a distinct legend glyph) from silently disappearing from the output.
+    #
+    # An index is considered "covered" if EITHER (a) it produced a text/
+    # visual/pictogram count > 0 above, OR (b) the producer stages ran
+    # without error but legitimately found no instances on the drawing
+    # (we still want diagnostic visibility). The conservative policy is:
+    # if neither text_counts (by sym) nor visual_counts (by idx) yielded
+    # any output and the description is non-empty, emit a count=1 warning
+    # row tagged with category="legend_unmatched" so the VOR consumer
+    # surfaces the missing category instead of silently dropping it.
+    try:
+        covered_idx: set[int] = set()
+        for idx, item in enumerate(legend_result.items):
+            sym = (item.symbol or "").strip()
+            if sym and text_counts.get(sym, 0) > 0:
+                covered_idx.add(idx)
+            elif visual_counts.get(idx, 0) > 0:
+                covered_idx.add(idx)
+        # Conservative guard: only emit audit rows on legends where the
+        # producer stages found at least one real match. If no legend
+        # index was covered at all, the parsed "legend" is more likely
+        # a false-positive table (e.g. a general-notes sheet, title
+        # block, or revision history) and we must NOT pollute the output
+        # with 20+ legend_unmatched rows for it.
+        if covered_idx:
+            for idx, item in enumerate(legend_result.items):
+                if idx in covered_idx:
+                    continue
+                desc = (item.description or "").strip()
+                if not desc:
+                    continue
+                items.append({
+                    "symbol": (item.symbol or ""),
+                    "name": desc,
+                    "count": 1,
+                    "count_ae": 0,
+                    "total": 1,
+                    "unit": "шт",
+                    "category": "legend_unmatched",
+                    "source": "legend_coverage_audit",
+                })
+    except Exception as exc:
+        log.warning("Legend coverage audit failed for %s: %s", pdf_path, exc)
+
     items = vor_map_items(items)
     return items
 

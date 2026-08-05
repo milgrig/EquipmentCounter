@@ -135,13 +135,23 @@ def register_vor_export(app):
         content = await asyncio.to_thread(_build_docx_bytes, aggregated, rel_folder)
 
         folder_name = rel_folder.rsplit("/", 1)[-1] if "/" in rel_folder else rel_folder
-        safe = "".join(c if c.isalnum() or c in "._- " else "_" for c in folder_name)
+        # B044 KB-006: HTTP headers must be latin-1; use ASCII fallback +
+        # RFC 5987 filename* for UTF-8 (browsers prefer filename* when present).
+        ascii_safe = "".join(
+            c if (c.isascii() and (c.isalnum() or c in "._- ")) else "_"
+            for c in folder_name
+        ) or "folder"
+        from urllib.parse import quote as _q
+        utf8_q = _q(f"VOR_{folder_name}.docx", safe="")
         return Response(
             content=content,
             media_type=("application/vnd.openxmlformats-officedocument."
                         "wordprocessingml.document"),
             headers={
-                "Content-Disposition": f'attachment; filename="VOR_{safe}.docx"',
+                "Content-Disposition": (
+                    f'attachment; filename="VOR_{ascii_safe}.docx"; '
+                    f"filename*=UTF-8''{utf8_q}"
+                ),
             },
         )
 
@@ -215,13 +225,22 @@ def register_vor_export(app):
         buf.seek(0)
 
         folder_name = rel_folder.rsplit("/", 1)[-1] if "/" in rel_folder else rel_folder
-        safe = "".join(c if c.isalnum() or c in "._- " else "_" for c in folder_name)
+        # B044 KB-006: HTTP headers latin-1 only -> RFC 5987 filename*
+        ascii_safe = "".join(
+            c if (c.isascii() and (c.isalnum() or c in "._- ")) else "_"
+            for c in folder_name
+        ) or "folder"
+        from urllib.parse import quote as _q
+        utf8_q = _q(f"VOR_{folder_name}.xlsx", safe="")
         return Response(
             content=buf.getvalue(),
             media_type=("application/vnd.openxmlformats-officedocument."
                         "spreadsheetml.sheet"),
             headers={
-                "Content-Disposition": f'attachment; filename="VOR_{safe}.xlsx"',
+                "Content-Disposition": (
+                    f'attachment; filename="VOR_{ascii_safe}.xlsx"; '
+                    f"filename*=UTF-8''{utf8_q}"
+                ),
             },
         )
 

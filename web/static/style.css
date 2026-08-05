@@ -818,9 +818,48 @@ body.dark .cat-эвакуационный   { background: #5a1030; color: #f098b
 .vor-table td:nth-child(3) { text-align: center; width: 5rem; }
 .vor-table td:nth-child(4) { text-align: center; width: 5rem; font-weight: 600; }
 .vor-table .mono { font-family: var(--mono, monospace); font-size: 0.75rem; color: var(--text-muted); }
-.vor-actions { padding: 1rem 0; display: flex; gap: 0.5rem; justify-content: flex-end; }
+.vor-section-header td { background: var(--accent-bg, #e8f0fe); padding: 0.5rem 0.6rem !important; font-size: 0.85rem; }
+.vor-material-row td { color: var(--text-muted); font-size: 0.78rem; }
+.vor-material-row td.indent { padding-left: 2rem !important; }
+.vor-actions { padding: 1rem 1.5rem; display: flex; gap: 0.5rem; justify-content: flex-end; }
 .btn-vor { margin-left: auto; background: var(--accent, #4a90d9); color: #fff; border: 1px solid transparent; font-size: 0.72rem; padding: 0.2rem 0.6rem; border-radius: 4px; cursor: pointer; white-space: nowrap; }
 .btn-vor:hover { opacity: 0.85; }
+
+/* ── Saved VOR files list ────────────────── */
+.vor-no-files { padding: 1rem 1.5rem; color: var(--text-muted); font-size: 0.85rem; }
+.vor-files-header { padding: 0.75rem 1.5rem 0.3rem; font-size: 0.85rem; font-weight: 600; color: var(--text-main); }
+.vor-files-list { padding: 0 1.5rem; }
+.vor-file-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border-light, #eee); font-size: 0.82rem; }
+.vor-file-row:hover { background: var(--row-hover, rgba(74,144,217,0.06)); }
+.vor-file-icon { font-size: 1rem; }
+.vor-file-name { flex: 1; font-weight: 500; }
+.vor-file-date { color: var(--text-muted); font-size: 0.75rem; min-width: 110px; }
+.vor-file-size { color: var(--text-muted); font-size: 0.75rem; min-width: 55px; text-align: right; }
+.btn-download { background: #27ae60; color: #fff; border: none; font-size: 0.7rem; padding: 0.2rem 0.5rem; border-radius: 3px; cursor: pointer; }
+.btn-download:hover { opacity: 0.85; }
+.vor-processing { border-top: 1px solid var(--border-light, #eee); margin-top: 0.5rem; padding-top: 0.5rem; }
+
+/* ── Found items section (inside VOR modal) ────────────────── */
+.vor-found { padding: 0 1.5rem; }
+.vor-found-header { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; cursor: pointer; user-select: none; font-size: 0.85rem; color: var(--text-main); border-bottom: 1px solid var(--border-light, #eee); }
+.vor-found-header:hover { color: var(--accent, #4a90d9); }
+.vor-found-arrow { font-size: 0.7rem; transition: transform 0.15s; }
+.vor-found-count { color: var(--text-muted); font-size: 0.8rem; margin-left: auto; }
+.vor-found-body { max-height: 300px; overflow-y: auto; padding: 0.25rem 0; }
+.vor-found-body.hidden { display: none; }
+.found-file-group { margin-bottom: 0.25rem; }
+.found-file-header { display: flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.5rem; cursor: pointer; user-select: none; font-size: 0.8rem; border-radius: 4px; }
+.found-file-header:hover { background: var(--row-hover, rgba(74,144,217,0.06)); }
+.found-file-arrow { font-size: 0.65rem; color: var(--text-muted); }
+.found-file-badge { display: inline-block; background: var(--accent, #4a90d9); color: #fff; font-size: 0.68rem; padding: 0.05rem 0.4rem; border-radius: 8px; font-weight: 600; }
+.found-items-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; margin: 0.15rem 0 0.4rem 1rem; }
+.found-items-table.hidden { display: none; }
+.found-items-table th { text-align: left; font-weight: 600; padding: 0.25rem 0.4rem; font-size: 0.72rem; color: var(--text-muted); border-bottom: 1px solid var(--border-light, #eee); }
+.found-items-table td { padding: 0.2rem 0.4rem; border-bottom: 1px solid var(--border-light, #f0f0f0); }
+.found-items-table tr:hover td { background: var(--row-hover, rgba(74,144,217,0.04)); }
+.found-sym { font-family: var(--mono, monospace); font-weight: 600; text-align: center; width: 3.5rem; color: var(--accent, #4a90d9); }
+.found-qty { text-align: center; width: 3.5rem; font-weight: 600; }
+.found-unit { text-align: center; width: 3rem; color: var(--text-muted); }
 
 /* ================================================================
    TAB BAR & COUNTING DASHBOARD
@@ -1378,4 +1417,60 @@ body.dark .cnt-cell.cnt-mismatch { background: #5c4b13; color: #ffd76a; }
     font-size: 0.72rem;
     opacity: 0.7;
     margin-top: 2px;
+}
+
+/* ================================================================
+   UPLOAD ZONE
+   ================================================================ */
+
+.upload-zone { margin: 0.75rem 1.5rem 0; }
+.upload-zone-inner {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 1.5rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+}
+.upload-zone-inner:hover,
+.upload-zone-inner.drag-over {
+    border-color: var(--accent);
+    background: rgba(74, 144, 217, 0.05);
+}
+body.dark .upload-zone-inner:hover,
+body.dark .upload-zone-inner.drag-over {
+    background: rgba(106, 168, 232, 0.08);
+}
+.upload-icon { font-size: 2rem; margin-bottom: 0.4rem; }
+.upload-text { font-size: 0.92rem; }
+.upload-label {
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline;
+}
+.upload-label:hover { color: var(--accent-hover); }
+.upload-buttons {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    margin-top: 0.6rem;
+}
+.upload-btn { cursor: pointer; }
+.upload-btn input { display: none; }
+.upload-hint {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    margin-top: 0.6rem;
+}
+.upload-progress {
+    margin-top: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.upload-progress .progress-bar { flex: 1; }
+#upload-status {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
 }

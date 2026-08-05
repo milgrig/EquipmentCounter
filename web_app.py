@@ -19,12 +19,13 @@ import json as json_mod
 import math
 import os
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import fitz  # PyMuPDF
 import pdfplumber
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -37,6 +38,10 @@ from pdf_legend_parser import parse_legend, LegendResult
 from pdf_count_text import count_symbols
 from pdf_count_cables import extract_cables
 from pdf_count_geometry import measure_cables
+from cable_length import measure_cable_lengths_raster
+import height_bucketer
+import route_classifier
+import thickness_extractor
 from pdf_count_visual import match_symbols, detect_pictograms, _extract_symbol_images, build_equipment_cluster_bboxes
 from vor_work_mapping import map_items as vor_map_items
 from legend_validator import validate_legend_symbols
@@ -48,6 +53,10 @@ from legend_validator import validate_legend_symbols
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "Data"
 WEB_DIR = BASE_DIR / "web"
+VOR_DIR = BASE_DIR / "vor_output"   # saved VOR xlsx files
+VOR_DIR.mkdir(exist_ok=True)
+UPLOADS_DIR = BASE_DIR / "uploads"  # uploaded projects via web interface
+UPLOADS_DIR.mkdir(exist_ok=True)
 
 # ---------------------------------------------------------------------------
 # FastAPI app
@@ -65,6 +74,46 @@ templates = Jinja2Templates(directory=str(WEB_DIR / "templates"))
 
 
 # ---------------------------------------------------------------------------
+# Cache: store VOR results after SSE processing so Excel export is instant
+# ---------------------------------------------------------------------------
+_vor_results_cache: dict[str, dict[str, list[dict]]] = {}  # folder_id → {filename: items}
+_vor_xlsx_cache: dict[str, bytes] = {}  # folder_id → ready xlsx bytes
+
+
+def _vor_folder_for(rel_folder: str) -> Path:
+    """Return (and create) the vor_output sub-folder for a given project folder."""
+    safe = rel_folder.replace("/", "_").replace("\\", "_")
+    safe = "".join(c if c.isalnum() or c in "._- " else "_" for c in safe) or "root"
+    p = VOR_DIR / safe
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _save_vor_xlsx(xlsx_bytes: bytes, rel_folder: str) -> Path:
+    """Save VOR Excel to disk with timestamp. Returns the saved file path."""
+    dest_dir = _vor_folder_for(rel_folder)
+    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    fname = f"VOR_{ts}.xlsx"
+    path = dest_dir / fname
+    path.write_bytes(xlsx_bytes)
+    return path
+
+
+def _list_vor_files(rel_folder: str) -> list[dict]:
+    """List all saved VOR xlsx files for a folder, newest first."""
+    dest_dir = _vor_folder_for(rel_folder)
+    files = sorted(dest_dir.glob("VOR_*.xlsx"), key=lambda p: p.stat().st_mtime, reverse=True)
+    result = []
+    for f in files:
+        stat = f.stat()
+        result.append({
+            "filename": f.name,
+            "size_kb": round(stat.st_size / 1024, 1),
+            "created": datetime.fromtimestamp(stat.st_mtime).strftime("%d.%m.%Y %H:%M"),
+        })
+    return result
+
+# ---------------------------------------------------------------------------
 # Helpers: folder operations
 # ---------------------------------------------------------------------------
 
@@ -74,8 +123,12 @@ def _folder_id(rel_folder: str) -> str:
 
 
 def _id_to_folder(folder_id: str) -> Optional[str]:
-    """Resolve folder ID back to relative folder path."""
+    """Resolve folder ID back to relative folder path.
+
+    Scans both DATA_DIR and UPLOADS_DIR (with '_uploads/' prefix).
+    """
     seen: set[str] = set()
+    # Scan DATA_DIR
     for pdf_path in DATA_DIR.rglob("*.pdf"):
         rel = str(pdf_path.relative_to(DATA_DIR)).replace("\\", "/")
         parts = rel.rsplit("/", 1)
@@ -84,12 +137,28 @@ def _id_to_folder(folder_id: str) -> Optional[str]:
             seen.add(folder)
             if _folder_id(folder) == folder_id:
                 return folder
+    # Scan UPLOADS_DIR
+    if UPLOADS_DIR.exists():
+        for pdf_path in UPLOADS_DIR.rglob("*.pdf"):
+            rel = str(pdf_path.relative_to(UPLOADS_DIR)).replace("\\", "/")
+            parts = rel.rsplit("/", 1)
+            sub = parts[0] if len(parts) > 1 else ""
+            folder = "_uploads/" + sub if sub else "_uploads"
+            if folder not in seen:
+                seen.add(folder)
+                if _folder_id(folder) == folder_id:
+                    return folder
     return None
 
 
 def _folder_files(rel_folder: str) -> list[Path]:
-    """Return all PDF files in a specific folder under DATA_DIR."""
-    folder_path = DATA_DIR / rel_folder
+    """Return all PDF files in a specific folder under DATA_DIR or UPLOADS_DIR."""
+    if rel_folder.startswith("_uploads/"):
+        folder_path = UPLOADS_DIR / rel_folder[len("_uploads/"):]
+    elif rel_folder == "_uploads":
+        folder_path = UPLOADS_DIR
+    else:
+        folder_path = DATA_DIR / rel_folder
     if not folder_path.is_dir():
         return []
     return sorted(folder_path.glob("*.pdf"))
@@ -108,11 +177,20 @@ def _file_id(rel_path: str) -> str:
 
 
 def _id_to_path(file_id: str) -> Optional[Path]:
-    """Resolve file ID back to an absolute path by scanning all PDFs."""
+    """Resolve file ID back to an absolute path by scanning all PDFs.
+
+    Searches both DATA_DIR and UPLOADS_DIR.
+    """
     for pdf_path in DATA_DIR.rglob("*.pdf"):
         rel = str(pdf_path.relative_to(DATA_DIR))
         if _file_id(rel) == file_id:
             return pdf_path
+    # Search uploads
+    if UPLOADS_DIR.exists():
+        for pdf_path in UPLOADS_DIR.rglob("*.pdf"):
+            rel = "_uploads/" + str(pdf_path.relative_to(UPLOADS_DIR)).replace("\\", "/")
+            if _file_id(rel) == file_id:
+                return pdf_path
     return None
 
 
@@ -159,36 +237,65 @@ def _detect_section_type(folder_path: str) -> str:
 
 
 def _scan_pdfs() -> list[dict]:
-    """Recursively scan Data/ for PDF files and return metadata."""
-    if not DATA_DIR.exists():
-        return []
-
+    """Recursively scan Data/ and uploads/ for PDF files and return metadata."""
     results = []
-    for pdf_path in sorted(DATA_DIR.rglob("*.pdf")):
-        try:
-            stat = pdf_path.stat()
-        except OSError:
-            continue
 
-        rel = str(pdf_path.relative_to(DATA_DIR))
-        fid = _file_id(rel)
+    # Scan DATA_DIR
+    if DATA_DIR.exists():
+        for pdf_path in sorted(DATA_DIR.rglob("*.pdf")):
+            try:
+                stat = pdf_path.stat()
+            except OSError:
+                continue
 
-        # Compute folder group
-        rel_posix = rel.replace("\\", "/")
-        parts = rel_posix.rsplit("/", 1)
-        folder = parts[0] if len(parts) > 1 else ""
+            rel = str(pdf_path.relative_to(DATA_DIR))
+            fid = _file_id(rel)
 
-        results.append({
-            "id": fid,
-            "filename": pdf_path.name,
-            "path": rel,
-            "folder": folder,
-            "size_kb": round(stat.st_size / 1024, 1),
-            "modified": time.strftime(
-                "%Y-%m-%d %H:%M", time.localtime(stat.st_mtime)
-            ),
-            "type_guess": _guess_type(rel),
-        })
+            # Compute folder group
+            rel_posix = rel.replace("\\", "/")
+            parts = rel_posix.rsplit("/", 1)
+            folder = parts[0] if len(parts) > 1 else ""
+
+            results.append({
+                "id": fid,
+                "filename": pdf_path.name,
+                "path": rel,
+                "folder": folder,
+                "size_kb": round(stat.st_size / 1024, 1),
+                "modified": time.strftime(
+                    "%Y-%m-%d %H:%M", time.localtime(stat.st_mtime)
+                ),
+                "type_guess": _guess_type(rel),
+            })
+
+    # Scan UPLOADS_DIR
+    if UPLOADS_DIR.exists():
+        for pdf_path in sorted(UPLOADS_DIR.rglob("*.pdf")):
+            try:
+                stat = pdf_path.stat()
+            except OSError:
+                continue
+
+            rel_upload = str(pdf_path.relative_to(UPLOADS_DIR)).replace("\\", "/")
+            rel = "_uploads/" + rel_upload
+            fid = _file_id(rel)
+
+            # Compute folder group (with _uploads/ prefix)
+            parts = rel.rsplit("/", 1)
+            folder = parts[0] if len(parts) > 1 else "_uploads"
+
+            results.append({
+                "id": fid,
+                "filename": pdf_path.name,
+                "path": rel,
+                "folder": folder,
+                "size_kb": round(stat.st_size / 1024, 1),
+                "modified": time.strftime(
+                    "%Y-%m-%d %H:%M", time.localtime(stat.st_mtime)
+                ),
+                "type_guess": _guess_type(rel),
+                "is_upload": True,
+            })
 
     return results
 
@@ -202,8 +309,9 @@ async def index(request: Request):
     """Render the main page with file list."""
     files = _scan_pdfs()
     return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "files": files, "total": len(files)},
+        request=request,
+        name="index.html",
+        context={"request": request, "files": files, "total": len(files)},
     )
 
 
@@ -226,10 +334,15 @@ async def viewer(request: Request, file_id: str):
     except Exception:
         page_count = 1
 
-    rel = str(pdf_path.relative_to(DATA_DIR))
+    try:
+        rel = str(pdf_path.relative_to(DATA_DIR))
+    except ValueError:
+        # File is in UPLOADS_DIR
+        rel = "_uploads/" + str(pdf_path.relative_to(UPLOADS_DIR)).replace("\\", "/")
     return templates.TemplateResponse(
-        "viewer.html",
-        {
+        request=request,
+        name="viewer.html",
+        context={
             "request": request,
             "file_id": file_id,
             "filename": pdf_path.name,
@@ -583,6 +696,61 @@ async def api_folders():
 
 
 # ---------------------------------------------------------------------------
+# 6c. POST /api/upload — upload PDF files to create a new project
+# ---------------------------------------------------------------------------
+
+@app.post("/api/upload")
+async def api_upload(
+    request: Request,
+    files: list[UploadFile] = File(...),
+):
+    """Upload PDFs and create a new project folder in uploads/.
+
+    Accepts multipart form with 'files' (PDF blobs) and optional 'paths'
+    (relative paths preserving folder structure, e.g. "MyProject/02_PDF/plan.pdf").
+    """
+    # Parse optional 'paths' list from the same multipart form
+    form = await request.form()
+    raw_paths = form.getlist("paths")
+
+    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    dest = UPLOADS_DIR / ts
+    dest.mkdir(parents=True, exist_ok=True)
+
+    saved = 0
+    for i, f in enumerate(files):
+        if not f.filename or not f.filename.lower().endswith(".pdf"):
+            continue
+
+        # Use relative path from frontend if available, else just filename
+        rel_path = raw_paths[i] if i < len(raw_paths) and raw_paths[i] else f.filename
+        # Sanitize: resolve to pure posix, strip leading slashes / ".."
+        rel_path = rel_path.replace("\\", "/")
+        parts = [p for p in rel_path.split("/") if p and p != ".."]
+        if not parts:
+            continue
+        safe_path = Path(*parts)
+
+        target = dest / safe_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        content = await f.read()
+        target.write_bytes(content)
+        saved += 1
+
+    if saved == 0:
+        import shutil
+        shutil.rmtree(dest, ignore_errors=True)
+        raise HTTPException(400, "Нет PDF файлов")
+
+    rel = "_uploads/" + ts
+    return JSONResponse({
+        "folder_id": _folder_id(rel),
+        "folder_name": ts,
+        "files_count": saved,
+    })
+
+
+# ---------------------------------------------------------------------------
 # Helpers: equipment aggregation
 # ---------------------------------------------------------------------------
 
@@ -592,38 +760,103 @@ def _aggregate_equipment(results: dict[str, list[dict]]) -> list[dict]:
     Uses 'work_name' (VOR work description) for aggregation if available,
     falling back to 'name'. Preserves 'equipment_name' (original equipment
     name from the PDF legend) for the 'Доп. информация' column.
+
+    T081 (S019-wire-attrs): preserves six attribute fields populated by
+    Steps 8-10 (height_bucketer / route_classifier / thickness_extractor)
+    so the downstream vor_compose.compose_vor_table can split rows by
+    installation context.  KB-008: agg key is extended from name only to
+    (name, height_bucket, route, mount) so that the same legend name
+    appearing on different floor elevations or routes is NOT silently
+    merged into one row.  Scalar fields (cross_section / section_mm2 /
+    diameter_mm) are projected as the first non-empty value seen because
+    they describe the cable kind, not the installation context.
     """
     import re
-    agg: dict[str, dict] = {}  # normalized_key -> {...}
+    agg: dict[tuple, dict] = {}  # (key, bucket, route, mount) -> {...}
+
+    # T088: strip [UNMATCHED-LEGEND] prefix BEFORE aggregation so that
+    # matched and unmatched variants of the same luminaire model merge
+    # into one row instead of producing two split rows per model.
+    # Idempotent + case-insensitive; mirrors the strip already applied at
+    # render time (T078) but applied earlier so the aggregation key
+    # collapses correctly.
+    _UNMATCHED_LEGEND_RE = re.compile(r"\[UNMATCHED-LEGEND\]\s*", re.IGNORECASE)
+    # T088: also collapse "Монтаж светильника Светильник X"
+    # → "Монтаж светильника X".  This pattern arises because matched
+    # items have work_name="Монтаж светильника <X>" while [UNMATCHED]
+    # items fall back to raw_name="Светильник <X>"; after stripping the
+    # [UNMATCHED-LEGEND] tag the work-name prefix gets re-prepended
+    # downstream and produces the doubled "Монтаж светильника Светильник".
+    # Collapsing here lets the matched and unmatched paths produce the
+    # same aggregation key.
+    _DOUBLED_LUM_RE = re.compile(
+        r"^(Монтаж\s+светильника)\s+Светильник\s+",
+        re.IGNORECASE,
+    )
+
+    def _strip_unmatched(s: str) -> str:
+        if not s:
+            return s
+        out = _UNMATCHED_LEGEND_RE.sub("", s).strip()
+        out = _DOUBLED_LUM_RE.sub(r"\1 ", out).strip()
+        return out
 
     for filename, items in results.items():
         drawing_ref = filename.replace(".pdf", "")
         for item in items:
             # Prefer work_name for VOR display; fall back to name
-            work_name = item.get("work_name", "").strip()
-            raw_name = item.get("name", "").strip()
+            work_name = _strip_unmatched(item.get("work_name", "").strip())
+            raw_name = _strip_unmatched(item.get("name", "").strip())
             display_name = work_name or raw_name
             if not display_name:
                 continue
-            key = re.sub(r"\s+", " ", display_name).strip().lower()
+            key_name = re.sub(r"\s+", " ", display_name).strip().lower()
             total = item.get("total", item.get("count", 0) + item.get("count_ae", 0))
             unit = item.get("unit", "шт")
             if total <= 0:
                 continue
+            # T081: extract 6 attribute fields populated by Steps 8-10.
+            height_bucket = item.get("height_bucket") or None
+            route = item.get("route") or None
+            mount = item.get("mount") or None
+            cross_section = item.get("cross_section") or None
+            section_mm2 = item.get("section_mm2")
+            diameter_mm = item.get("diameter_mm")
+            # KB-008: agg key includes attribute context so same-name-
+            # different-bucket/route/mount rows are not merged.
+            key = (key_name, height_bucket, route, mount)
             if key not in agg:
                 # equipment_name is the original name from PDF legend
-                equip_name = item.get("equipment_name", raw_name)
+                equip_name = _strip_unmatched(
+                    item.get("equipment_name", raw_name)
+                )
                 agg[key] = {
                     "name": display_name, "unit": unit, "total": 0,
                     "per_file": {}, "files": [],
                     "equipment_names": set(),
+                    # T081: preserved attribute context
+                    "height_bucket": height_bucket,
+                    "route": route,
+                    "mount": mount,
+                    "cross_section": cross_section,
+                    "section_mm2": section_mm2,
+                    "diameter_mm": diameter_mm,
                 }
                 if equip_name:
                     agg[key]["equipment_names"].add(equip_name)
             else:
-                equip_name = item.get("equipment_name", raw_name)
+                equip_name = _strip_unmatched(
+                    item.get("equipment_name", raw_name)
+                )
                 if equip_name:
                     agg[key]["equipment_names"].add(equip_name)
+                # Scalar projection: take first non-empty value seen.
+                if not agg[key].get("cross_section") and cross_section:
+                    agg[key]["cross_section"] = cross_section
+                if agg[key].get("section_mm2") in (None, 0) and section_mm2:
+                    agg[key]["section_mm2"] = section_mm2
+                if agg[key].get("diameter_mm") in (None, 0) and diameter_mm:
+                    agg[key]["diameter_mm"] = diameter_mm
             agg[key]["total"] += total
             agg[key]["per_file"][drawing_ref] = agg[key]["per_file"].get(drawing_ref, 0) + total
             if drawing_ref not in agg[key]["files"]:
@@ -641,6 +874,15 @@ def _aggregate_equipment(results: dict[str, list[dict]]) -> list[dict]:
             "total": info["total"], "formula": formula,
             "drawing_refs": ", ".join(info["files"]),
             "extra_info": extra_info,
+            # T081: project preserved attributes to output rows so
+            # vor_compose.compose_vor_table and downstream renderers
+            # can group/split by installation context.
+            "height_bucket": info.get("height_bucket"),
+            "route": info.get("route"),
+            "mount": info.get("mount"),
+            "cross_section": info.get("cross_section"),
+            "section_mm2": info.get("section_mm2"),
+            "diameter_mm": info.get("diameter_mm"),
         })
     return result
 
@@ -927,6 +1169,231 @@ def extract_luminaire_heights(pdf_path: str) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# T058 / B051: Reverse label -> legend channel
+# ---------------------------------------------------------------------------
+# T057 recon established that on-drawing engineer labels (e.g. PU6, PU7
+# for "Post upravleniya"; SHO3-Gr.15 for working-lighting groups) are
+# stored as pdfplumber chars with explicit non-default non_stroking_color
+# (blue (0,0,1) for working circuits, red (1,0,0) for emergency).  These
+# labels never reach the equipment count because:
+#   - Phase 2 (count_symbols) only looks for the legend symbol token.
+#   - Phase 3 (match_symbols) needs a distinct glyph in the legend.
+#   - Phase 5 (extract_cables) only catches cable schedule entries.
+# This helper extracts those colored labels, groups char-level data into
+# words, classifies each word into a recognised label family (PU\d+,
+# VKL, POST, etc.), then fuzzy-matches the label text against the
+# descriptions of legend rows that NO producer stage has covered yet.
+# When a match scores above threshold, all labels in that group are
+# attributed to the matched legend index.
+
+_REVERSE_BLUE_RGB = (0.0, 0.0, 1.0)
+_REVERSE_RED_RGB = (1.0, 0.0, 0.0)
+_REVERSE_COLOR_TOL = 0.05  # tuples are exact in this corpus, give tiny slack
+# Tight regex for short labels that map back to legend equipment.
+# - PU\d+  : control post (Cyrillic Pe-U + digit)
+# - VKL\d* : switch ("VKL" = vyklyuchatel in Cyrillic)
+# - POST   : standalone POST keyword
+# - PULT\w*: pult control
+# - DV\d+  : motion sensor / DataVid family
+_REVERSE_EQUIP_LABEL_RE = re_mod.compile(
+    r"^("
+    r"\u041f\u0423\d+"       # PU<n>
+    r"|\u0412\u041a\u041b\d*"  # VKL[<n>]
+    r"|\u041f\u041e\u0421\u0422"  # POST
+    r"|\u041f\u0423\u041b\u042c\w*"  # PULT...
+    r"|\u0414\u0412\d+"      # DV<n>
+    r")$"
+)
+# Threshold for fuzzy match between label/keyword and legend description.
+# Tuned from T057 recon: "PU" vs "Post upravleniya rabochim osveshcheniem"
+# token_set_ratio is ~38; we use a keyword-tag lookup table instead so the
+# threshold here is the secondary fallback for plain-text labels.
+_REVERSE_FUZZY_THRESHOLD = 65
+
+# Label -> legend-description keyword hint table.  Each label family is
+# tied to a set of Cyrillic keywords that MUST appear in the legend
+# description for the match to be considered.  This prevents PU<n>
+# matching any legend that happens to fuzzy-score high.
+_REVERSE_LABEL_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "PU":   ("\u043f\u043e\u0441\u0442", "\u0443\u043f\u0440\u0430\u0432\u043b"),   # post + upravlen
+    "VKL":  ("\u0432\u044b\u043a\u043b\u044e\u0447\u0430\u0442\u0435\u043b",),       # vyklyuchatel
+    "POST": ("\u043f\u043e\u0441\u0442",),                                            # post
+    "PULT": ("\u043f\u0443\u043b\u044c\u0442",),                                      # pult
+    "DV":   ("\u0434\u0430\u0442\u0447\u0438\u043a",),                                # datchik (sensor)
+}
+
+
+def _reverse_label_family(text: str) -> str | None:
+    """Map a label string like 'PU7' to its family key ('PU', 'VKL', ...)."""
+    if not text:
+        return None
+    # Strip trailing digits to get family stem
+    stem = re_mod.sub(r"\d+$", "", text)
+    stem_upper = stem.upper()
+    # Cyrillic -> Latin equivalent mapping for stems we care about
+    cyr_to_lat = {
+        "\u041f\u0423": "PU",
+        "\u0412\u041a\u041b": "VKL",
+        "\u041f\u041e\u0421\u0422": "POST",
+        "\u041f\u0423\u041b\u042c": "PULT",
+        "\u0414\u0412": "DV",
+    }
+    return cyr_to_lat.get(stem_upper) or (stem_upper if stem_upper in _REVERSE_LABEL_KEYWORDS else None)
+
+
+def _reverse_extract_colored_words(pdf_path: str, page_index: int) -> list[dict]:
+    """Read pdfplumber chars on the given page and return word-level groups
+    that have a non-default non_stroking_color (blue or red).
+
+    Output dict shape: {text, x0, y0, x1, y1, color, family}.
+    """
+    out: list[dict] = []
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            if page_index >= len(pdf.pages):
+                return out
+            page = pdf.pages[page_index]
+            chars = page.chars or []
+    except Exception:
+        return out
+
+    def _is_target_color(c) -> bool:
+        col = c.get("non_stroking_color")
+        if col is None:
+            return False
+        # pdfplumber returns either a tuple of length 1 (gray), 3 (RGB)
+        # or 4 (CMYK).  We only care about RGB blue/red.
+        if not isinstance(col, (tuple, list)) or len(col) != 3:
+            return False
+        cb = tuple(round(float(v), 4) for v in col)
+        for target in (_REVERSE_BLUE_RGB, _REVERSE_RED_RGB):
+            if all(abs(cb[i] - target[i]) <= _REVERSE_COLOR_TOL for i in range(3)):
+                return True
+        return False
+
+    colored = [c for c in chars if _is_target_color(c)]
+    if not colored:
+        return out
+
+    # Group chars to words: y-snap line clustering then x-gap word splitting
+    from collections import defaultdict
+    y_snap = 1.5
+    gap_factor = 0.55
+    lines: dict[float, list[dict]] = defaultdict(list)
+    for c in colored:
+        ykey = round(float(c.get("y0", 0)) / y_snap) * y_snap
+        lines[ykey].append(c)
+
+    for _, line_chars in lines.items():
+        line_chars.sort(key=lambda x: float(x.get("x0", 0)))
+        cur: list[dict] = []
+
+        def _flush(buf: list[dict]):
+            if not buf:
+                return
+            text = "".join(str(cc.get("text", "")) for cc in buf)
+            bx0 = min(float(cc.get("x0", 0)) for cc in buf)
+            bx1 = max(float(cc.get("x1", 0)) for cc in buf)
+            by0 = min(float(cc.get("y0", 0)) for cc in buf)
+            by1 = max(float(cc.get("y1", 0)) for cc in buf)
+            col = buf[0].get("non_stroking_color")
+            out.append({
+                "text": text,
+                "x0": bx0, "y0": by0, "x1": bx1, "y1": by1,
+                "color": tuple(round(float(v), 4) for v in col) if col else None,
+                "family": _reverse_label_family(text),
+            })
+
+        for c in line_chars:
+            if cur:
+                last_x1 = float(cur[-1].get("x1", 0))
+                size = float(c.get("size", 6) or 6)
+                gap_thresh = size * gap_factor
+                if (float(c.get("x0", 0)) - last_x1) > gap_thresh:
+                    _flush(cur)
+                    cur = []
+            cur.append(c)
+        _flush(cur)
+
+    return out
+
+
+def _reverse_match_labels_to_legend(
+    words: list[dict],
+    legend_items,
+    covered_idx: set[int],
+) -> dict[int, list[dict]]:
+    """For each colored word that classifies as an equipment label,
+    find the best uncovered legend index whose description contains the
+    label-family's keyword set.  Returns idx -> list of label dicts.
+    """
+    result: dict[int, list[dict]] = {}
+    if not words or not legend_items:
+        return result
+
+    # Try rapidfuzz, fall back to difflib if not installed
+    try:
+        from rapidfuzz import fuzz as _fuzz
+        def _score(a: str, b: str) -> float:
+            return _fuzz.token_set_ratio(a, b)
+    except Exception:
+        import difflib
+        def _score(a: str, b: str) -> float:
+            return difflib.SequenceMatcher(None, a, b).ratio() * 100.0
+
+    for word in words:
+        text = (word.get("text") or "").strip()
+        family = word.get("family")
+        if not text or not family:
+            continue
+        # Tight regex guard: only match exact equip-label forms,
+        # excluding e.g. legend footnote 'PUE p.1.1.29' substrings.
+        if not _REVERSE_EQUIP_LABEL_RE.match(text):
+            continue
+        keywords = _REVERSE_LABEL_KEYWORDS.get(family, ())
+        if not keywords:
+            continue
+
+        # Primary gate: ALL keywords for this family must appear in the
+        # legend description (Cyrillic substring check).  When that holds
+        # we accept the smallest matching idx; the fuzzy score below is
+        # used only to disambiguate when MULTIPLE uncovered legend rows
+        # satisfy the keyword test (e.g. several variants of "switch"
+        # rows for a VKL\d+ label).
+        candidates: list[tuple[int, float]] = []
+        for idx, item in enumerate(legend_items):
+            if idx in covered_idx:
+                continue
+            desc = (item.description or "").strip()
+            if not desc:
+                continue
+            desc_lower = desc.lower()
+            if not all(kw in desc_lower for kw in keywords):
+                continue
+            # Secondary fuzzy score on the legend description against
+            # itself + keyword block (deterministic tie-breaker).
+            kw_blob = " ".join(keywords)
+            score = _score(kw_blob, desc_lower)
+            candidates.append((idx, score))
+
+        if candidates:
+            # Pick the highest-scoring candidate; ties broken by lowest idx.
+            candidates.sort(key=lambda t: (-t[1], t[0]))
+            best_idx, best_score = candidates[0]
+            result.setdefault(best_idx, []).append({
+                "text": text,
+                "x0": word.get("x0"),
+                "y0": word.get("y0"),
+                "x1": word.get("x1"),
+                "y1": word.get("y1"),
+                "family": family,
+                "score": round(best_score, 1),
+            })
+
+    return result
+
+
 def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
     """Run legend extraction + counting methods on a single PDF.
 
@@ -956,6 +1423,12 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
     has_legend = bool(legend_result.items)
 
     items: list[dict] = []
+    # T054 / KB-015: track which legend indices reached output so we can
+    # emit an [UNMATCHED-LEGEND] warning row for any item that no
+    # producer stage covered.  Without this audit, symbol-less legend
+    # rows (switches, posts, cable trasses) are silently dropped — the
+    # exact failure mode reported as B048 on 007-Plans osvescheniya PDF.
+    covered_legend_idx: set[int] = set()
 
     # Step 2-4: legend-based equipment counting (skip if no legend found)
     if has_legend:
@@ -1066,6 +1539,7 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
                 "count_ae": 0,
                 "total": count,
             })
+            covered_legend_idx.add(idx)
 
     # Step 4b: detect pictograms — text labels like "ВЫХОД" on the drawing
     # that have no legend entry and no visual template (T149).
@@ -1166,10 +1640,227 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
         except Exception as exc:
             log.warning("Geometric measurement failed for %s: %s", pdf_path, exc)
 
+    # Step 6a (T058 / B051): reverse label -> legend channel.
+    # Extract colored on-drawing labels (blue PU<n>, VKL, POST etc.) via
+    # pdfplumber chars and match each label family to the descriptions of
+    # legend rows that are still UNCOVERED after the earlier stages.
+    # Marks the matched legend idx as covered so the [UNMATCHED-LEGEND]
+    # audit below does NOT also flag them.  See T057 recon for the
+    # color/encoding evidence on 007-Plans osvescheniya PDF.
+    if has_legend:
+        try:
+            colored_words = _reverse_extract_colored_words(
+                pdf_path, legend_result.page_index,
+            )
+            label_groups = _reverse_match_labels_to_legend(
+                colored_words, legend_result.items, covered_legend_idx,
+            )
+            for idx, labels in label_groups.items():
+                item = legend_result.items[idx]
+                qty = len(labels)
+                items.append({
+                    "symbol": (item.symbol or ""),
+                    "name": item.description or "",
+                    "count": qty,
+                    "count_ae": 0,
+                    "total": qty,
+                    "unit": "шт",
+                    "category": "reverse_label_match",
+                    "source": "reverse_label_match",
+                })
+                covered_legend_idx.add(idx)
+                log.info(
+                    "reverse_label_match idx=%d desc=%r qty=%d family=%s",
+                    idx, (item.description or "")[:40], qty,
+                    labels[0].get("family", ""),
+                )
+        except Exception as exc:
+            log.warning(
+                "Reverse label channel failed for %s: %s", pdf_path, exc,
+            )
+
+    # Step 6b (T068 / S016-cable-length): raster polyline detection and
+    # length engine.  The vector pipeline (Step 6 measure_cables, only
+    # ran on section 'ЭГ' above) misses cable trasses rendered as
+    # embedded raster fills, which is the case on most GPK3 lighting
+    # sheets and was the single biggest accuracy gap (519 m generated
+    # vs ~14 000 m reference on 3-zahvatka).
+    #
+    # The raster engine renders each plan page at 300 DPI, builds an
+    # HSV mask per cable-trace legend category (idx 10..14 on 007-style
+    # legends: emergency / working cable trasses + 3 provodka classes),
+    # skeletonises and sums pixel runs, then divides by the per-page
+    # px-per-metre scale derived from titleblock axis pairs.  See
+    # cable_length.measure_cable_lengths_raster.
+    #
+    # Items emitted carry source='cable_length_raster' so downstream
+    # VOR mapping can attribute them to the correct height bucket via
+    # T065/T060 rules; we deliberately do NOT mark covered_legend_idx
+    # for these because the UNMATCHED audit below should still flag
+    # the symbol-less legend rows that lost their visual template match
+    # under KB-015.
+    if has_legend:
+        try:
+            cl_pages = [legend_result.page_index] if legend_result is not None else None
+            cl_rep = measure_cable_lengths_raster(
+                pdf_path, pages=cl_pages, legend_result=legend_result,
+            )
+            for cl_item in cl_rep.items:
+                items.append({
+                    "symbol": cl_item.get("symbol", ""),
+                    "name": cl_item.get("name", ""),
+                    "count": 0,
+                    "count_ae": 0,
+                    "total": cl_item.get("total", 0.0),
+                    "unit": cl_item.get("unit", "\u043c"),
+                    "category": "cable_length_raster",
+                    "source": "cable_length_raster",
+                })
+            if cl_rep.total_length_m > 0:
+                log.info(
+                    "cable_length_raster: %.1f m across %d entries on %s",
+                    cl_rep.total_length_m, len(cl_rep.entries), pdf_path,
+                )
+            # When the raster engine matched a legend idx for a category
+            # that produced a non-trivial length (>=0.5 m), mark that
+            # idx as covered so the UNMATCHED audit does not double-emit
+            # the same row as a [UNMATCHED-LEGEND] warning.
+            for e in cl_rep.entries:
+                if e.legend_idx >= 0 and e.length_m >= 0.5:
+                    covered_legend_idx.add(e.legend_idx)
+        except Exception as exc:
+            log.warning(
+                "Raster cable-length engine failed for %s: %s",
+                pdf_path, exc,
+            )
+
+    # Step 6c (T054 / KB-015): emit warning rows for legend items that
+    # no producer stage covered.  The [UNMATCHED-LEGEND] name prefix
+    # surfaces the gap to the user so symbol-less switches, posts, and
+    # cable trasses (B048 reproducer on 007-Plans osvescheniya) appear
+    # in the VOR even when count_text + match_visual found nothing.
+    #
+    # Quantity policy:
+    #   * line patterns (cable trasse / provodka) — qty=0 because count
+    #     is meaningless for these (length is the real metric, deferred
+    #     to follow-up B049 cable polyline detection).
+    #   * everything else (switches, posts, control devices) — qty=1
+    #     so the VOR row at least registers that ONE legend mention
+    #     existed; the user can refine count manually.
+    #
+    # Conservative guard: skip the audit on legends where ZERO producer
+    # stages matched anything, because such "legends" are usually
+    # title-block or notes-table false positives and would otherwise
+    # flood the output with spurious rows.
+    if has_legend and covered_legend_idx:
+        _line_categories = {
+            "кабельная трасса", "проводка", "линия связи",
+            "кабельная", "трасса", "wire", "cable", "trasse",
+        }
+        for idx, item in enumerate(legend_result.items):
+            if idx in covered_legend_idx:
+                continue
+            desc = (item.description or "").strip()
+            if not desc:
+                continue
+            cat = (item.category or "").strip().lower()
+            desc_lower = desc.lower()
+            is_line = (
+                cat in _line_categories
+                or "трасс" in desc_lower
+                or "прокладыв" in desc_lower
+                or "провод" in desc_lower
+                or "кабельн" in desc_lower
+            )
+            warn_count = 0 if is_line else 1
+            items.append({
+                "symbol": (item.symbol or ""),
+                "name": f"[UNMATCHED-LEGEND] {desc}",
+                "count": warn_count,
+                "count_ae": 0,
+                "total": warn_count,
+                "unit": "шт",
+                "category": "legend_unmatched",
+                "source": "legend_coverage_audit",
+            })
+
     # Step 7: apply VOR work-name mapping
     items = vor_map_items(items)
 
+    # Step 8 (T069 / S016-height-bucket): tag every item with its
+    # height_bucket key derived from the PDF filename's "\u043e\u0442\u043c."
+    # otmetka.  Per T065 recon Q1, the reference VOR groups every
+    # installation row into one of 4 buckets ("\u0434\u043e 5 \u043c.",
+    # "\u043e\u0442 5 \u0434\u043e 13 \u043c.", "\u043e\u0442 13 \u0434\u043e 20 \u043c.",
+    # "\u043e\u0442 20 \u0434\u043e 35 \u043c.") by the floor elevation
+    # encoded in the PDF title block.  When the filename carries no
+    # otmetka marker (e.g. 001 general-data sheets, 003/004 panel
+    # schematics) the bucket falls back to "unknown" so downstream
+    # vor_composer can still group those rows separately.
+    try:
+        height_bucketer.attribute_items(items, pdf_path)
+    except Exception as exc:
+        log.warning("height-bucket attribution failed for %s: %s", pdf_path, exc)
+
+    # Step 9 (T070 / S016-route-classify): tag every cable-trace item
+    # with route in {tray, pipe_hidden, pipe_open, unknown} and every
+    # luminaire item with mount in {wall, shpilka, anker, unknown}.
+    # Decision rules live in route_classifier; the call is idempotent
+    # so pre-tagged items (from a future per-symbol pipeline) are
+    # preserved.
+    try:
+        route_classifier.attribute_items(items)
+    except Exception as exc:
+        log.warning("route-classify attribution failed for %s: %s", pdf_path, exc)
+
+    # Step 10 (T072 / S016-thickness): extract dimensional metadata --
+    # cable cross_section (e.g. "3\u04451,5"), gofra diameter_mm, lotok
+    # width_mm x height_mm.  Reuses the cross-section regex hardened
+    # against KB-007 (Cyrillic \u0445 / Latin x / Unicode MULT \u00d7).
+    # Idempotent over reruns; pre-set fields are preserved.
+    try:
+        thickness_extractor.attribute_items(items)
+    except Exception as exc:
+        log.warning("thickness attribution failed for %s: %s", pdf_path, exc)
+
     return items
+
+
+# ---------------------------------------------------------------------------
+# 6c. Convert pipeline VorSection objects → flat aggregated list for UI
+# ---------------------------------------------------------------------------
+
+def _sections_to_aggregated(sections) -> list[dict]:
+    """Convert list of VorSection into flat list of dicts for the UI table."""
+    result = []
+    row_num = 1
+    for section in sections:
+        # Section header row
+        result.append({
+            "row": row_num,
+            "name": section.title,
+            "unit": "",
+            "total": "",
+            "formula": "",
+            "drawing_refs": "",
+            "extra_info": "",
+            "is_section_header": True,
+        })
+        row_num += 1
+        for row_data in section.rows:
+            result.append({
+                "row": row_num,
+                "name": row_data["name"],
+                "unit": row_data["unit"],
+                "total": row_data["qty"],
+                "formula": str(row_data["qty"]) if row_data.get("qty", 0) > 0 else "",
+                "drawing_refs": row_data.get("drawing_ref", ""),
+                "extra_info": "",
+                "is_section_header": False,
+                "is_material": row_data.get("is_material", False),
+            })
+            row_num += 1
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -1178,7 +1869,15 @@ def _count_equipment_in_pdf(pdf_path: str) -> list[dict]:
 
 @app.get("/api/folder/{folder_id}/process")
 async def api_folder_process(folder_id: str):
-    """Process all PDFs in a folder via SSE stream with progress."""
+    """Process all PDFs in a folder via SSE stream with progress.
+
+    Uses the full VOR pipeline (pdf_vor_pipeline.py) which:
+    - Parses specs (СО), plans, schemas, binding plans
+    - Builds height distribution ratios
+    - Generates proper VOR sections with materials
+    """
+    from pdf_vor_pipeline import generate_vor_from_pdfs, export_vor_xlsx, generate_vor_aggregated
+
     rel_folder = _id_to_folder(folder_id)
     if rel_folder is None:
         raise HTTPException(status_code=404, detail="Folder not found")
@@ -1186,61 +1885,75 @@ async def api_folder_process(folder_id: str):
     if not pdf_files:
         raise HTTPException(status_code=404, detail="No PDFs in folder")
 
+    if rel_folder.startswith("_uploads/"):
+        folder_path = UPLOADS_DIR / rel_folder[len("_uploads/"):]
+    elif rel_folder == "_uploads":
+        folder_path = UPLOADS_DIR
+    else:
+        folder_path = DATA_DIR / rel_folder
+
     async def event_stream():
-        all_results: dict[str, list[dict]] = {}
-        errors: list[dict] = []
         total = len(pdf_files)
         yield f"event: start\ndata: {json_mod.dumps({'total': total, 'folder': rel_folder}, ensure_ascii=False)}\n\n"
 
-        for i, pdf_path in enumerate(pdf_files):
-            filename = pdf_path.name
-            yield f"event: progress\ndata: {json_mod.dumps({'current': i + 1, 'total': total, 'filename': filename}, ensure_ascii=False)}\n\n"
-            try:
-                file_result = await asyncio.to_thread(
-                    _count_equipment_in_pdf, str(pdf_path)
-                )
-                all_results[filename] = file_result
-                yield f"event: file_done\ndata: {json_mod.dumps({'filename': filename, 'items': len(file_result), 'status': 'ok'}, ensure_ascii=False)}\n\n"
-            except Exception as e:
-                errors.append({"filename": filename, "error": str(e)})
-                yield f"event: file_done\ndata: {json_mod.dumps({'filename': filename, 'items': 0, 'status': 'error', 'error': str(e)}, ensure_ascii=False)}\n\n"
+        # Collect log messages from pipeline to stream as SSE events
+        log_messages: list[str] = []
+        step_count = 0
 
-        aggregated = _aggregate_equipment(all_results)
-        yield f"event: done\ndata: {json_mod.dumps({'aggregated': aggregated, 'files_processed': len(all_results), 'errors': errors, 'total_files': total}, ensure_ascii=False)}\n\n"
+        def pipeline_log(msg: str):
+            nonlocal step_count
+            log_messages.append(msg)
+            step_count += 1
+
+        # Run full VOR pipeline in a thread (CPU-bound) — single pass
+        try:
+            sections = await asyncio.to_thread(
+                generate_vor_from_pdfs, str(folder_path), pipeline_log
+            )
+        except Exception as e:
+            yield f"event: file_done\ndata: {json_mod.dumps({'filename': 'pipeline', 'items': 0, 'status': 'error', 'error': str(e), 'current': 1, 'total': 1}, ensure_ascii=False)}\n\n"
+            yield f"event: done\ndata: {json_mod.dumps({'aggregated': [], 'files_processed': 0, 'errors': [{'filename': 'pipeline', 'error': str(e)}], 'total_files': total}, ensure_ascii=False)}\n\n"
+            return
+
+        # Send log messages as progress events
+        for i, msg in enumerate(log_messages):
+            if msg.strip():
+                yield f"event: file_done\ndata: {json_mod.dumps({'filename': msg.strip()[:120], 'items': 0, 'status': 'ok', 'current': i + 1, 'total': len(log_messages)}, ensure_ascii=False)}\n\n"
+
+        # Build aggregated list from sections (for UI table)
+        aggregated = _sections_to_aggregated(sections)
+
+        # Save Excel to disk using pipeline's own export (proper formatting)
+        saved_filename = ""
+        try:
+            dest_dir = _vor_folder_for(rel_folder)
+            ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            xlsx_path = dest_dir / f"VOR_{ts}.xlsx"
+            export_vor_xlsx(sections, str(xlsx_path))
+            saved_filename = xlsx_path.name
+        except Exception:
+            # Fallback: build simple xlsx
+            try:
+                xlsx_bytes = _build_vor_xlsx(aggregated, rel_folder)
+                saved_path = _save_vor_xlsx(xlsx_bytes, rel_folder)
+                saved_filename = saved_path.name
+            except Exception:
+                pass
+
+        yield f"event: done\ndata: {json_mod.dumps({'aggregated': aggregated, 'files_processed': total, 'errors': [], 'total_files': total, 'xlsx_file': saved_filename}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ---------------------------------------------------------------------------
-# 6d. GET /api/folder/{folder_id}/export_xlsx — Excel VOR export
+# 6d. Helper: build VOR xlsx bytes from aggregated data
 # ---------------------------------------------------------------------------
 
-@app.get("/api/folder/{folder_id}/export_xlsx")
-async def api_folder_export_xlsx(folder_id: str):
-    """Generate and download VOR Excel file for a folder."""
+def _build_vor_xlsx(aggregated: list[dict], rel_folder: str) -> bytes:
+    """Build VOR Excel workbook and return raw bytes."""
     import openpyxl
     from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
-
-    rel_folder = _id_to_folder(folder_id)
-    if rel_folder is None:
-        raise HTTPException(status_code=404, detail="Folder not found")
-    pdf_files = _folder_files(rel_folder)
-    if not pdf_files:
-        raise HTTPException(status_code=404, detail="No PDFs in folder")
-
-    # Process all files using counting methods for actual quantities
-    all_results: dict[str, list[dict]] = {}
-    for pdf_path in pdf_files:
-        try:
-            file_result = await asyncio.to_thread(
-                _count_equipment_in_pdf, str(pdf_path)
-            )
-            all_results[pdf_path.name] = file_result
-        except Exception:
-            continue
-
-    aggregated = _aggregate_equipment(all_results)
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -1275,14 +1988,45 @@ async def api_folder_export_xlsx(folder_id: str):
 
     buf = io.BytesIO()
     wb.save(buf)
-    buf.seek(0)
+    return buf.getvalue()
 
-    folder_name = rel_folder.rsplit("/", 1)[-1] if "/" in rel_folder else rel_folder
-    safe_name = "".join(c if c.isalnum() or c in "._- " else "_" for c in folder_name)
 
-    return Response(content=buf.getvalue(),
+# ---------------------------------------------------------------------------
+# 6d. VOR file management: list saved files + download
+# ---------------------------------------------------------------------------
+
+@app.get("/api/folder/{folder_id}/vor_files")
+async def api_folder_vor_files(folder_id: str):
+    """List all saved VOR xlsx files for a folder."""
+    rel_folder = _id_to_folder(folder_id)
+    if rel_folder is None:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    return JSONResponse({"files": _list_vor_files(rel_folder)})
+
+
+@app.get("/api/folder/{folder_id}/vor_download/{filename}")
+async def api_folder_vor_download(folder_id: str, filename: str):
+    """Download a specific saved VOR xlsx file from disk."""
+    from urllib.parse import quote
+
+    rel_folder = _id_to_folder(folder_id)
+    if rel_folder is None:
+        raise HTTPException(status_code=404, detail="Folder not found")
+
+    # Sanitize filename — only allow VOR_*.xlsx pattern
+    if not filename.startswith("VOR_") or not filename.endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    file_path = _vor_folder_for(rel_folder) / filename
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Файл не найден")
+
+    xlsx_bytes = file_path.read_bytes()
+    encoded_name = quote(filename)
+
+    return Response(content=xlsx_bytes,
                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                   headers={"Content-Disposition": f'attachment; filename="VOR_{safe_name}.xlsx"'})
+                   headers={"Content-Disposition": f"attachment; filename=\"{filename}\"; filename*=UTF-8''{encoded_name}"})
 
 
 # ---------------------------------------------------------------------------
@@ -2285,6 +3029,61 @@ async def api_count_all(file_id: str):
     except Exception as e:
         errors["visual"] = str(e)
 
+    # Method E: Reverse label-to-legend channel (T060/B051)
+    # Per-file path mirror of the channel added by T058 in
+    # _count_equipment_in_pdf.  Picks up on-drawing colored engineer labels
+    # (e.g. blue PU6/PU7 for "Post upravleniya") that none of the
+    # text/visual stages covered, and attributes them to uncovered legend
+    # rows.  Without this, UI "Zapusk" button never surfaces symbol-less
+    # legend items even though _count_equipment_in_pdf does.
+    try:
+        t1 = time.time()
+        # Build covered_legend_idx from visual counts only.  This is
+        # intentionally a SIMPLER set than what _count_equipment_in_pdf
+        # builds at L1225-1300, because per-file results carry visual
+        # counts by symbol_index but not the visual/text reconciliation
+        # logic.  Reverse channel only fires for legend rows nothing else
+        # covered, so over-conservative covered_idx (only visual hits)
+        # produces at most one extra reverse_label row per family which
+        # is acceptable.
+        covered_legend_idx_pf: set[int] = set()
+        vis_counts_obj = results.get("visual", {}).get("counts") or {}
+        if isinstance(vis_counts_obj, dict):
+            for k, v in vis_counts_obj.items():
+                try:
+                    if int(v) > 0:
+                        covered_legend_idx_pf.add(int(k))
+                except (TypeError, ValueError):
+                    continue
+        # Run extraction + match
+        colored_words = await asyncio.to_thread(
+            _reverse_extract_colored_words, str(pdf_path), legend_page,
+        )
+        label_groups = await asyncio.to_thread(
+            _reverse_match_labels_to_legend,
+            colored_words, legend.items, covered_legend_idx_pf,
+        )
+        reverse_items = []
+        for idx, labels in label_groups.items():
+            try:
+                desc = legend.items[idx].description or ""
+            except (IndexError, AttributeError):
+                desc = f"legend[{idx}]"
+            reverse_items.append({
+                "legend_index": idx,
+                "name": desc,
+                "count": len(labels),
+                "source": "reverse_label_match",
+                "labels": labels,
+            })
+        results["reverse"] = {
+            "items": reverse_items,
+            "blue_words_total": len(colored_words),
+            "elapsed_s": round(time.time() - t1, 2),
+        }
+    except Exception as e:
+        errors["reverse"] = str(e)
+
     total_elapsed = round(time.time() - t0, 2)
 
     return JSONResponse(content={
@@ -2574,4 +3373,4 @@ async def api_count_stream(file_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("web_app:app", host="0.0.0.0", port=8050, reload=True)
+    uvicorn.run("web_app:app", host="0.0.0.0", port=8051, reload=False)
